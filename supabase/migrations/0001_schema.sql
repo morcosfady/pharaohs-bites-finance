@@ -41,7 +41,7 @@ create type delivery_method as enum ('delivery', 'pickup');
 create type delivery_provider as enum ('owner', 'uber', 'third_party', 'customer_pickup', 'other');
 create type delivery_status as enum ('not_started', 'scheduled', 'out_for_delivery', 'delivered', 'failed', 'picked_up');
 create type tax_status as enum ('taxable', 'nontaxable', 'review');
-create type customer_status as enum ('active', 'vip', 'blocked');
+create type customer_status as enum ('active', 'vip', 'trouble_maker', 'blocked');
 create type cost_type as enum ('direct_product', 'operating');
 create type order_source as enum ('website', 'manual', 'import');
 create type tax_filing_frequency as enum ('monthly', 'quarterly', 'annual');

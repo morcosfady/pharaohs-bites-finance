@@ -12,7 +12,7 @@ export type DeliveryMethod = "delivery" | "pickup";
 export type DeliveryProvider = "owner" | "uber" | "third_party" | "customer_pickup" | "other";
 export type DeliveryStatus = "not_started" | "scheduled" | "out_for_delivery" | "delivered" | "failed" | "picked_up";
 export type TaxStatus = "taxable" | "nontaxable" | "review";
-export type CustomerStatus = "active" | "vip" | "blocked";
+export type CustomerStatus = "active" | "vip" | "trouble_maker" | "blocked";
 export type CostType = "direct_product" | "operating";
 export type Num = number | string;
 

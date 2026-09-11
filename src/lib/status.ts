@@ -47,8 +47,9 @@ export const TAX_STATUSES: { value: TaxStatus; label: string; cls: string }[] = 
 
 export const CUSTOMER_STATUSES: { value: CustomerStatus; label: string; cls: string }[] = [
   { value: "active", label: "Active", cls: "bg-teal-100 text-teal-900" },
-  { value: "vip", label: "VIP", cls: "bg-gold-100 text-amber-900" },
-  { value: "blocked", label: "Blocked", cls: "bg-rose-100 text-rose-900" },
+  { value: "vip", label: "VIP", cls: "bg-emerald-100 text-emerald-900 ring-1 ring-emerald-400" },
+  { value: "trouble_maker", label: "Trouble maker", cls: "bg-red-100 text-red-800 ring-1 ring-red-400" },
+  { value: "blocked", label: "Blocked", cls: "bg-neutral-800 text-white" },
 ];
 
 export const UNITS = ["lb", "oz", "kg", "g", "gallon", "quart", "pint", "cup", "tbsp", "tsp", "ml", "l", "piece", "package"];

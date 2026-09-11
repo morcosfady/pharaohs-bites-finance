@@ -37,7 +37,7 @@ export function CustomersPage() {
   const filtered = rows.filter((r) => !q || r.search.includes(q.toLowerCase()));
   const lifetimeAll = rows.reduce((s, r) => s + r.lifetime, 0);
   const allCols: Column<Row>[] = [
-    { key: "name", header: "Customer", primary: true, render: (r) => <span><span className="font-medium">{r.name}</span> {advanced && <Badge className={cls(CUSTOMER_STATUSES, r.status)}>{label(CUSTOMER_STATUSES, r.status)}</Badge>}<span className="block text-xs text-charcoal/50">{r.phone}</span></span> },
+    { key: "name", header: "Customer", primary: true, render: (r) => <span><span className="font-medium">{r.name}</span> {r.status !== "active" && <Badge className={cls(CUSTOMER_STATUSES, r.status)}>{label(CUSTOMER_STATUSES, r.status)}</Badge>}<span className="block text-xs text-charcoal/50">{r.phone}</span></span> },
     { key: "address", header: "Address", mobile: false },
     { key: "orders", header: "Orders", numeric: true },
     { key: "lifetime", header: "Lifetime total", numeric: true, render: (r) => <b>{fmt(r.lifetime)}</b> },
@@ -92,7 +92,7 @@ export function CustomerDetailPage() {
       <div className="grid gap-4 lg:grid-cols-3">
         <Section title="Profile">
           <div className="mb-2 flex items-center gap-2"><Badge className={cls(CUSTOMER_STATUSES, cust.status)}>{label(CUSTOMER_STATUSES, cust.status)}</Badge>
-            <select className="input !min-h-9 !w-auto !py-1" value={cust.status} onChange={(e) => save(async () => unwrap(await supabase.from("customers").update({ status: e.target.value as CustomerStatus }).eq("id", cust.id).select("id")), "Status updated")}>{CUSTOMER_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select></div>
+            <select className={`input !min-h-9 !w-auto !py-1 font-medium ${cust.status === "vip" ? "!border-emerald-500 !text-emerald-800" : cust.status === "trouble_maker" ? "!border-red-500 !text-red-700" : cust.status === "blocked" ? "!border-neutral-800 !text-neutral-900" : ""}`} value={cust.status} onChange={(e) => save(async () => unwrap(await supabase.from("customers").update({ status: e.target.value as CustomerStatus }).eq("id", cust.id).select("id")), "Status updated")} aria-label="Customer status">{CUSTOMER_STATUSES.map((s) => <option key={s.value} value={s.value} style={{ color: s.value === "vip" ? "#16855B" : s.value === "trouble_maker" ? "#C64040" : undefined, fontWeight: s.value === "active" ? 400 : 600 }}>{s.label}</option>)}</select></div>
           <p className="text-sm">{cust.phone}{cust.email ? ` · ${cust.email}` : ""}</p>
           {a && <p className="mt-2 text-sm">{a.street}{a.apt ? `, ${a.apt}` : ""}<br />{a.city}, {a.state} {a.zip}{a.instructions && <span className="block text-xs text-charcoal/60">📝 {a.instructions}</span>}</p>}
           <dl className="mt-3 grid grid-cols-2 gap-y-1 text-sm">

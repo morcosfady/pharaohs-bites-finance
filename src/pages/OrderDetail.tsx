@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { MessageCircle, MapPin, Printer, Plus, Trash2 } from "lucide-react";
-import { useOrder, useProducts, useSettings, useWrite, useAudit } from "../hooks/queries";
+import { useOrder, useProducts, useSettings, useWrite, useAudit, useCustomer } from "../hooks/queries";
 import { PageHeader, Badge, Section, Skeleton, ErrorBox, Modal, Field, ConfirmDialog, useToast, EditButton } from "../components/ui";
-import { ORDER_STATUSES, PAYMENT_STATUSES, PAYMENT_METHODS, DELIVERY_PROVIDERS, DELIVERY_STATUSES, cls, label } from "../lib/status";
+import { ORDER_STATUSES, PAYMENT_STATUSES, PAYMENT_METHODS, DELIVERY_PROVIDERS, DELIVERY_STATUSES, CUSTOMER_STATUSES, cls, label } from "../lib/status";
 import { fmt, toCents, fromCents, pct } from "../lib/money";
 import { fmtDateTime } from "../lib/dates";
 import { waLink, mapsLink, fillTemplate } from "../lib/whatsapp";
@@ -23,6 +23,7 @@ export function OrderDetailPage() {
   const write = useWrite();
   const toast = useToast();
   const o = q.data;
+  const cust = useCustomer(o?.customer_id ?? undefined);
   const [confirm, setConfirm] = useState<{ title: string; body: string; run: () => Promise<void>; danger?: boolean } | null>(null);
   const [payOpen, setPayOpen] = useState(false);
   const [refundOpen, setRefundOpen] = useState(false);
@@ -169,7 +170,7 @@ export function OrderDetailPage() {
 
         <div className="space-y-4">
           <Section title="Customer" right={<EditButton small label="Edit customer & address" onClick={() => setEditCust(true)} />}>
-            <p className="font-medium">{o.customer_name}</p>
+            <p className="font-medium">{o.customer_name} {cust.data && cust.data.status !== "active" && <Badge className={cls(CUSTOMER_STATUSES, cust.data.status)}>{label(CUSTOMER_STATUSES, cust.data.status)}</Badge>}</p>
             <p className="text-sm">{o.customer_phone}</p>
             {o.delivery_method === "delivery" ? (
               <p className="mt-2 text-sm text-charcoal/80">{o.address_street}{o.address_apt ? `, ${o.address_apt}` : ""}<br />{o.address_city}, {o.address_state} {o.address_zip}</p>
