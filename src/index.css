@@ -42,7 +42,10 @@ h1, h2, h3 { @apply font-display; }
 .card-head { @apply flex items-center justify-between gap-3 px-5 pt-4 pb-2; }
 .card-title { @apply font-display text-lg font-semibold text-teal-900; }
 
-.btn { @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold; min-height: 44px; }
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold;
+  min-height: 44px;
+}
 .btn-primary { @apply btn bg-teal-800 text-ivory hover:bg-teal-700; }
 .btn-gold { @apply btn bg-gold text-teal-900 hover:bg-gold-soft; }
 .btn-ghost { @apply btn border border-ivory-200 bg-white text-teal-900 hover:bg-ivory-50; }

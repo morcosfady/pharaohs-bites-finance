@@ -770,3 +770,7 @@ from order_items oi
 join orders o on o.id = oi.order_id
 left join products p on p.id = oi.product_id
 where o.deleted_at is null;
+
+-- Realtime: the dashboard subscribes to order changes so a website order
+-- appears immediately. RLS still applies to what each subscriber receives.
+alter publication supabase_realtime add table orders;
