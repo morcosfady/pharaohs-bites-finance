@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { PageHeader, Section, Field, Skeleton, ErrorBox, useToast } from "../components/ui";
-import { useSettings, useWrite } from "../hooks/queries";
+import { useSettings, useWrite, useCategories, useExpenseCategories } from "../hooks/queries";
 import { ORDER_STATUSES, PAYMENT_METHODS, DELIVERY_PROVIDERS } from "../lib/status";
 import { supabase, unwrap } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
@@ -49,6 +49,7 @@ export function SettingsPage() {
           </div>
           <p className="mt-2 text-xs text-charcoal/50">These lists are fixed in the database schema so historical records stay consistent; ask your developer to add new values via a migration.</p>
         </Section>
+        <CategoryManager />
         <Section title="Account & security">
           <p className="text-sm">Signed in as <b>{adminName}</b> ({session?.user.email}).</p>
           <ul className="mt-2 list-disc pl-5 text-sm text-charcoal/70">
@@ -60,5 +61,43 @@ export function SettingsPage() {
         </Section>
       </div>
     </div>
+  );
+}
+
+function CategoryManager() {
+  const cats = useCategories(); const ecats = useExpenseCategories(); const write = useWrite(); const toast = useToast();
+  const [np, setNp] = useState(""); const [ne, setNe] = useState(""); const [neType, setNeType] = useState<"operating" | "direct_product">("operating");
+  const run = async (fn: () => Promise<unknown>, msg: string) => { try { await write.mutateAsync(fn); toast.push(msg); } catch (e) { toast.push((e as Error).message, "err"); } };
+  return (
+    <Section title="Categories">
+      <div className="grid gap-6 sm:grid-cols-2">
+        <div>
+          <p className="label">Product categories</p>
+          <ul className="divide-y divide-ivory-200 text-sm">
+            {(cats.data ?? []).map((c) => (
+              <li key={c.id} className="flex items-center gap-2 py-1.5">
+                <input className="input !min-h-9 !py-1" defaultValue={c.name} onBlur={(e) => e.target.value.trim() && e.target.value !== c.name && run(async () => unwrap(await supabase.from("product_categories").update({ name: e.target.value.trim() }).eq("id", c.id).select("id")), "Category renamed")} aria-label={`Rename ${c.name}`} />
+                <button className="btn-ghost btn-sm text-negative" onClick={() => run(async () => unwrap(await supabase.from("product_categories").delete().eq("id", c.id).select("id")), "Category removed")}>Remove</button>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-2 flex gap-2"><input className="input !min-h-9 !py-1" placeholder="New category" value={np} onChange={(e) => setNp(e.target.value)} /><button className="btn-primary btn-sm" disabled={!np.trim()} onClick={() => run(async () => unwrap(await supabase.from("product_categories").insert({ name: np.trim(), sort_order: (cats.data?.length ?? 0) + 1 }).select("id")), "Category added").then(() => setNp(""))}>Add</button></div>
+          <p className="mt-1 text-xs text-charcoal/50">Removing a category keeps its products; they just show no category until you pick another.</p>
+        </div>
+        <div>
+          <p className="label">Expense categories</p>
+          <ul className="divide-y divide-ivory-200 text-sm">
+            {(ecats.data ?? []).map((c) => (
+              <li key={c.id} className="flex items-center gap-2 py-1.5">
+                <input className="input !min-h-9 !py-1" defaultValue={c.name} onBlur={(e) => e.target.value.trim() && e.target.value !== c.name && run(async () => unwrap(await supabase.from("expense_categories").update({ name: e.target.value.trim() }).eq("id", c.id).select("id")), "Category renamed")} aria-label={`Rename ${c.name}`} />
+                <select className="input !min-h-9 !w-auto !py-1 text-xs" value={c.cost_type} onChange={(e) => run(async () => unwrap(await supabase.from("expense_categories").update({ cost_type: e.target.value }).eq("id", c.id).select("id")), "Category updated")} aria-label={`Cost type for ${c.name}`}><option value="direct_product">Direct</option><option value="operating">Operating</option></select>
+                <button className="btn-ghost btn-sm text-negative" onClick={() => run(async () => unwrap(await supabase.from("expense_categories").delete().eq("id", c.id).select("id")), "Category removed")}>Remove</button>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-2 flex gap-2"><input className="input !min-h-9 !py-1" placeholder="New category" value={ne} onChange={(e) => setNe(e.target.value)} /><select className="input !min-h-9 !w-auto !py-1 text-xs" value={neType} onChange={(e) => setNeType(e.target.value as "operating" | "direct_product")}><option value="direct_product">Direct</option><option value="operating">Operating</option></select><button className="btn-primary btn-sm" disabled={!ne.trim()} onClick={() => run(async () => unwrap(await supabase.from("expense_categories").insert({ name: ne.trim(), cost_type: neType, sort_order: (ecats.data?.length ?? 0) + 1 }).select("id")), "Category added").then(() => setNe(""))}>Add</button></div>
+        </div>
+      </div>
+    </Section>
   );
 }
