@@ -16,6 +16,13 @@ profitability, reports, insights and exports.
 > All tax figures are **estimates** to help set money aside. They do not
 > replace a tax professional or the Texas Comptroller.
 
+**Simple by default.** The dashboard opens in *Simple mode*: Home, Orders,
+Products, Expenses, Reports, Settings; four headline numbers; a
+New → Confirmed → Done order flow; short forms. *Settings → Advanced mode*
+reveals everything else (best sellers, customers, payments, deliveries, sales
+tax, insights, import/export, all 11 statuses, refunds, cost breakdowns, tax
+overrides, recipes, all reports).
+
 ---
 
 ## 1. Architecture

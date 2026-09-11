@@ -70,7 +70,7 @@ function afterWrite(table: string, before: Row | null, after: Row | null) {
   }
   if (table === "orders" && after) recalcOrder(after.id as string);
   if (table === "expenses" && after) after.total_amount = r2(n(after.amount_before_tax) + n(after.sales_tax_paid));
-  if (table === "recipes" || table === "ingredients") for (const p of store.products) recalcProduct(p.id as string);
+  if (table === "recipes" || table === "ingredients") for (const p of store.products) if (store.recipes.some((r) => r.product_id === p.id)) recalcProduct(p.id as string);
   if (["orders", "order_items", "payments", "refunds", "expenses", "products", "customers"].includes(table)) store.audit_logs.push({ id: store.audit_logs.length + 1, table_name: table, record_id: String(rec.id ?? ""), action: !before ? "INSERT" : !after ? "DELETE" : "UPDATE", changed_by: "demo", old_data: before, new_data: after, created_at: now() });
   persist();
 }

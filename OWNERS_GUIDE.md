@@ -3,6 +3,11 @@
 Sign in at **https://morcosfady.github.io/pharaohs-bites-finance/** with the
 email and password created for you in Supabase. Nobody else can register.
 
+## Simple or advanced
+The dashboard starts simple: six tabs and a New → Confirmed → Done order flow.
+When you want more (refunds, deliveries, best sellers, sales-tax periods,
+recipes…), open **Settings**, tick **Advanced mode** and save.
+
 ## Confirm an order
 1. A new website order shows up in **Orders** as *Pending WhatsApp Confirmation*
    (the bell icon and the Orders badge count them).

@@ -54,9 +54,9 @@ describe("dashboard rendering", () => {
   it("shows KPI cards with formulas and never counts tax as sales", async () => {
     auth.session = { user: { id: "u", email: "o@x" } }; auth.isAdmin = true;
     mount("/");
-    expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
-    expect(screen.getByText("Net sales")).toBeInTheDocument();
-    expect(screen.getByText("Sales tax collected")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Home" })).toBeInTheDocument();
+    expect(screen.getByText("Sales")).toBeInTheDocument();
+    expect(screen.getByText("Sales tax to set aside")).toBeInTheDocument();
   });
   it("order detail shows the WhatsApp and Maps links and status workflow", async () => {
     auth.session = { user: { id: "u", email: "o@x" } }; auth.isAdmin = true;

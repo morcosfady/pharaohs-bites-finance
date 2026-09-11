@@ -11,6 +11,7 @@ import { fmtDateTime, inRange } from "../lib/dates";
 import type { Order, OrderItem } from "../lib/types";
 import { supabase, unwrap } from "../lib/supabase";
 import { downloadText, toCsv } from "../lib/csv";
+import { useAdvanced } from "../hooks/useMode";
 
 type Row = Order & { cost: number; profit: number; balance: number; search: string };
 
@@ -25,6 +26,7 @@ export function OrdersPage() {
   const cats = useCategories();
   const [q, setQ] = useState("");
   const [newOpen, setNewOpen] = useState(false);
+  const advanced = useAdvanced();
   const f = {
     status: sp.get("status") ?? "", payment: sp.get("payment") ?? "", method: sp.get("method") ?? "", product: sp.get("product") ?? "",
     category: sp.get("category") ?? "", delivery: sp.get("delivery") ?? "", tax: sp.get("tax") ?? "", profit: sp.get("profit") ?? "", all: sp.get("all") === "1",
@@ -60,7 +62,7 @@ export function OrdersPage() {
     return true;
   }), [rows, f, range, q, products.data]);
 
-  const cols: Column<Row>[] = [
+  const allCols: Column<Row>[] = [
     { key: "order_number", header: "Order #", primary: true, render: (o) => <span className="font-mono text-xs font-medium text-teal-800">{o.order_number}</span> },
     { key: "created_at", header: "Date", render: (o) => fmtDateTime(o.created_at), sortValue: (o) => o.created_at },
     { key: "customer_name", header: "Customer", render: (o) => <span>{o.customer_name}<span className="block text-xs text-charcoal/50">{o.customer_phone}</span></span> },
@@ -78,6 +80,8 @@ export function OrdersPage() {
     { key: "payment_method", header: "Method", mobile: false, render: (o) => label(PAYMENT_METHODS, o.payment_method) },
     { key: "delivery_method", header: "Fulfilment", mobile: false, render: (o) => o.delivery_method === "delivery" ? "Delivery" : "Pickup" },
   ];
+  const SIMPLE = ["order_number", "created_at", "customer_name", "status", "payment_status", "total", "balance"];
+  const cols = advanced ? allCols : allCols.filter((c) => SIMPLE.includes(c.key));
 
   const exportCsv = () => downloadText(`orders-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(filtered.map((o) => ({
     order_number: o.order_number, date: o.created_at, customer: o.customer_name, phone: o.customer_phone, status: o.status, payment_status: o.payment_status,
@@ -98,12 +102,14 @@ export function OrdersPage() {
         <input className="input !min-h-9 !py-1 sm:!w-64" placeholder="Search order #, name, phone, address" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search orders" />
         <select className={sel} value={f.status} onChange={(e) => set("status", e.target.value)} aria-label="Order status"><option value="">Any status</option>{ORDER_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
         <select className={sel} value={f.payment} onChange={(e) => set("payment", e.target.value)} aria-label="Payment status"><option value="">Any payment</option>{PAYMENT_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
+        {advanced && <>
         <select className={sel} value={f.method} onChange={(e) => set("method", e.target.value)} aria-label="Payment method"><option value="">Any method</option>{PAYMENT_METHODS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
         <select className={sel} value={f.product} onChange={(e) => set("product", e.target.value)} aria-label="Product"><option value="">Any product</option>{(products.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
         <select className={sel} value={f.category} onChange={(e) => set("category", e.target.value)} aria-label="Category"><option value="">Any category</option>{(cats.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
         <select className={sel} value={f.delivery} onChange={(e) => set("delivery", e.target.value)} aria-label="Fulfilment"><option value="">Delivery or pickup</option><option value="delivery">Delivery</option><option value="pickup">Pickup</option></select>
         <select className={sel} value={f.tax} onChange={(e) => set("tax", e.target.value)} aria-label="Tax"><option value="">Taxable or not</option><option value="taxable">Taxable</option><option value="nontaxable">Nontaxable</option></select>
         <select className={sel} value={f.profit} onChange={(e) => set("profit", e.target.value)} aria-label="Profitability"><option value="">Any profitability</option><option value="profitable">Profitable</option><option value="unprofitable">Unprofitable</option></select>
+        </>}
         <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={f.all} onChange={(e) => set("all", e.target.checked ? "1" : "")} /> ignore date range</label>
       </div>
       {orders.error && <ErrorBox error={orders.error} />}

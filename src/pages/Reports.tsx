@@ -9,6 +9,7 @@ import { computeKpis, rankProducts, REVENUE_STATUSES, type Kpis } from "../lib/m
 import { fmt, fromCents, toCents, pct, change, sum } from "../lib/money";
 import { downloadText, toCsv } from "../lib/csv";
 import { PAYMENT_METHODS, label } from "../lib/status";
+import { useAdvanced } from "../hooks/useMode";
 
 const REPORTS = [
   ["sales", "Sales summary (daily / weekly / monthly / quarterly / annual)"], ["pnl", "Profit & loss"], ["products", "Product profitability & best sellers"],
@@ -21,6 +22,7 @@ export function ReportsPage() {
   const prev = useMemo(() => previousRange(range), [range]);
   const [key, setKey] = useState<Key>("sales");
   const settings = useSettings();
+  const advanced = useAdvanced();
   const includeLabor = settings.data?.include_owner_labor ?? false;
   const cur = { orders: useOrderFinancials(range), expenses: useExpenses(range), payments: usePayments(range), refunds: useRefunds(range), sales: useProductSales(range) };
   const pre = { orders: useOrderFinancials(prev), expenses: useExpenses(prev), payments: usePayments(prev), refunds: useRefunds(prev) };
@@ -59,7 +61,7 @@ export function ReportsPage() {
     <div>
       <PageHeader title="Reports" crumbs={["Home", "Reports"]} actions={<><button className="btn-ghost btn-sm no-print" onClick={exportCurrent}><Download size={16} /> CSV</button><button className="btn-ghost btn-sm no-print" onClick={() => window.print()}><Printer size={16} /> Print / PDF</button></>} />
       <div className="no-print"><DateRangeBar range={range} onChange={setRange} /></div>
-      <div className="no-print mb-4 flex flex-wrap gap-1">{REPORTS.map(([kk, l]) => <button key={kk} onClick={() => setKey(kk)} className={`rounded-full px-3 py-1.5 text-xs font-medium ${key === kk ? "bg-teal-800 text-ivory" : "bg-white text-teal-900 ring-1 ring-ivory-200"}`}>{l.split(" (")[0]}</button>)}</div>
+      <div className="no-print mb-4 flex flex-wrap gap-1">{REPORTS.filter(([kk]) => advanced || ["sales", "pnl", "products", "tax"].includes(kk)).map(([kk, l]) => <button key={kk} onClick={() => setKey(kk)} className={`rounded-full px-3 py-1.5 text-xs font-medium ${key === kk ? "bg-teal-800 text-ivory" : "bg-white text-teal-900 ring-1 ring-ivory-200"}`}>{l.split(" (")[0]}</button>)}</div>
       <p className="mb-3 hidden print:block">Period: {range.from.toLocaleDateString()} – {range.to.toLocaleDateString()}</p>
       {error && <ErrorBox error={error} />}
       {loading || !k || !p ? <Skeleton rows={8} className="card p-5" /> : (

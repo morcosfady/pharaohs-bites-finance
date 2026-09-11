@@ -10,6 +10,7 @@ import { fromCents, toCents, fmt, sum } from "../lib/money";
 import { buildInsights } from "../lib/insights";
 import { ORDER_STATUSES, cls, label } from "../lib/status";
 import { fmtDateTime } from "../lib/dates";
+import { useAdvanced } from "../hooks/useMode";
 
 const COLORS = ["#0F4C4C", "#D4A72C", "#146060", "#E7C76A", "#1c7575", "#8c6239", "#083838", "#b8912e"];
 
@@ -18,6 +19,7 @@ export function DashboardPage() {
   const prev = useMemo(() => previousRange(range), [range]);
   const settings = useSettings();
   const taxS = useTaxSettings();
+  const advanced = useAdvanced();
   const cur = { orders: useOrderFinancials(range), expenses: useExpenses(range), payments: usePayments(range), refunds: useRefunds(range), sales: useProductSales(range) };
   const pre = { orders: useOrderFinancials(prev), expenses: useExpenses(prev), payments: usePayments(prev), refunds: useRefunds(prev), sales: useProductSales(prev) };
   const adj = useTaxAdjustments();
@@ -75,7 +77,7 @@ export function DashboardPage() {
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-        <h1 className="font-display text-2xl font-semibold text-teal-900 md:text-3xl">Dashboard</h1>
+        <h1 className="font-display text-2xl font-semibold text-teal-900 md:text-3xl">{advanced ? "Dashboard" : "Home"}</h1>
         <Link to="/orders" className="btn-gold btn-sm">Review orders</Link>
       </div>
       <DateRangeBar range={range} onChange={setRange} />
@@ -83,16 +85,16 @@ export function DashboardPage() {
       {loading || !k ? <Skeleton rows={6} className="card p-5" /> : (
         <>
           {/* headline KPIs */}
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
-            <KpiCard label="Net sales" value={k.netSales} prev={p?.netSales} formula={KPI_FORMULAS.netSales} spark={series.map((s) => s.revenue)} />
-            <KpiCard label="Est. net profit" value={k.netProfit} prev={p?.netProfit} formula={KPI_FORMULAS.netProfit} spark={series.map((s) => s.profit)} />
-            <KpiCard label="Completed orders" value={k.completedOrders} prev={p?.completedOrders} kind="int" spark={series.map((s) => s.orders)} />
-            <KpiCard label="Pending orders" value={k.pendingOrders} prev={p?.pendingOrders} kind="int" invert />
-            <KpiCard label="Avg order value" value={k.avgOrderValue} prev={p?.avgOrderValue} formula={KPI_FORMULAS.avgOrderValue} />
-            <KpiCard label="Outstanding balance" value={k.outstandingBalance} prev={p?.outstandingBalance} invert formula={KPI_FORMULAS.outstandingBalance} />
+          <div className={`grid grid-cols-2 gap-3 ${advanced ? "md:grid-cols-4 xl:grid-cols-6" : "md:grid-cols-4"}`}>
+            <KpiCard label="Sales" value={k.netSales} prev={p?.netSales} formula={KPI_FORMULAS.netSales} spark={series.map((s) => s.revenue)} />
+            <KpiCard label="Profit" value={k.netProfit} prev={p?.netProfit} formula={KPI_FORMULAS.netProfit} spark={series.map((s) => s.profit)} />
+            <KpiCard label="Orders completed" value={k.completedOrders} prev={p?.completedOrders} kind="int" spark={series.map((s) => s.orders)} />
+            <KpiCard label="Money still owed" value={k.outstandingBalance} prev={p?.outstandingBalance} invert formula={KPI_FORMULAS.outstandingBalance} />
+            {advanced && <KpiCard label="Pending orders" value={k.pendingOrders} prev={p?.pendingOrders} kind="int" invert />}
+            {advanced && <KpiCard label="Avg order value" value={k.avgOrderValue} prev={p?.avgOrderValue} formula={KPI_FORMULAS.avgOrderValue} />}
           </div>
 
-          <details className="group mt-3" open>
+          {advanced && <details className="group mt-3">
             <summary className="cursor-pointer list-none text-sm font-medium text-teal-900/70 hover:text-teal-900">All metrics <span className="text-xs">(click to collapse)</span></summary>
             <div className="mt-2 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
               <KpiCard label="Gross sales" value={k.grossSales} prev={p?.grossSales} formula={KPI_FORMULAS.grossSales} />
@@ -114,7 +116,12 @@ export function DashboardPage() {
               <KpiCard label="Avg profit / order" value={k.avgProfitPerOrder} prev={p?.avgProfitPerOrder} formula={KPI_FORMULAS.avgProfitPerOrder} />
               <KpiCard label="Est. sales-tax liability" value={k.taxLiability} prev={p?.taxLiability} invert formula={KPI_FORMULAS.taxLiability} />
             </div>
-          </details>
+          </details>}
+          {!advanced && <div className="mt-3 grid grid-cols-3 gap-3">
+            <KpiCard label="Sales tax to set aside" value={k.taxCollected} formula={KPI_FORMULAS.taxCollected} />
+            <KpiCard label="Cost of food & packaging" value={k.cogs} formula={KPI_FORMULAS.cogs} invert />
+            <KpiCard label="Other expenses" value={k.operatingExpenses + k.processingFees + k.deliveryCost} formula="Operating expenses + payment fees + delivery costs in this period." invert />
+          </div>}
 
           <div className="mt-4 grid gap-4 lg:grid-cols-3">
             <Section title="Revenue & profit over time" className="lg:col-span-2">
@@ -131,7 +138,7 @@ export function DashboardPage() {
                 </ResponsiveContainer>
               )}
             </Section>
-            <Section title="Insights" right={<Link to="/insights" className="text-xs text-teal-700 hover:underline">All insights</Link>}>
+            <Section title="What to know" right={advanced ? <Link to="/insights" className="text-xs text-teal-700 hover:underline">All insights</Link> : undefined}>
               {insights.length === 0 ? <p className="text-sm text-charcoal/60">Nothing to flag for this period.</p> : (
                 <ul className="space-y-2 text-sm">
                   {insights.map((i, n) => (
@@ -144,8 +151,8 @@ export function DashboardPage() {
             </Section>
           </div>
 
-          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Section title="Top products (net revenue)">
+          <div className={`mt-4 grid gap-4 md:grid-cols-2 ${advanced ? "xl:grid-cols-4" : ""}`}>
+            <Section title="Top products">
               {products.length === 0 ? <p className="text-sm text-charcoal/60">No sales yet.</p> : (
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={products.slice(0, 6).map((x) => ({ name: x.name.split(" ").slice(0, 2).join(" "), value: fromCents(x.net) }))} layout="vertical" margin={{ left: 8 }}>
@@ -155,12 +162,12 @@ export function DashboardPage() {
                 </ResponsiveContainer>
               )}
             </Section>
-            <Section title="Orders by status">
+            {advanced && <Section title="Orders by status">
               {byStatus.length === 0 ? <p className="text-sm text-charcoal/60">No orders.</p> : <Donut data={byStatus} />}
-            </Section>
-            <Section title="Payments by method">
+            </Section>}
+            {advanced && <Section title="Payments by method">
               {byMethod.length === 0 ? <p className="text-sm text-charcoal/60">No payments in this period.</p> : <Donut data={byMethod} money />}
-            </Section>
+            </Section>}
             <Section title="Expenses by category">
               {expByCat.length === 0 ? <p className="text-sm text-charcoal/60">No expenses in this period.</p> : <Donut data={expByCat} money />}
             </Section>

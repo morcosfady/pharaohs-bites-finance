@@ -22,7 +22,7 @@ export interface BusinessSettings {
   id: number; business_name: string; owner_name: string; address: string; phone: string; whatsapp_number: string;
   email: string; logo_url: string; currency: string; timezone: string; order_number_prefix: string;
   default_delivery_rate_per_mile: Num; default_mileage_cost_per_mile: Num; default_labor_rate_per_hour: Num;
-  include_owner_labor: boolean; low_margin_warning_pct: Num; minimum_order_amount: Num;
+  include_owner_labor: boolean; advanced_mode: boolean; low_margin_warning_pct: Num; minimum_order_amount: Num;
   default_whatsapp_message: string; cancellation_rules: string; updated_at: string;
 }
 

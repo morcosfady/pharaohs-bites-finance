@@ -100,6 +100,7 @@ create table business_settings (
   default_mileage_cost_per_mile  numeric(8,2) not null default 0.67,
   default_labor_rate_per_hour    numeric(8,2) not null default 15.00,
   include_owner_labor       boolean not null default false,
+  advanced_mode             boolean not null default false,   -- UI: show every tab/field, or the simple set
   low_margin_warning_pct    numeric(7,4) not null default 0.30,
   minimum_order_amount      numeric(12,2) not null default 20.00,
   default_whatsapp_message  text not null default 'Hi {name}, this is Pharaoh''s Bites about order {order_number}. Your delivery fee is {delivery_fee} and the final total is {total}. Please confirm and we will start baking!',
@@ -258,12 +259,17 @@ declare
   v_labor numeric;
   v_rate numeric;
 begin
-  select coalesce(sum(recipe_line_cost(r.quantity, r.unit, i.package_size, i.package_unit, i.package_price, greatest(r.waste_pct, i.waste_pct))), 0)
-    into v_ing
-  from recipes r join ingredients i on i.id = r.ingredient_id
-  where r.product_id = p_product_id and i.deleted_at is null;
-
-  update products set ingredient_cost = v_ing where id = p_product_id returning * into v_p;
+  -- Products without recipe lines keep the ingredient cost typed by hand.
+  if exists (select 1 from recipes where product_id = p_product_id) then
+    select coalesce(sum(recipe_line_cost(r.quantity, r.unit, i.package_size, i.package_unit, i.package_price, greatest(r.waste_pct, i.waste_pct))), 0)
+      into v_ing
+    from recipes r join ingredients i on i.id = r.ingredient_id
+    where r.product_id = p_product_id and i.deleted_at is null;
+    update products set ingredient_cost = v_ing where id = p_product_id returning * into v_p;
+  else
+    select * into v_p from products where id = p_product_id;
+    v_ing := v_p.ingredient_cost;
+  end if;
   select default_labor_rate_per_hour into v_rate from business_settings where id = 1;
   v_labor := round(v_p.labor_minutes / 60.0 * coalesce(v_rate, 0), 4);
 

@@ -11,6 +11,7 @@ import { productUnitCost, REVENUE_STATUSES } from "../lib/metrics";
 import { supabase, unwrap } from "../lib/supabase";
 import { format } from "date-fns";
 import type { Ingredient } from "../lib/types";
+import { useAdvanced } from "../hooks/useMode";
 
 /** Mirrors unit_to_base() in the database so the UI preview matches. */
 const BASE: Record<string, number> = { g: 1, kg: 1000, oz: 28.3495, lb: 453.592, ml: 1, l: 1000, tsp: 4.92892, tbsp: 14.7868, cup: 236.588, pint: 473.176, quart: 946.353, gallon: 3785.41, piece: 1, package: 1 };
@@ -28,7 +29,7 @@ export function ProductDetailPage() {
   const cats = useCategories();
   const settings = useSettings();
   const sales = useProductSalesFor(id);
-  const write = useWrite(); const toast = useToast();
+  const write = useWrite(); const toast = useToast(); const advanced = useAdvanced();
   const [edit, setEdit] = useState(false);
   const [addIng, setAddIng] = useState(false);
   const [newIng, setNewIng] = useState(false);
@@ -77,8 +78,8 @@ export function ProductDetailPage() {
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <Section title="Recipe & ingredient cost" right={<div className="flex gap-2"><button className="btn-ghost btn-sm" onClick={() => setNewIng(true)}>New ingredient</button><button className="btn-gold btn-sm" onClick={() => setAddIng(true)}><Plus size={14} /> Add to recipe</button></div>}>
-          {recipes.isLoading ? <Skeleton /> : (recipes.data ?? []).length === 0 ? <p className="text-sm text-charcoal/60">No recipe lines yet. Add ingredients to calculate the cost per unit.</p> : (
+        <Section title={advanced ? "Recipe & ingredient cost" : "Ingredient cost"} right={<div className="flex gap-2">{(advanced || (recipes.data ?? []).length > 0) && <><button className="btn-ghost btn-sm" onClick={() => setNewIng(true)}>New ingredient</button><button className="btn-gold btn-sm" onClick={() => setAddIng(true)}><Plus size={14} /> Add to recipe</button></>}</div>}>
+          {recipes.isLoading ? <Skeleton /> : (recipes.data ?? []).length === 0 ? <p className="text-sm text-charcoal/60">Ingredient cost per unit: <b>{fmt(toCents(prod.ingredient_cost))}</b> (typed on <button className="text-teal-700 underline" onClick={() => setEdit(true)}>Edit product</button>).{advanced ? " Or add ingredients below to calculate it from a recipe." : ""}</p> : (
             <div className="table-wrap"><table className="table !min-w-0">
               <thead><tr><th>Ingredient</th><th className="num">Used</th><th className="num">Package</th><th className="num">Waste</th><th className="num">Cost</th><th></th></tr></thead>
               <tbody>{(recipes.data ?? []).map((r) => {
@@ -114,7 +115,7 @@ export function ProductDetailPage() {
         </Section>
       </div>
 
-      <ProductModal key={String(edit)} open={edit} onClose={() => setEdit(false)} categories={cats.data ?? []} product={prod} />
+      <ProductModal key={String(edit)} open={edit} onClose={() => setEdit(false)} categories={cats.data ?? []} product={prod} hasRecipe={(recipes.data ?? []).length > 0} />
       <AddRecipeModal open={addIng} onClose={() => setAddIng(false)} productId={prod.id} ingredients={ingredients.data ?? []} onSave={save} />
       <IngredientModal open={newIng} onClose={() => setNewIng(false)} onSave={save} />
       <ConfirmDialog open={del} title="Archive this product?" body="It is hidden from the catalogue and the website cannot order it. Sales history is kept." danger confirmLabel="Archive" onCancel={() => setDel(false)} onConfirm={async () => { setDel(false); await save(async () => unwrap(await supabase.from("products").update({ deleted_at: new Date().toISOString(), is_active: false }).eq("id", prod.id).select("id")), "Product archived"); }} />

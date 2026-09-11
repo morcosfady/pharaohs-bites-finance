@@ -2,29 +2,32 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { LayoutDashboard, ShoppingBag, Package, BarChart3, Users, Receipt, CreditCard, Truck, FileText, Percent, Settings, Database, LogOut, Menu, Bell, X, Lightbulb } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import { useAdvanced } from "../hooks/useMode";
 import { useQueryClient } from "@tanstack/react-query";
 import { subscribeOrders, useOrders, useTaxSettings } from "../hooks/queries";
 import { differenceInCalendarDays } from "date-fns";
 
 const NAV = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/", label: "Home", icon: LayoutDashboard, end: true },
   { to: "/orders", label: "Orders", icon: ShoppingBag },
   { to: "/products", label: "Products", icon: Package },
-  { to: "/performance", label: "Product Performance", icon: BarChart3 },
-  { to: "/customers", label: "Customers", icon: Users },
   { to: "/expenses", label: "Expenses", icon: Receipt },
-  { to: "/payments", label: "Payments", icon: CreditCard },
-  { to: "/deliveries", label: "Deliveries", icon: Truck },
   { to: "/reports", label: "Reports", icon: FileText },
-  { to: "/tax", label: "Sales Tax", icon: Percent },
-  { to: "/insights", label: "Insights", icon: Lightbulb },
-  { to: "/data", label: "Import / Export", icon: Database },
+  { to: "/performance", label: "Best Sellers", icon: BarChart3, advanced: true },
+  { to: "/customers", label: "Customers", icon: Users, advanced: true },
+  { to: "/payments", label: "Payments", icon: CreditCard, advanced: true },
+  { to: "/deliveries", label: "Deliveries", icon: Truck, advanced: true },
+  { to: "/tax", label: "Sales Tax", icon: Percent, advanced: true },
+  { to: "/insights", label: "Insights", icon: Lightbulb, advanced: true },
+  { to: "/data", label: "Import / Export", icon: Database, advanced: true },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 const MOBILE = ["/", "/orders", "/products", "/expenses", "/reports"];
 
 export function Layout() {
   const { adminName, signOut } = useAuth();
+  const advanced = useAdvanced();
+  const items = NAV.filter((n) => advanced || !n.advanced);
   const [open, setOpen] = useState(false);
   const loc = useLocation();
   const qc = useQueryClient();
@@ -43,12 +46,13 @@ export function Layout() {
 
   const nav = (
     <nav className="flex flex-col gap-0.5 p-3">
-      {NAV.map((n) => (
+      {items.map((n) => (
         <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${isActive ? "bg-gold/15 font-medium text-gold-soft" : "text-ivory/75 hover:bg-white/5 hover:text-ivory"}`}>
           <n.icon size={18} /> {n.label}
           {n.to === "/orders" && pending > 0 && <span className="ml-auto rounded-full bg-gold px-2 py-0.5 text-[10px] font-semibold text-teal-900">{pending}</span>}
         </NavLink>
       ))}
+      {!advanced && <NavLink to="/settings" className="mt-2 rounded-lg px-3 py-2 text-[11px] uppercase tracking-wider text-ivory/40 hover:text-ivory/70">More tools: turn on Advanced in Settings</NavLink>}
     </nav>
   );
 
@@ -106,7 +110,7 @@ export function Layout() {
         <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-ivory-200 bg-white/95 backdrop-blur md:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
           {NAV.filter((n) => MOBILE.includes(n.to)).map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => `flex flex-col items-center gap-0.5 py-2 text-[10px] ${isActive ? "text-teal-800" : "text-charcoal/50"}`}>
-              <n.icon size={20} />{n.label === "Dashboard" ? "Home" : n.label}
+              <n.icon size={20} />{n.label}
             </NavLink>
           ))}
         </nav>

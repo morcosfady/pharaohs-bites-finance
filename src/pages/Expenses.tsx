@@ -10,6 +10,7 @@ import { fmtDate, toInputDate } from "../lib/dates";
 import { supabase, unwrap } from "../lib/supabase";
 import { downloadText, toCsv } from "../lib/csv";
 import type { Expense, PaymentMethod } from "../lib/types";
+import { useAdvanced } from "../hooks/useMode";
 
 type Row = Expense & { category: string; [k: string]: unknown };
 
@@ -19,11 +20,12 @@ export function ExpensesPage() {
   const cats = useExpenseCategories();
   const [edit, setEdit] = useState<Expense | null | "new">(null);
   const [del, setDel] = useState<Expense | null>(null);
+  const advanced = useAdvanced();
   const write = useWrite(); const toast = useToast();
   const rows = useMemo<Row[]>(() => (expenses.data ?? []).map((e) => ({ ...e, category: e.expense_categories?.name ?? "—" })), [expenses.data]);
   const total = sum(rows.map((r) => toCents(r.total_amount)));
   const direct = sum(rows.filter((r) => r.cost_type === "direct_product").map((r) => toCents(r.total_amount)));
-  const cols: Column<Row>[] = [
+  const allCols: Column<Row>[] = [
     { key: "expense_date", header: "Date", render: (r) => fmtDate(r.expense_date) },
     { key: "vendor", header: "Vendor", primary: true, render: (r) => <span><span className="font-medium">{r.vendor || "—"}</span><span className="block text-xs text-charcoal/50">{r.description}</span></span> },
     { key: "category", header: "Category" },
@@ -35,6 +37,7 @@ export function ExpensesPage() {
     { key: "receipt_path", header: "Receipt", render: (r) => r.receipt_path ? <button className="text-teal-700 hover:underline" onClick={async (ev) => { ev.stopPropagation(); const { data } = await supabase.storage.from("receipts").createSignedUrl(r.receipt_path, 300); if (data?.signedUrl) window.open(data.signedUrl, "_blank"); }}><Paperclip size={14} /></button> : "" },
     { key: "recurrence", header: "Recurring", mobile: false, render: (r) => r.recurrence === "none" ? "" : r.recurrence },
   ];
+  const cols = advanced ? allCols : allCols.filter((c) => ["expense_date", "vendor", "category", "total_amount", "receipt_path"].includes(c.key));
   return (
     <div>
       <PageHeader title="Expenses" crumbs={["Home", "Expenses"]} actions={<>
@@ -42,7 +45,7 @@ export function ExpensesPage() {
         <button className="btn-gold btn-sm" onClick={() => setEdit("new")}><Plus size={16} /> Add expense</button>
       </>} />
       <DateRangeBar range={range} onChange={setRange} />
-      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4"><KpiCard label="Total expenses" value={total} /><KpiCard label="Direct product costs" value={direct} /><KpiCard label="Operating expenses" value={total - direct} /><KpiCard label="Entries" value={rows.length} kind="int" /></div>
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4"><KpiCard label="Total expenses" value={total} />{advanced && <><KpiCard label="Direct product costs" value={direct} /><KpiCard label="Operating expenses" value={total - direct} /></>}<KpiCard label="Entries" value={rows.length} kind="int" /></div>
       {expenses.error && <ErrorBox error={expenses.error} />}
       {expenses.isLoading ? <Skeleton rows={8} className="card p-5" /> : <DataTable rows={rows} columns={cols} rowKey={(r) => r.id} onRowClick={(r) => setEdit(r)} initialSort={{ key: "expense_date", dir: "desc" }} />}
       {edit && <ExpenseModal expense={edit === "new" ? undefined : edit} categories={cats.data ?? []} onClose={() => setEdit(null)} onDelete={(e) => { setEdit(null); setDel(e); }} />}
@@ -53,7 +56,7 @@ export function ExpensesPage() {
 
 export function ExpenseModal({ expense, categories, onClose, onDelete }: { expense?: Expense; categories: { id: string; name: string; cost_type: string }[]; onClose: () => void; onDelete?: (e: Expense) => void }) {
   const products = useProducts();
-  const write = useWrite(); const toast = useToast();
+  const write = useWrite(); const toast = useToast(); const advanced = useAdvanced();
   const [f, setF] = useState({ expense_date: expense?.expense_date ?? toInputDate(new Date()), vendor: expense?.vendor ?? "", category_id: expense?.category_id ?? "", description: expense?.description ?? "", amount_before_tax: Number(expense?.amount_before_tax ?? 0), sales_tax_paid: Number(expense?.sales_tax_paid ?? 0), payment_method: expense?.payment_method ?? "card", cost_type: expense?.cost_type ?? "operating", product_id: expense?.product_id ?? "", order_id: expense?.order_id ?? "", notes: expense?.notes ?? "", recurrence: expense?.recurrence ?? "none" });
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -83,16 +86,22 @@ export function ExpenseModal({ expense, categories, onClose, onDelete }: { expen
         <Field label="Date"><input className="input" type="date" value={f.expense_date} onChange={u("expense_date")} /></Field>
         <Field label="Vendor"><input className="input" value={f.vendor} onChange={u("vendor")} /></Field>
         <Field label="Category"><select className="input" value={f.category_id} onChange={u("category_id")}><option value="">—</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
-        <Field label="Cost type" hint="Direct product costs feed COGS; operating expenses reduce net profit."><select className="input" value={f.cost_type} onChange={u("cost_type")}><option value="direct_product">Direct product cost</option><option value="operating">Operating expense</option></select></Field>
-        <Field label="Amount before tax"><input className="input" type="number" step="0.01" min="0" value={f.amount_before_tax} onChange={u("amount_before_tax")} /></Field>
-        <Field label="Sales tax paid" hint={`Total: ${fmt(toCents(f.amount_before_tax) + toCents(f.sales_tax_paid))}`}><input className="input" type="number" step="0.01" min="0" value={f.sales_tax_paid} onChange={u("sales_tax_paid")} /></Field>
+        {advanced ? <>
+          <Field label="Cost type" hint="Direct product costs feed COGS; operating expenses reduce net profit."><select className="input" value={f.cost_type} onChange={u("cost_type")}><option value="direct_product">Direct product cost</option><option value="operating">Operating expense</option></select></Field>
+          <Field label="Amount before tax"><input className="input" type="number" step="0.01" min="0" value={f.amount_before_tax} onChange={u("amount_before_tax")} /></Field>
+          <Field label="Sales tax paid" hint={`Total: ${fmt(toCents(f.amount_before_tax) + toCents(f.sales_tax_paid))}`}><input className="input" type="number" step="0.01" min="0" value={f.sales_tax_paid} onChange={u("sales_tax_paid")} /></Field>
+        </> : (
+          <Field label="Amount paid (total)"><input className="input" type="number" step="0.01" min="0" value={f.amount_before_tax} onChange={u("amount_before_tax")} /></Field>
+        )}
         <Field label="Payment method"><select className="input" value={f.payment_method ?? ""} onChange={u("payment_method")}>{PAYMENT_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</select></Field>
+        {advanced && <>
         <Field label="Recurring"><select className="input" value={f.recurrence} onChange={u("recurrence")}><option value="none">One-off</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="annual">Annual</option></select></Field>
         <Field label="Linked product (optional)"><select className="input" value={f.product_id} onChange={u("product_id")}><option value="">—</option>{(products.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
         <Field label="Linked order id (optional)"><input className="input" value={f.order_id} onChange={u("order_id")} placeholder="paste order UUID" /></Field>
+        </>}
         <Field label="Description" className="sm:col-span-2"><input className="input" value={f.description} onChange={u("description")} /></Field>
         <Field label="Receipt photo / PDF" hint={expense?.receipt_path ? "A receipt is attached; choosing a file replaces it." : "Stored privately; only admins can open it."}><input className="input" type="file" accept="image/*,application/pdf" capture="environment" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></Field>
-        <Field label="Notes"><input className="input" value={f.notes} onChange={u("notes")} /></Field>
+        {advanced && <Field label="Notes"><input className="input" value={f.notes} onChange={u("notes")} /></Field>}
       </div>
       <div className="flex justify-between gap-2">
         {expense && onDelete ? <button className="btn-ghost text-negative" onClick={() => onDelete(expense)}>Delete</button> : <span />}

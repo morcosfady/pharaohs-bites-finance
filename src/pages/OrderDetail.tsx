@@ -9,11 +9,17 @@ import { fmtDateTime } from "../lib/dates";
 import { waLink, mapsLink, fillTemplate } from "../lib/whatsapp";
 import { supabase, unwrap } from "../lib/supabase";
 import type { Order, OrderItem, OrderStatus, PaymentMethod, DeliveryProvider, DeliveryStatus, DeliveryRecord } from "../lib/types";
+import { useAdvanced } from "../hooks/useMode";
+
+const SIMPLE_STATUSES: { value: OrderStatus; label: string }[] = [
+  { value: "pending_whatsapp_confirmation", label: "New" }, { value: "confirmed", label: "Confirmed" }, { value: "completed", label: "Done" }, { value: "cancelled", label: "Cancelled" },
+];
 
 export function OrderDetailPage() {
   const { id } = useParams();
   const q = useOrder(id);
   const settings = useSettings();
+  const advanced = useAdvanced();
   const write = useWrite();
   const toast = useToast();
   const o = q.data;
@@ -66,12 +72,13 @@ export function OrderDetailPage() {
 
       {/* status workflow */}
       <div className="no-print mb-4 flex flex-wrap gap-1.5">
-        {ORDER_STATUSES.map((s) => (
+        {(advanced ? ORDER_STATUSES : SIMPLE_STATUSES).map((s) => (
           <button key={s.value} disabled={s.value === o.status || write.isPending} onClick={() => setStatus(s.value)}
             className={`rounded-full px-3 py-1.5 text-xs font-medium ring-1 transition disabled:opacity-60 ${s.value === o.status ? "bg-teal-800 text-ivory ring-teal-800" : "bg-white text-teal-900 ring-ivory-200 hover:bg-ivory-50"}`}>
             {s.label}
           </button>
         ))}
+        {!advanced && !SIMPLE_STATUSES.some((s) => s.value === o.status) && <span className="badge bg-teal-100 text-teal-900">{label(ORDER_STATUSES, o.status)}</span>}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3 print:hidden">
@@ -93,18 +100,18 @@ export function OrderDetailPage() {
               <MoneyField label="Discount" value={o.discount} disabled={locked} onSave={(v) => upd({ discount: v })} />
               <Field label="Discount reason"><input className="input" defaultValue={o.discount_reason} disabled={locked} onBlur={(e) => e.target.value !== o.discount_reason && upd({ discount_reason: e.target.value })} /></Field>
               <MoneyField label="Delivery fee charged" value={o.delivery_fee} disabled={locked} onSave={(v) => upd({ delivery_fee: v })} />
-              <Field label="Who pays the delivery fee">
+              {advanced && <Field label="Who pays the delivery fee">
                 <select className="input" value={o.delivery_fee_customer_paid ? "customer" : "business"} disabled={locked} onChange={(e) => upd({ delivery_fee_customer_paid: e.target.value === "customer" })}>
                   <option value="customer">Customer pays (counts as revenue)</option><option value="business">Business absorbs / subsidised</option>
                 </select>
-              </Field>
-              <Field label="Tax rate applied" hint="Estimated sales tax. Set per order; product taxability is per line.">
+              </Field>}
+              {advanced && <Field label="Tax rate applied" hint="Estimated sales tax. Set per order; product taxability is per line.">
                 <input className="input" type="number" step="0.0001" min="0" defaultValue={Number(o.tax_rate_applied)} disabled={locked || o.tax_manually_set} onBlur={(e) => Number(e.target.value) !== Number(o.tax_rate_applied) && upd({ tax_rate_applied: Number(e.target.value) })} />
-              </Field>
-              <div>
+              </Field>}
+              {advanced && <div>
                 <MoneyField label={o.tax_manually_set ? "Tax amount (manual)" : "Tax amount (calculated)"} value={o.tax_amount} disabled={locked || !o.tax_manually_set} onSave={(v) => upd({ tax_amount: v, tax_manually_set: true })} />
                 <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={o.tax_manually_set} disabled={locked} onChange={(e) => upd({ tax_manually_set: e.target.checked })} /> set tax manually</label>
-              </div>
+              </div>}
             </div>
             <dl className="mt-4 grid grid-cols-2 gap-y-1 border-t border-ivory-200 pt-3 text-sm sm:grid-cols-4">
               <dt className="text-charcoal/60">Subtotal</dt><dd className="text-right tabular-nums">{fmt(toCents(o.subtotal))}</dd>
@@ -115,7 +122,7 @@ export function OrderDetailPage() {
               <dt className="text-charcoal/60">Paid</dt><dd className="text-right tabular-nums">{fmt(toCents(o.amount_paid))}</dd>
               <dt className="text-charcoal/60">Balance due</dt><dd className={`text-right tabular-nums ${balance > 0 ? "text-negative" : "text-positive"}`}>{fmt(balance)}</dd>
             </dl>
-            <dl className="mt-3 grid grid-cols-2 gap-y-1 rounded-lg bg-teal-50 px-3 py-2 text-sm sm:grid-cols-4">
+            <dl className={`mt-3 grid grid-cols-2 gap-y-1 rounded-lg bg-teal-50 px-3 py-2 text-sm sm:grid-cols-4 ${advanced ? "" : "hidden"}`}>
               <dt className="text-charcoal/60">Cost of goods</dt><dd className="text-right tabular-nums">{fmt(cost)}</dd>
               <dt className="text-charcoal/60">Delivery cost</dt><dd className="text-right tabular-nums">{fmt(toCents(d?.actual_cost ?? 0))}</dd>
               <dt className="text-charcoal/60">Owner labor{settings.data?.include_owner_labor ? "" : " (excluded)"}</dt><dd className="text-right tabular-nums">{fmt(labor)}</dd>
@@ -124,8 +131,8 @@ export function OrderDetailPage() {
           </Section>
 
           {/* payments */}
-          <Section title="Payments & refunds" right={<div className="no-print flex gap-2"><button className="btn-ghost btn-sm" onClick={() => setRefundOpen(true)}>Refund</button><button className="btn-gold btn-sm" onClick={() => setPayOpen(true)}><Plus size={14} /> Record payment</button></div>}>
-            <div className="grid gap-4 sm:grid-cols-2">
+          <Section title={advanced ? "Payments & refunds" : "Payment"} right={<div className="no-print flex gap-2">{advanced && <button className="btn-ghost btn-sm" onClick={() => setRefundOpen(true)}>Refund</button>}<button className="btn-gold btn-sm" onClick={() => setPayOpen(true)}><Plus size={14} /> Record payment</button></div>}>
+            <div className={`grid gap-4 sm:grid-cols-2 ${advanced ? "" : "hidden"}`}>
               <Field label="Payment method"><select className="input" value={o.payment_method ?? ""} onChange={(e) => upd({ payment_method: (e.target.value || null) as PaymentMethod | null })}><option value="">—</option>{PAYMENT_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</select></Field>
               <Field label="Payment status" hint="Derived automatically from payments; choose Disputed or Deposit received to override."><select className="input" value={o.payment_status} onChange={(e) => upd({ payment_status: e.target.value as Order["payment_status"] })}>{PAYMENT_STATUSES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</select></Field>
             </div>
@@ -146,13 +153,13 @@ export function OrderDetailPage() {
           </Section>
 
           {/* delivery */}
-          {o.delivery_method === "delivery" && <DeliveryPanel orderId={o.id} record={d} fee={toCents(o.delivery_fee)} locked={locked} onSave={save} mileageCost={Number(settings.data?.default_mileage_cost_per_mile ?? 0)} deliveryRate={Number(settings.data?.default_delivery_rate_per_mile ?? 0)} onFee={(v) => upd({ delivery_fee: v })} />}
+          {o.delivery_method === "delivery" && <DeliveryPanel orderId={o.id} record={d} fee={toCents(o.delivery_fee)} locked={locked} onSave={save} mileageCost={Number(settings.data?.default_mileage_cost_per_mile ?? 0)} deliveryRate={Number(settings.data?.default_delivery_rate_per_mile ?? 0)} onFee={(v) => upd({ delivery_fee: v })} advanced={advanced} />}
 
           {/* notes */}
           <Section title="Notes">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Internal notes (owner only)"><textarea className="input min-h-24" defaultValue={o.internal_notes} onBlur={(e) => e.target.value !== o.internal_notes && upd({ internal_notes: e.target.value })} /></Field>
-              <Field label="Customer-visible notes (printed on the summary)"><textarea className="input min-h-24" defaultValue={o.customer_notes} onBlur={(e) => e.target.value !== o.customer_notes && upd({ customer_notes: e.target.value })} /></Field>
+            <div className={`grid gap-4 ${advanced ? "sm:grid-cols-2" : ""}`}>
+              <Field label={advanced ? "Internal notes (owner only)" : "Notes"}><textarea className="input min-h-24" defaultValue={o.internal_notes} onBlur={(e) => e.target.value !== o.internal_notes && upd({ internal_notes: e.target.value })} /></Field>
+              {advanced && <Field label="Customer-visible notes (printed on the summary)"><textarea className="input min-h-24" defaultValue={o.customer_notes} onBlur={(e) => e.target.value !== o.customer_notes && upd({ customer_notes: e.target.value })} /></Field>}
             </div>
           </Section>
         </div>
@@ -173,7 +180,7 @@ export function OrderDetailPage() {
                 <li key={h.id} className="flex gap-2"><span className="w-28 shrink-0 text-charcoal/50">{fmtDateTime(h.created_at)}</span><span>{h.from_status ? `${label(ORDER_STATUSES, h.from_status)} → ` : ""}<b>{label(ORDER_STATUSES, h.to_status)}</b>{h.note ? ` — ${h.note}` : ""}</span></li>
               ))}
             </ol>
-            <AuditTrail table="orders" id={o.id} />
+            {advanced && <AuditTrail table="orders" id={o.id} />}
           </Section>
           {!locked && <div className="no-print flex gap-2">
             <button className="btn-primary flex-1" onClick={() => setStatus("confirmed")} disabled={o.status === "confirmed"}>Confirm order</button>
@@ -214,7 +221,7 @@ function MoneyField({ label: l, value, disabled, onSave }: { label: string; valu
   return <Field label={l}><input className="input" type="number" step="0.01" min="0" value={v} disabled={disabled} onChange={(e) => setV(Number(e.target.value))} onBlur={() => toCents(v) !== toCents(value) && onSave(v)} /></Field>;
 }
 
-function DeliveryPanel({ orderId, record, fee, locked, onSave, mileageCost, deliveryRate, onFee }: { orderId: string; record: DeliveryRecord | null; fee: number; locked: boolean; onSave: (fn: () => Promise<unknown>, msg?: string) => Promise<void>; mileageCost: number; deliveryRate: number; onFee: (v: number) => void }) {
+function DeliveryPanel({ orderId, record, fee, locked, onSave, mileageCost, deliveryRate, onFee, advanced }: { orderId: string; record: DeliveryRecord | null; fee: number; advanced: boolean; locked: boolean; onSave: (fn: () => Promise<unknown>, msg?: string) => Promise<void>; mileageCost: number; deliveryRate: number; onFee: (v: number) => void }) {
   const r = record as (DeliveryRecord & { provider: DeliveryProvider; status: DeliveryStatus }) | null;
   const upsert = (patch: Record<string, unknown>) => onSave(async () => unwrap(await supabase.from("delivery_records").upsert({ order_id: orderId, ...(r ? { id: r.id } : {}), ...patch }, { onConflict: "order_id" }).select("id")), "Delivery updated");
   const miles = Number(r?.distance_miles ?? 0);
@@ -225,12 +232,14 @@ function DeliveryPanel({ orderId, record, fee, locked, onSave, mileageCost, deli
     <Section title="Delivery">
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Distance (miles)"><input className="input" type="number" step="0.1" min="0" defaultValue={miles} disabled={locked} onBlur={(e) => Number(e.target.value) !== miles && upsert({ distance_miles: Number(e.target.value) })} /></Field>
-        <Field label="Actual delivery cost" hint={miles ? `Suggested at ${fmt(Math.round(mileageCost * 100))}/mi: ${fmt(suggestedCost)}` : undefined}><input className="input" type="number" step="0.01" min="0" defaultValue={fromCents(cost)} onBlur={(e) => toCents(e.target.value) !== cost && upsert({ actual_cost: Number(e.target.value) })} /></Field>
+        <Field label={advanced ? "Actual delivery cost" : "What the delivery cost you (gas / courier)"} hint={miles ? `Suggested at ${fmt(Math.round(mileageCost * 100))}/mi: ${fmt(suggestedCost)}` : undefined}><input className="input" type="number" step="0.01" min="0" defaultValue={fromCents(cost)} onBlur={(e) => toCents(e.target.value) !== cost && upsert({ actual_cost: Number(e.target.value) })} /></Field>
+        {advanced && <>
         <Field label="Provider"><select className="input" value={r?.provider ?? "owner"} onChange={(e) => upsert({ provider: e.target.value })}>{DELIVERY_PROVIDERS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</select></Field>
         <Field label="Driver"><input className="input" defaultValue={r?.driver ?? ""} onBlur={(e) => e.target.value !== (r?.driver ?? "") && upsert({ driver: e.target.value })} /></Field>
         <Field label="Tracking / reference"><input className="input" defaultValue={r?.tracking_ref ?? ""} onBlur={(e) => e.target.value !== (r?.tracking_ref ?? "") && upsert({ tracking_ref: e.target.value })} /></Field>
         <Field label="Delivery status"><select className="input" value={r?.status ?? "not_started"} onChange={(e) => upsert({ status: e.target.value })}>{DELIVERY_STATUSES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</select></Field>
         <Field label="Delivery notes" className="sm:col-span-3"><input className="input" defaultValue={r?.notes ?? ""} onBlur={(e) => e.target.value !== (r?.notes ?? "") && upsert({ notes: e.target.value })} /></Field>
+        </>}
       </div>
       <div className="flex flex-wrap items-center gap-3 text-sm">
         {miles > 0 && !locked && <button className="btn-ghost btn-sm no-print" onClick={() => onFee(fromCents(suggestedFee))}>Use suggested fee {fmt(suggestedFee)} ({fmt(Math.round(deliveryRate * 100))}/mi)</button>}
