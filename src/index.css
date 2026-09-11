@@ -61,6 +61,8 @@ h1, h2, h3 { @apply font-display; }
 .table-wrap { @apply overflow-x-auto rounded-xl border border-ivory-200 bg-white; }
 .table { @apply w-full min-w-[640px] text-sm; }
 .table th { @apply bg-teal-50 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-teal-900/80 whitespace-nowrap; }
+.table th.num, .table td.num { text-align: right; }
+.table th.num > button { justify-content: flex-end; width: 100%; }
 .table td { @apply border-t border-ivory-200 px-3 py-2.5 align-middle; }
 .table tr:hover td { @apply bg-ivory-50; }
 .num { @apply text-right tabular-nums; }
