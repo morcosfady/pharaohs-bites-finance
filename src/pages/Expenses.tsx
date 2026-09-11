@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Plus, Paperclip } from "lucide-react";
 import { DateRangeBar, useDateRange } from "../components/DateRangeBar";
 import { DataTable, type Column } from "../components/DataTable";
-import { PageHeader, Modal, Field, Skeleton, ErrorBox, KpiCard, ConfirmDialog, useToast } from "../components/ui";
+import { PageHeader, Modal, Field, Skeleton, ErrorBox, KpiCard, ConfirmDialog, useToast, EditButton } from "../components/ui";
 import { useExpenses, useExpenseCategories, useProducts, useWrite } from "../hooks/queries";
 import { PAYMENT_METHODS, label } from "../lib/status";
 import { fmt, toCents, sum } from "../lib/money";
@@ -37,7 +37,8 @@ export function ExpensesPage() {
     { key: "receipt_path", header: "Receipt", render: (r) => r.receipt_path ? <button className="text-teal-700 hover:underline" onClick={async (ev) => { ev.stopPropagation(); const { data } = await supabase.storage.from("receipts").createSignedUrl(r.receipt_path, 300); if (data?.signedUrl) window.open(data.signedUrl, "_blank"); }}><Paperclip size={14} /></button> : "" },
     { key: "recurrence", header: "Recurring", mobile: false, render: (r) => r.recurrence === "none" ? "" : r.recurrence },
   ];
-  const cols = advanced ? allCols : allCols.filter((c) => ["expense_date", "vendor", "category", "total_amount", "receipt_path"].includes(c.key));
+  const editCol: Column<Row> = { key: "edit", header: "", render: (r) => <EditButton small label="Edit expense" onClick={() => setEdit(r)} /> };
+  const cols = [...(advanced ? allCols : allCols.filter((c) => ["expense_date", "vendor", "category", "total_amount", "receipt_path"].includes(c.key))), editCol];
   return (
     <div>
       <PageHeader title="Expenses" crumbs={["Home", "Expenses"]} actions={<>

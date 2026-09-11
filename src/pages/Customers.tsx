@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { MessageCircle, MapPin } from "lucide-react";
 import { DataTable, type Column } from "../components/DataTable";
-import { PageHeader, Badge, Section, Skeleton, ErrorBox, Field, Modal, ConfirmDialog, useToast } from "../components/ui";
+import { PageHeader, Badge, Section, Skeleton, ErrorBox, Field, Modal, ConfirmDialog, useToast, EditButton } from "../components/ui";
+import { useAdvanced } from "../hooks/useMode";
 import { useCustomers, useCustomer, useAllOrderFinancials, useWrite, useOrders } from "../hooks/queries";
 import { CUSTOMER_STATUSES, ORDER_STATUSES, PAYMENT_STATUSES, cls, label } from "../lib/status";
 import { fmt, toCents } from "../lib/money";
@@ -12,41 +13,53 @@ import { supabase, unwrap } from "../lib/supabase";
 import { REVENUE_STATUSES } from "../lib/metrics";
 import type { Customer, CustomerStatus } from "../lib/types";
 
-type Row = Customer & { first: string | null; last: string | null; completed: number; cancelled: number; spent: number; aov: number | null; balance: number; address: string; search: string; [k: string]: unknown };
+type Row = Customer & { first: string | null; last: string | null; orders: number; completed: number; cancelled: number; spent: number; lifetime: number; aov: number | null; balance: number; address: string; search: string; [k: string]: unknown };
 
 export function CustomersPage() {
   const nav = useNavigate();
   const customers = useCustomers();
   const fin = useAllOrderFinancials();
+  const advanced = useAdvanced();
   const [q, setQ] = useState("");
   const rows = useMemo<Row[]>(() => (customers.data ?? []).map((c) => {
     const os = (fin.data ?? []).filter((o) => o.customer_id === c.id);
     const rev = os.filter((o) => REVENUE_STATUSES.includes(o.status));
     const completed = os.filter((o) => o.status === "completed").length;
     const spent = rev.reduce((s, o) => s + toCents(o.net_product_sales) + toCents(o.delivery_revenue), 0);
+    // lifetime value = everything they ordered (order totals, refunds taken off), cancelled excluded
+    const lifetime = os.filter((o) => o.status !== "cancelled").reduce((s, o) => s + toCents(o.total) - toCents(o.amount_refunded), 0);
     const dates = os.map((o) => o.created_at).sort();
     const a = c.customer_addresses?.find((x) => x.is_default) ?? c.customer_addresses?.[0];
-    return { ...c, first: dates[0] ?? null, last: dates[dates.length - 1] ?? null, completed, cancelled: os.filter((o) => o.status === "cancelled").length, spent,
+    return { ...c, first: dates[0] ?? null, last: dates[dates.length - 1] ?? null, orders: os.filter((o) => o.status !== "cancelled").length, lifetime, completed, cancelled: os.filter((o) => o.status === "cancelled").length, spent,
       aov: rev.length ? Math.round(spent / rev.length) : null, balance: os.filter((o) => o.status !== "cancelled").reduce((s, o) => s + Math.max(0, toCents(o.balance_due)), 0),
       address: a ? `${a.street}${a.apt ? ", " + a.apt : ""}, ${a.city}` : "", search: [c.name, c.phone, a?.street, a?.city, a?.zip].join(" ").toLowerCase() };
   }), [customers.data, fin.data]);
   const filtered = rows.filter((r) => !q || r.search.includes(q.toLowerCase()));
-  const cols: Column<Row>[] = [
-    { key: "name", header: "Customer", primary: true, render: (r) => <span><span className="font-medium">{r.name}</span> <Badge className={cls(CUSTOMER_STATUSES, r.status)}>{label(CUSTOMER_STATUSES, r.status)}</Badge><span className="block text-xs text-charcoal/50">{r.phone}</span></span> },
+  const lifetimeAll = rows.reduce((s, r) => s + r.lifetime, 0);
+  const allCols: Column<Row>[] = [
+    { key: "name", header: "Customer", primary: true, render: (r) => <span><span className="font-medium">{r.name}</span> {advanced && <Badge className={cls(CUSTOMER_STATUSES, r.status)}>{label(CUSTOMER_STATUSES, r.status)}</Badge>}<span className="block text-xs text-charcoal/50">{r.phone}</span></span> },
     { key: "address", header: "Address", mobile: false },
+    { key: "orders", header: "Orders", numeric: true },
+    { key: "lifetime", header: "Lifetime total", numeric: true, render: (r) => <b>{fmt(r.lifetime)}</b> },
     { key: "completed", header: "Completed", numeric: true },
-    { key: "spent", header: "Total spent", numeric: true, render: (r) => fmt(r.spent) },
+    { key: "spent", header: "Net sales", numeric: true, render: (r) => fmt(r.spent) },
     { key: "aov", header: "Avg order", numeric: true, render: (r) => r.aov == null ? "—" : fmt(r.aov) },
     { key: "balance", header: "Balance", numeric: true, render: (r) => <span className={r.balance > 0 ? "text-negative" : ""}>{fmt(r.balance)}</span> },
     { key: "cancelled", header: "Cancelled", numeric: true, mobile: false },
     { key: "last", header: "Last order", render: (r) => fmtDate(r.last), sortValue: (r) => r.last },
+    { key: "edit", header: "", render: (r) => <EditButton small label={`Edit ${r.name}`} onClick={() => nav(`/customers/${r.id}`)} /> },
   ];
+  const cols = advanced ? allCols : allCols.filter((c) => ["name", "orders", "lifetime", "balance", "last", "edit"].includes(c.key));
   return (
     <div>
       <PageHeader title="Customers" crumbs={["Home", "Customers"]} />
+      <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="card px-4 py-3"><div className="text-xs uppercase tracking-wider text-teal-900/70">Customers</div><div className="font-display text-2xl font-semibold text-teal-900">{rows.length}</div></div>
+        <div className="card px-4 py-3"><div className="text-xs uppercase tracking-wider text-teal-900/70">Lifetime orders total</div><div className="font-display text-2xl font-semibold text-teal-900">{fmt(lifetimeAll)}</div></div>
+      </div>
       <input className="input mb-3 sm:!w-80" placeholder="Search name, phone, address" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search customers" />
       {customers.error && <ErrorBox error={customers.error} />}
-      {customers.isLoading ? <Skeleton rows={8} className="card p-5" /> : <DataTable rows={filtered} columns={cols} rowKey={(r) => r.id} onRowClick={(r) => nav(`/customers/${r.id}`)} initialSort={{ key: "spent", dir: "desc" }} />}
+      {customers.isLoading ? <Skeleton rows={8} className="card p-5" /> : <DataTable rows={filtered} columns={cols} rowKey={(r) => r.id} onRowClick={(r) => nav(`/customers/${r.id}`)} initialSort={{ key: "lifetime", dir: "desc" }} />}
     </div>
   );
 }
@@ -74,7 +87,7 @@ export function CustomerDetailPage() {
       <PageHeader title={cust.name} crumbs={["Home", "Customers", cust.name]} actions={<>
         {cust.phone && <a className="btn-ghost btn-sm" href={waLink(cust.phone)} target="_blank" rel="noopener"><MessageCircle size={16} /> WhatsApp</a>}
         {a && <a className="btn-ghost btn-sm" href={mapsLink(a)} target="_blank" rel="noopener"><MapPin size={16} /> Maps</a>}
-        <button className="btn-ghost btn-sm" onClick={() => setEdit(true)}>Edit</button>
+        <EditButton label="Edit customer" onClick={() => setEdit(true)} />
       </>} />
       <div className="grid gap-4 lg:grid-cols-3">
         <Section title="Profile">

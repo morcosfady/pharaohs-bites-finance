@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip as RTooltip, BarChart, Bar, PieChart, Pie, Cell, Legend, CartesianGrid } from "recharts";
 import { DateRangeBar, useDateRange } from "../components/DateRangeBar";
-import { KpiCard, Section, Skeleton, ErrorBox, EmptyState, Badge } from "../components/ui";
+import { KpiCard, Section, Skeleton, ErrorBox, EmptyState, Badge, EditButton } from "../components/ui";
 import { useOrderFinancials, useExpenses, usePayments, useRefunds, useSettings, useProductSales, useTaxAdjustments, useTaxSettings } from "../hooks/queries";
 import { previousRange, bucketKey, bucketLabel } from "../lib/dates";
 import { computeKpis, KPI_FORMULAS, rankProducts, REVENUE_STATUSES } from "../lib/metrics";
@@ -183,6 +183,7 @@ export function DashboardPage() {
                     <Badge className={cls(ORDER_STATUSES, o.status)}>{label(ORDER_STATUSES, o.status)}</Badge>
                     <span className="ml-auto tabular-nums">{fmt(toCents(o.total))}</span>
                     <span className="w-full text-xs text-charcoal/50 sm:w-auto">{fmtDateTime(o.created_at)}</span>
+                    <EditButton small label={`Edit ${o.order_number}`} onClick={() => { window.location.hash = `#/orders/${o.id}`; }} />
                   </Link></li>
                 ))}
               </ul>

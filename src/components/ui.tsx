@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode, createContext, useContext, useCallback } from "react";
-import { X, Info, TrendingUp, TrendingDown, Minus, CheckCircle2, AlertTriangle, XCircle, Inbox } from "lucide-react";
+import { X, Info, TrendingUp, TrendingDown, Minus, CheckCircle2, AlertTriangle, XCircle, Inbox, Pencil } from "lucide-react";
 import { fmt, pct, change } from "../lib/money";
 
 /* ---------- Toasts ---------- */
@@ -112,6 +112,16 @@ function Spark({ data, good }: { data: number[]; good: boolean }) {
   const max = Math.max(...data), min = Math.min(...data);
   const pts = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - min) / (max - min || 1)) * (h - 2) - 1}`).join(" ");
   return <svg width={w} height={h} className="shrink-0" aria-hidden="true"><polyline points={pts} fill="none" stroke={good ? "#16855B" : "#C64040"} strokeWidth="1.5" /></svg>;
+}
+
+/* ---------- Pencil (edit) button ---------- */
+export function EditButton({ onClick, label = "Edit", small, className = "" }: { onClick: (e: React.MouseEvent) => void; label?: string; small?: boolean; className?: string }) {
+  return (
+    <button type="button" aria-label={label} title={label} onClick={(e) => { e.stopPropagation(); onClick(e); }}
+      className={`no-print inline-flex items-center justify-center rounded-full text-teal-800 ring-1 ring-teal-800/20 transition hover:bg-gold/20 hover:ring-gold ${small ? "h-8 w-8" : "h-10 w-10"} ${className}`}>
+      <Pencil size={small ? 14 : 16} />
+    </button>
+  );
 }
 
 /* ---------- Misc ---------- */

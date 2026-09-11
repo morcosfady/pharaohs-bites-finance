@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { DataTable, type Column } from "../components/DataTable";
-import { PageHeader, Badge, Skeleton, ErrorBox, Modal, Field, useToast } from "../components/ui";
+import { PageHeader, Badge, Skeleton, ErrorBox, Modal, Field, useToast, EditButton } from "../components/ui";
 import { useProducts, useCategories, useSettings, useWrite, useAllOrderFinancials, useProductSalesFor } from "../hooks/queries";
 import { TAX_STATUSES, cls, label } from "../lib/status";
 import { fmt, toCents, pct, ratio } from "../lib/money";
@@ -22,6 +22,8 @@ export function ProductsPage() {
   const settings = useSettings();
   const sales = useQuery({ queryKey: ["product_sales", "all"], queryFn: async () => unwrap(await supabase.from("product_sales").select("*").limit(20000)) as ProductSale[] });
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Product | null>(null);
+  const recipeIds = useQuery({ queryKey: ["recipes", "product-ids"], queryFn: async () => new Set((unwrap(await supabase.from("recipes").select("product_id")) as { product_id: string }[]).map((r) => r.product_id)) });
   const advanced = useAdvanced();
   const includeLabor = settings.data?.include_owner_labor ?? false;
   const laborRate = settings.data?.default_labor_rate_per_hour ?? 0;
@@ -50,7 +52,8 @@ export function ProductsPage() {
     { key: "profit", header: "Profit", numeric: true, render: (p) => fmt(p.profit) },
     { key: "updated_at", header: "Updated", mobile: false, render: (p) => fmtDate(p.updated_at) },
   ];
-  const cols = advanced ? allCols : allCols.filter((c) => ["name", "selling_price", "unitCost", "unitProfit", "sold", "profit"].includes(c.key));
+  const editCol: Column<Row> = { key: "edit", header: "", render: (p) => <EditButton small label={`Edit ${p.name}`} onClick={() => setEditing(p)} /> };
+  const cols = [...(advanced ? allCols : allCols.filter((c) => ["name", "selling_price", "unitCost", "unitProfit", "sold", "profit"].includes(c.key))), editCol];
 
   return (
     <div>
@@ -59,6 +62,7 @@ export function ProductsPage() {
       {products.error && <ErrorBox error={products.error} />}
       {products.isLoading ? <Skeleton rows={8} className="card p-5" /> : <DataTable rows={rows} columns={cols} rowKey={(p) => p.id} onRowClick={(p) => nav(`/products/${p.id}`)} initialSort={{ key: "revenue", dir: "desc" }} />}
       <ProductModal open={open} onClose={() => setOpen(false)} categories={cats.data ?? []} />
+      {editing && <ProductModal key={editing.id} open onClose={() => setEditing(null)} categories={cats.data ?? []} product={editing} hasRecipe={recipeIds.data?.has(editing.id) ?? false} />}
     </div>
   );
 }

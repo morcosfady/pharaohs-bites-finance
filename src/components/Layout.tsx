@@ -11,10 +11,10 @@ const NAV = [
   { to: "/", label: "Home", icon: LayoutDashboard, end: true },
   { to: "/orders", label: "Orders", icon: ShoppingBag },
   { to: "/products", label: "Products", icon: Package },
+  { to: "/customers", label: "Customers", icon: Users },
   { to: "/expenses", label: "Expenses", icon: Receipt },
   { to: "/reports", label: "Reports", icon: FileText },
   { to: "/performance", label: "Best Sellers", icon: BarChart3, advanced: true },
-  { to: "/customers", label: "Customers", icon: Users, advanced: true },
   { to: "/payments", label: "Payments", icon: CreditCard, advanced: true },
   { to: "/deliveries", label: "Deliveries", icon: Truck, advanced: true },
   { to: "/tax", label: "Sales Tax", icon: Percent, advanced: true },
@@ -22,7 +22,7 @@ const NAV = [
   { to: "/data", label: "Import / Export", icon: Database, advanced: true },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
-const MOBILE = ["/", "/orders", "/products", "/expenses", "/reports"];
+const MOBILE = ["/", "/orders", "/customers", "/products", "/expenses"];
 
 export function Layout() {
   const { adminName, signOut } = useAuth();

@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid } from "recharts";
 import { Plus, Trash2 } from "lucide-react";
 import { useProduct, useRecipes, useIngredients, useCategories, useSettings, useWrite, useProductSalesFor } from "../hooks/queries";
-import { PageHeader, Section, Skeleton, ErrorBox, Badge, Modal, Field, useToast, KpiCard, ConfirmDialog } from "../components/ui";
+import { PageHeader, Section, Skeleton, ErrorBox, Badge, Modal, Field, useToast, KpiCard, ConfirmDialog, EditButton } from "../components/ui";
 import { ProductModal } from "./Products";
 import { TAX_STATUSES, UNITS, cls, label } from "../lib/status";
 import { fmt, toCents, fromCents, pct, ratio } from "../lib/money";
@@ -60,7 +60,7 @@ export function ProductDetailPage() {
   return (
     <div>
       <PageHeader title={prod.name} crumbs={["Home", "Products", prod.name]} actions={<>
-        <button className="btn-ghost btn-sm" onClick={() => setEdit(true)}>Edit product</button>
+        <EditButton label="Edit product" onClick={() => setEdit(true)} /><button className="btn-ghost btn-sm" onClick={() => setEdit(true)}>Edit product</button>
         <button className="btn-ghost btn-sm text-negative" onClick={() => setDel(true)}>Archive</button>
       </>} />
       <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">

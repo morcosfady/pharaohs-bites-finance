@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { DataTable, type Column } from "../components/DataTable";
-import { PageHeader, Badge, Skeleton, ErrorBox, Modal, Field, useToast, EmptyState } from "../components/ui";
+import { PageHeader, Badge, Skeleton, ErrorBox, Modal, Field, useToast, EmptyState, EditButton } from "../components/ui";
 import { DateRangeBar, useDateRange } from "../components/DateRangeBar";
 import { useOrders, useProducts, useCategories, useWrite } from "../hooks/queries";
 import { ORDER_STATUSES, PAYMENT_STATUSES, PAYMENT_METHODS, cls, label } from "../lib/status";
@@ -81,7 +81,8 @@ export function OrdersPage() {
     { key: "delivery_method", header: "Fulfilment", mobile: false, render: (o) => o.delivery_method === "delivery" ? "Delivery" : "Pickup" },
   ];
   const SIMPLE = ["order_number", "created_at", "customer_name", "status", "payment_status", "total", "balance"];
-  const cols = advanced ? allCols : allCols.filter((c) => SIMPLE.includes(c.key));
+  const editCol: Column<Row> = { key: "edit", header: "", render: (o) => <EditButton small label={`Edit ${o.order_number}`} onClick={() => nav(`/orders/${o.id}`)} /> };
+  const cols = [...(advanced ? allCols : allCols.filter((c) => SIMPLE.includes(c.key))), editCol];
 
   const exportCsv = () => downloadText(`orders-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(filtered.map((o) => ({
     order_number: o.order_number, date: o.created_at, customer: o.customer_name, phone: o.customer_phone, status: o.status, payment_status: o.payment_status,

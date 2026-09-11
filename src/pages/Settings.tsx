@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PageHeader, Section, Field, Skeleton, ErrorBox, useToast } from "../components/ui";
+import { PageHeader, Section, Field, Skeleton, ErrorBox, useToast, EditButton } from "../components/ui";
 import { useSettings, useWrite, useCategories, useExpenseCategories } from "../hooks/queries";
 import { ORDER_STATUSES, PAYMENT_METHODS, DELIVERY_PROVIDERS } from "../lib/status";
 import { supabase, unwrap } from "../lib/supabase";
@@ -24,7 +24,8 @@ export function SettingsPage() {
             <span><b>Advanced mode</b> — shows every tab (best sellers, customers, payments, deliveries, sales tax, insights, import/export), all 11 order statuses, refunds, cost breakdowns, tax overrides, recipes and every report. Leave it off for the simple view. Press <i>Save changes</i> to apply.</span>
           </label>
         </Section>
-        <Section title="Business information">
+        <Section title="Business information" right={<EditButton small label="Edit business information" onClick={() => document.getElementById("s-biz")?.querySelector<HTMLElement>("input")?.focus()} />}>
+          <div id="s-biz">
           <Field label="Business name"><input className="input" value={f.business_name ?? ""} onChange={u("business_name")} /></Field>
           <Field label="Owner name"><input className="input" value={f.owner_name ?? ""} onChange={u("owner_name")} /></Field>
           <Field label="Address"><input className="input" value={f.address ?? ""} onChange={u("address")} /></Field>
@@ -32,6 +33,7 @@ export function SettingsPage() {
           <Field label="Email"><input className="input" value={f.email ?? ""} onChange={u("email")} /></Field>
           <Field label="Logo URL" hint="Leave blank to use the built-in Pharaoh's Bites logo."><input className="input" value={f.logo_url ?? ""} onChange={u("logo_url")} /></Field>
           <div className="grid grid-cols-2 gap-3"><Field label="Currency"><input className="input" value={f.currency ?? "USD"} onChange={u("currency")} /></Field><Field label="Time zone"><input className="input" value={f.timezone ?? "America/Chicago"} onChange={u("timezone")} /></Field></div>
+          </div>
         </Section>
         {f.advanced_mode && <Section title="Financial settings">
           <p className="mb-3 text-xs text-charcoal/60">The default tax rate, filing frequency and due date live on the <a href="#/tax" className="text-teal-700 hover:underline">Sales Tax</a> page.</p>
