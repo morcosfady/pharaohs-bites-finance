@@ -1,0 +1,30 @@
+# Supabase CLI project config (used by `supabase db push`, `supabase functions deploy`).
+# project_id is filled in by `supabase link`.
+[api]
+enabled = true
+schemas = ["public", "storage"]
+
+[db]
+major_version = 15
+
+[db.seed]
+# Sample data is opt-in and dev-only. Leave disabled for production.
+enabled = false
+sql_paths = ["./seed.dev.sql"]
+
+[auth]
+enabled = true
+site_url = "https://morcosfady.github.io/pharaohs-bites-finance/"
+additional_redirect_urls = ["http://localhost:5173", "http://localhost:5173/"]
+# Public signups are DISABLED. The first admin is created from the Supabase
+# dashboard (see README) and then listed in admin_profiles.
+enable_signup = false
+
+[auth.email]
+enable_signup = false
+enable_confirmations = false
+
+[functions.create-order]
+# The website calls this without a user session; the function applies its own
+# origin allow-list, validation and rate limiting.
+verify_jwt = false

@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@theme {
+  --color-teal-900: #083838;
+  --color-teal-800: #0F4C4C;
+  --color-teal-700: #146060;
+  --color-teal-600: #1c7575;
+  --color-teal-100: #d9e8e6;
+  --color-teal-50: #eef5f4;
+  --color-ivory: #F7F0DF;
+  --color-ivory-50: #fcf9f2;
+  --color-ivory-200: #ede3cb;
+  --color-gold: #D4A72C;
+  --color-gold-soft: #E7C76A;
+  --color-gold-100: #f8efd3;
+  --color-charcoal: #242424;
+  --color-positive: #16855B;
+  --color-warning: #D88912;
+  --color-negative: #C64040;
+  --color-whatsapp: #25D366;
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-sans: "Jost", system-ui, sans-serif;
+}
+
+html { color-scheme: light; }
+body {
+  @apply bg-ivory text-charcoal font-sans antialiased;
+  background-image:
+    radial-gradient(circle at 0% 0%, rgba(212, 167, 44, .07), transparent 40%),
+    radial-gradient(circle at 100% 100%, rgba(15, 76, 76, .06), transparent 45%);
+  background-attachment: fixed;
+}
+h1, h2, h3 { @apply font-display; }
+
+/* thin, brand-coloured scrollbars */
+* { scrollbar-width: thin; scrollbar-color: #c9bfa5 transparent; }
+
+/* papyrus-ish card texture, kept very subtle */
+.card {
+  @apply rounded-xl border border-ivory-200 bg-white/90 shadow-[0_1px_2px_rgba(36,36,36,.05),0_8px_24px_-12px_rgba(15,76,76,.18)];
+}
+.card-head { @apply flex items-center justify-between gap-3 px-5 pt-4 pb-2; }
+.card-title { @apply font-display text-lg font-semibold text-teal-900; }
+
+.btn { @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold; min-height: 44px; }
+.btn-primary { @apply btn bg-teal-800 text-ivory hover:bg-teal-700; }
+.btn-gold { @apply btn bg-gold text-teal-900 hover:bg-gold-soft; }
+.btn-ghost { @apply btn border border-ivory-200 bg-white text-teal-900 hover:bg-ivory-50; }
+.btn-danger { @apply btn bg-negative text-white hover:bg-red-700; }
+.btn-sm { @apply px-3 py-1.5 text-xs; min-height: 36px; }
+
+.input { @apply w-full rounded-lg border border-ivory-200 bg-white px-3 py-2.5 text-sm text-charcoal placeholder:text-charcoal/40 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20; min-height: 44px; }
+.label { @apply mb-1 block text-xs font-medium uppercase tracking-wider text-teal-900/70; }
+.field { @apply mb-4; }
+
+.badge { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap; }
+
+.table-wrap { @apply overflow-x-auto rounded-xl border border-ivory-200 bg-white; }
+.table { @apply w-full min-w-[640px] text-sm; }
+.table th { @apply bg-teal-50 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-teal-900/80 whitespace-nowrap; }
+.table td { @apply border-t border-ivory-200 px-3 py-2.5 align-middle; }
+.table tr:hover td { @apply bg-ivory-50; }
+.num { @apply text-right tabular-nums; }
+
+.skeleton { @apply animate-pulse rounded-md bg-ivory-200; }
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; }
+  .card { box-shadow: none; border-color: #ddd; }
+}
