@@ -43,6 +43,10 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_BUSINESS_WHATSAPP: "17879684078"
+      # Sample-data demo of every screen at /demo/ (no database, nothing saved)
+      - run: npx vite build --config vite.demo.config.ts --outDir dist/demo
+        env:
+          VITE_DEMO: "1"
       # SPA on Pages: serve index.html for unknown paths (HashRouter makes this rare)
       - run: cp dist/index.html dist/404.html
       - uses: actions/upload-pages-artifact@v3
