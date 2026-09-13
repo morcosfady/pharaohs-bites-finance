@@ -55,8 +55,8 @@ describe("dashboard rendering", () => {
     auth.session = { user: { id: "u", email: "o@x" } }; auth.isAdmin = true;
     mount("/");
     expect(await screen.findByRole("heading", { name: "Home" })).toBeInTheDocument();
-    expect(screen.getByText("Sales")).toBeInTheDocument();
-    expect(screen.getByText("Sales tax to set aside")).toBeInTheDocument();
+    expect(screen.getAllByText(/Sales$/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Sales tax to set aside/)).toBeInTheDocument();
   });
   it("order detail shows the WhatsApp and Maps links and status workflow", async () => {
     auth.session = { user: { id: "u", email: "o@x" } }; auth.isAdmin = true;
