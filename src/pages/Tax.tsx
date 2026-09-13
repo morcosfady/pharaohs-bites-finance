@@ -81,7 +81,7 @@ export function TaxPage() {
         </Section>
       </div>
 
-      <Section title="Product taxability" className="mt-4" right={<Link to="/products" className="text-xs text-teal-700 hover:underline">Products</Link>}>
+      <Section title="Product taxability" className="mt-4" right={<Link to="/menu" className="text-xs text-teal-700 hover:underline">Menu &amp; Profit</Link>}>
         <p className="mb-3 text-sm text-charcoal/60">Set each product yourself. Items marked "needs review" are treated as nontaxable on new orders until you decide. Existing orders keep the decision that was in effect when they were placed.</p>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {(products.data ?? []).map((p) => (

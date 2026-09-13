@@ -59,7 +59,7 @@ export function ProductDetailPage() {
 
   return (
     <div>
-      <PageHeader title={prod.name} crumbs={["Home", "Products", prod.name]} actions={<>
+      <PageHeader title={prod.name} crumbs={["Home", "Menu & Profit", prod.name]} actions={<>
         <EditButton label="Edit product" onClick={() => setEdit(true)} /><button className="btn-ghost btn-sm" onClick={() => setEdit(true)}>Edit product</button>
         <button className="btn-ghost btn-sm text-negative" onClick={() => setDel(true)}>Archive</button>
       </>} />

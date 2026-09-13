@@ -17,7 +17,7 @@ profitability, reports, insights and exports.
 > replace a tax professional or the Texas Comptroller.
 
 **Simple by default.** The dashboard opens in *Simple mode*: Home, Orders,
-Products, Expenses, Reports, Settings; four headline numbers; a
+Menu & Profit, Sales by Dish, Expenses, Reports, Settings; four headline numbers; a
 New → Confirmed → Done order flow; short forms. *Settings → Advanced mode*
 reveals everything else (best sellers, customers, payments, deliveries, sales
 tax, insights, import/export, all 11 statuses, refunds, cost breakdowns, tax

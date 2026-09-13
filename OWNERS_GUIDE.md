@@ -52,7 +52,7 @@ directly). Choose *Direct product cost* for ingredients/packaging and
 *Operating expense* for everything else. Tick a recurrence for monthly bills.
 
 ## Update product costs
-**Products -> open a product -> Recipe**. Add each ingredient with the quantity
+**Menu & Profit -> tap a dish -> Recipe**. Add each ingredient with the quantity
 you use per unit; the package size and price on the ingredient give the cost
 automatically (a $10 / 10 lb bag with 1 lb used = $1.00). Packaging and
 labor minutes are on *Edit product*. Past orders keep the cost that applied
@@ -75,5 +75,5 @@ Every list has **Export CSV**. **Reports** has CSV and *Print / PDF* (use the
 browser's *Save as PDF*). **Import / Export** has a full JSON backup.
 
 ## Phone tips
-The bottom bar gives you Home, Orders, Products, Expenses and Reports; the
+The bottom bar gives you Home, Orders, Menu & Profit, Sales by Dish and Expenses; the
 menu button has everything else. Tables become cards; tap a card to open it.

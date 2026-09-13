@@ -5,9 +5,9 @@ import { LoginPage } from "./pages/Login";
 import { DashboardPage } from "./pages/Dashboard";
 import { OrdersPage } from "./pages/Orders";
 import { OrderDetailPage } from "./pages/OrderDetail";
-import { ProductsPage } from "./pages/Products";
 import { ProductDetailPage } from "./pages/ProductDetail";
 import { MenuPage } from "./pages/Menu";
+import { SalesPage } from "./pages/Sales";
 import { PerformancePage } from "./pages/Performance";
 import { CustomersPage, CustomerDetailPage } from "./pages/Customers";
 import { ExpensesPage } from "./pages/Expenses";
@@ -38,9 +38,10 @@ export default function App() {
           <Route index element={<DashboardPage />} />
           <Route path="orders" element={<OrdersPage />} />
           <Route path="orders/:id" element={<OrderDetailPage />} />
-          <Route path="products" element={<ProductsPage />} />
+          <Route path="products" element={<Navigate to="/menu" replace />} />
           <Route path="products/:id" element={<ProductDetailPage />} />
           <Route path="menu" element={<MenuPage />} />
+          <Route path="sales" element={<SalesPage />} />
           <Route path="performance" element={<PerformancePage />} />
           <Route path="customers" element={<CustomersPage />} />
           <Route path="customers/:id" element={<CustomerDetailPage />} />
