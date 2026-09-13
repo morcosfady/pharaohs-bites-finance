@@ -95,6 +95,8 @@ export interface Expense {
   amount_before_tax: Num; sales_tax_paid: Num; total_amount: Num; payment_method: PaymentMethod | null;
   receipt_path: string; cost_type: CostType; product_id: string | null; order_id: string | null; notes: string;
   recurrence: "none" | "weekly" | "monthly" | "quarterly" | "annual"; recurring_parent_id: string | null;
+  /** 'order_cost' = written automatically from an order's cost snapshot; null = entered by hand. */
+  auto_source: string | null;
   created_at: string; updated_at: string; deleted_at: string | null; expense_categories?: { name: string } | null;
 }
 

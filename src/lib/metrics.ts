@@ -60,7 +60,8 @@ export function computeKpis(i: MetricInputs): Kpis {
   const liveExp = i.expenses.filter((e) => !e.deleted_at);
   const catName = (e: Expense) => (e.expense_categories?.name ?? "").toLowerCase();
   const processingFees = sum(liveExp.filter((e) => catName(e).includes("payment fee") || catName(e).includes("bank")).map((e) => toCents(e.total_amount)));
-  const otherVariable = sum(liveExp.filter((e) => e.cost_type === "direct_product" && !!e.order_id).map((e) => toCents(e.total_amount)));
+  // Auto-generated order-cost rows mirror the COGS snapshot above, so they are shown in Expenses but not added again here.
+  const otherVariable = sum(liveExp.filter((e) => e.cost_type === "direct_product" && !!e.order_id && e.auto_source !== "order_cost").map((e) => toCents(e.total_amount)));
   // Operating expenses exclude direct product purchases (those are in COGS via recipes) and refunds (already netted).
   const operatingExpenses = sum(liveExp.filter((e) => e.cost_type === "operating" && !catName(e).includes("refund") && !catName(e).includes("payment fee") && !catName(e).includes("bank")).map((e) => toCents(e.total_amount)));
 

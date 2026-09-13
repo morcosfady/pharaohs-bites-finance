@@ -7,6 +7,7 @@ import { OrdersPage } from "./pages/Orders";
 import { OrderDetailPage } from "./pages/OrderDetail";
 import { ProductsPage } from "./pages/Products";
 import { ProductDetailPage } from "./pages/ProductDetail";
+import { MenuPage } from "./pages/Menu";
 import { PerformancePage } from "./pages/Performance";
 import { CustomersPage, CustomerDetailPage } from "./pages/Customers";
 import { ExpensesPage } from "./pages/Expenses";
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="orders/:id" element={<OrderDetailPage />} />
           <Route path="products" element={<ProductsPage />} />
           <Route path="products/:id" element={<ProductDetailPage />} />
+          <Route path="menu" element={<MenuPage />} />
           <Route path="performance" element={<PerformancePage />} />
           <Route path="customers" element={<CustomersPage />} />
           <Route path="customers/:id" element={<CustomerDetailPage />} />

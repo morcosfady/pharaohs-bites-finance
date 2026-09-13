@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Plus, Paperclip } from "lucide-react";
+import { Plus, Paperclip, Lock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { DateRangeBar, useDateRange } from "../components/DateRangeBar";
 import { DataTable, type Column } from "../components/DataTable";
 import { PageHeader, Modal, Field, Skeleton, ErrorBox, KpiCard, ConfirmDialog, useToast, EditButton } from "../components/ui";
@@ -15,6 +16,7 @@ import { useAdvanced } from "../hooks/useMode";
 type Row = Expense & { category: string; [k: string]: unknown };
 
 export function ExpensesPage() {
+  const nav = useNavigate();
   const [range, setRange] = useDateRange("this_month");
   const expenses = useExpenses(range);
   const cats = useExpenseCategories();
@@ -25,9 +27,11 @@ export function ExpensesPage() {
   const rows = useMemo<Row[]>(() => (expenses.data ?? []).map((e) => ({ ...e, category: e.expense_categories?.name ?? "—" })), [expenses.data]);
   const total = sum(rows.map((r) => toCents(r.total_amount)));
   const direct = sum(rows.filter((r) => r.cost_type === "direct_product").map((r) => toCents(r.total_amount)));
+  const auto = rows.filter((r) => r.auto_source === "order_cost");
+  const autoTotal = sum(auto.map((r) => toCents(r.total_amount)));
   const allCols: Column<Row>[] = [
     { key: "expense_date", header: "Date", render: (r) => fmtDate(r.expense_date) },
-    { key: "vendor", header: "Vendor", primary: true, render: (r) => <span><span className="font-medium">{r.vendor || "—"}</span><span className="block text-xs text-charcoal/50">{r.description}</span></span> },
+    { key: "vendor", header: "Vendor", primary: true, render: (r) => <span><span className="font-medium">{r.vendor || "—"}</span>{r.auto_source === "order_cost" && <span className="badge ml-2 bg-teal-50 text-teal-800" title="Calculated from the order; opens the order"><Lock size={10} /> Auto · order cost</span>}<span className="block text-xs text-charcoal/50">{r.description}</span></span> },
     { key: "category", header: "Category" },
     { key: "cost_type", header: "Type", mobile: false, render: (r) => r.cost_type === "direct_product" ? "Direct product cost" : "Operating" },
     { key: "amount_before_tax", header: "Before tax", numeric: true, mobile: false, render: (r) => fmt(toCents(r.amount_before_tax)) },
@@ -37,7 +41,7 @@ export function ExpensesPage() {
     { key: "receipt_path", header: "Receipt", render: (r) => r.receipt_path ? <button className="text-teal-700 hover:underline" onClick={async (ev) => { ev.stopPropagation(); const { data } = await supabase.storage.from("receipts").createSignedUrl(r.receipt_path, 300); if (data?.signedUrl) window.open(data.signedUrl, "_blank"); }}><Paperclip size={14} /></button> : "" },
     { key: "recurrence", header: "Recurring", mobile: false, render: (r) => r.recurrence === "none" ? "" : r.recurrence },
   ];
-  const editCol: Column<Row> = { key: "edit", header: "", render: (r) => <EditButton small label="Edit expense" onClick={() => setEdit(r)} /> };
+  const editCol: Column<Row> = { key: "edit", header: "", render: (r) => r.auto_source === "order_cost" ? <span /> : <EditButton small label="Edit expense" onClick={() => setEdit(r)} /> };
   const cols = [...(advanced ? allCols : allCols.filter((c) => ["expense_date", "vendor", "category", "total_amount", "receipt_path"].includes(c.key))), editCol];
   return (
     <div>
@@ -46,9 +50,9 @@ export function ExpensesPage() {
         <button className="btn-gold btn-sm" onClick={() => setEdit("new")}><Plus size={16} /> Add expense</button>
       </>} />
       <DateRangeBar range={range} onChange={setRange} />
-      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4"><KpiCard label="Total expenses" value={total} />{advanced && <><KpiCard label="Direct product costs" value={direct} /><KpiCard label="Operating expenses" value={total - direct} /></>}<KpiCard label="Entries" value={rows.length} kind="int" /></div>
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4"><KpiCard label="Total expenses" value={total} />{advanced ? <><KpiCard label="Direct product costs" value={direct} formula={`Includes ${fmt(autoTotal)} of order costs written automatically from ${auto.length} real order${auto.length === 1 ? "" : "s"}.`} /><KpiCard label="Operating expenses" value={total - direct} /></> : <KpiCard label="Order costs (auto)" value={autoTotal} formula={`Ingredients and packaging for ${auto.length} real order${auto.length === 1 ? "" : "s"}, added automatically. Test orders are skipped.`} />}<KpiCard label="Entries" value={rows.length} kind="int" /></div>
       {expenses.error && <ErrorBox error={expenses.error} />}
-      {expenses.isLoading ? <Skeleton rows={8} className="card p-5" /> : <DataTable rows={rows} columns={cols} rowKey={(r) => r.id} onRowClick={(r) => setEdit(r)} initialSort={{ key: "expense_date", dir: "desc" }} />}
+      {expenses.isLoading ? <Skeleton rows={8} className="card p-5" /> : <DataTable rows={rows} columns={cols} rowKey={(r) => r.id} onRowClick={(r) => r.auto_source === "order_cost" && r.order_id ? nav(`/orders/${r.order_id}`) : setEdit(r)} initialSort={{ key: "expense_date", dir: "desc" }} />}
       {edit && <ExpenseModal expense={edit === "new" ? undefined : edit} categories={cats.data ?? []} onClose={() => setEdit(null)} onDelete={(e) => { setEdit(null); setDel(e); }} />}
       <ConfirmDialog open={!!del} title="Delete this expense?" body="It is archived (soft-deleted) and kept in the audit log." danger confirmLabel="Delete" onCancel={() => setDel(null)} onConfirm={async () => { const e = del!; setDel(null); try { await write.mutateAsync(async () => unwrap(await supabase.from("expenses").update({ deleted_at: new Date().toISOString() }).eq("id", e.id).select("id"))); toast.push("Expense deleted"); } catch (err) { toast.push((err as Error).message, "err"); } }} />
     </div>
