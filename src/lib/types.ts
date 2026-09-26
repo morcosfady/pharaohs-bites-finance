@@ -97,7 +97,28 @@ export interface Expense {
   recurrence: "none" | "weekly" | "monthly" | "quarterly" | "annual"; recurring_parent_id: string | null;
   /** 'order_cost' = written automatically from an order's cost snapshot; null = entered by hand. */
   auto_source: string | null;
+  bank_transaction_id: string | null;
   created_at: string; updated_at: string; deleted_at: string | null; expense_categories?: { name: string } | null;
+}
+
+export interface BankAccount {
+  id: string; item_id: string; plaid_account_id: string; name: string; official_name: string;
+  mask: string; type: string; subtype: string; current_balance: Num | null; available_balance: Num | null;
+  is_tracked: boolean; created_at: string; updated_at: string;
+  bank_items?: { institution_name: string; status: string; last_synced_at: string | null; last_error: string } | null;
+}
+
+export interface BankTransaction {
+  id: string; account_id: string; plaid_transaction_id: string; posted_on: string; name: string;
+  merchant_name: string; /** Plaid convention: positive = money out. */ amount: Num;
+  iso_currency_code: string; pending: boolean; plaid_category: string; payment_channel: string;
+  expense_id: string | null; ignored: boolean; created_at: string; updated_at: string;
+  bank_accounts?: { name: string; mask: string } | null;
+}
+
+export interface BankRule {
+  id: string; match_text: string; vendor: string; category_id: string | null;
+  cost_type: CostType; skip: boolean; sort_order: number; created_at: string;
 }
 
 export interface TaxAdjustment { id: string; adjusted_on: string; amount: Num; reason: string; created_at: string }

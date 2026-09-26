@@ -5,6 +5,7 @@ import { supabase, unwrap } from "../lib/supabase";
 import type {
   BusinessSettings, TaxSettings, Product, ProductCategory, Ingredient, Recipe, Customer, Order, OrderFinancial,
   ProductSale, Payment, Refund, Expense, ExpenseCategory, DeliveryRecord, TaxAdjustment, TaxPeriodSummary, AuditLog,
+  BankAccount, BankTransaction, BankRule,
 } from "../lib/types";
 import type { DateRange } from "../lib/dates";
 
@@ -111,6 +112,60 @@ export function useTaxAdjustments() {
 }
 export function useTaxSummaries() {
   return useQuery({ queryKey: ["tax_summaries"], queryFn: async () => unwrap(await supabase.from("tax_period_summaries").select("*").order("period_start", { ascending: false })) as TaxPeriodSummary[] });
+}
+
+/* ---------------------------------------------------------------- bank feed */
+
+export function useBankAccounts() {
+  return useQuery({ queryKey: ["bank_accounts"], queryFn: async () =>
+    unwrap(await supabase.from("bank_accounts").select("*, bank_items(institution_name, status, last_synced_at, last_error)").order("created_at")) as BankAccount[] });
+}
+
+export function useBankTransactions(limit = 200) {
+  return useQuery({ queryKey: ["bank_transactions", limit], queryFn: async () =>
+    unwrap(await supabase.from("bank_transactions").select("*, bank_accounts(name, mask)").order("posted_on", { ascending: false }).limit(limit)) as BankTransaction[] });
+}
+
+export function useBankRules() {
+  return useQuery({ queryKey: ["bank_rules"], queryFn: async () =>
+    unwrap(await supabase.from("bank_rules").select("*").order("sort_order").order("created_at")) as BankRule[] });
+}
+
+/** Calls one of the Plaid edge functions with the signed-in admin's JWT. */
+export async function callPlaid<T>(fn: "plaid-link-token" | "plaid-exchange" | "plaid-sync", body: Record<string, unknown> = {}): Promise<T> {
+  const { data, error } = await supabase.functions.invoke(fn, { body });
+  if (error) {
+    // Supabase wraps non-2xx responses; surface Plaid's own message when present.
+    const detail = await (error as { context?: Response }).context?.json?.().catch(() => null);
+    throw new Error(detail?.error ?? error.message);
+  }
+  const res = data as { ok?: boolean; error?: string };
+  if (res?.ok === false) throw new Error(res.error ?? "request failed");
+  return data as T;
+}
+
+/** Loads Plaid Link once, from Plaid's own CDN. */
+export function loadPlaidLink(): Promise<PlaidLinkFactory> {
+  const w = window as unknown as { Plaid?: PlaidLinkFactory };
+  if (w.Plaid) return Promise.resolve(w.Plaid);
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>("script[data-plaid-link]");
+    const done = () => (w.Plaid ? resolve(w.Plaid) : reject(new Error("Plaid Link failed to load")));
+    if (existing) { existing.addEventListener("load", done); existing.addEventListener("error", () => reject(new Error("Plaid Link failed to load"))); return; }
+    const s = document.createElement("script");
+    s.src = "https://cdn.plaid.com/link/v2/stable/link-initialize.js";
+    s.async = true; s.dataset.plaidLink = "1";
+    s.onload = done; s.onerror = () => reject(new Error("Plaid Link failed to load"));
+    document.head.appendChild(s);
+  });
+}
+
+export interface PlaidLinkFactory {
+  create(opts: {
+    token: string;
+    onSuccess: (publicToken: string, metadata: { institution?: { institution_id?: string; name?: string } }) => void;
+    onExit?: (err: { display_message?: string; error_message?: string } | null) => void;
+  }): { open: () => void; exit: () => void; destroy: () => void };
 }
 
 /** Generic write helper: invalidates everything that could be affected. */
