@@ -18,7 +18,9 @@ export function cors(origin: string | null) {
   const allow = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
   return {
     "Access-Control-Allow-Origin": allow,
-    "Access-Control-Allow-Headers": "authorization, content-type",
+    // supabase-js always sends apikey and x-client-info; omitting them here
+    // makes the browser's preflight fail before the request is ever sent.
+    "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info, x-supabase-api-version, x-cron-secret",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Vary": "Origin",
   };
