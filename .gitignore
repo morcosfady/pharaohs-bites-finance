@@ -30,3 +30,6 @@ dist-ssr
 # supabase local state
 supabase/.temp
 supabase/.branches
+
+# Internal business documents — never publish to the public repo
+private/
