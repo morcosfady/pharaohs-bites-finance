@@ -1786,3 +1786,13 @@ select 'om-ali', 'Om Ali', 'أم علي', c.id,
 from product_categories c where c.name = 'Desserts'
 on conflict (slug) do update set name = excluded.name, name_ar = excluded.name_ar,
   selling_price = excluded.selling_price, image_url = excluded.image_url, is_active = true, deleted_at = null;
+
+-- ============================================================================
+-- 0029_white_cheese_photo_desc.sql : real photo + rewritten copy, 2026-09-27
+-- Mirrors assets/js/data.js on the customer website. Price unchanged ($2.99).
+-- ============================================================================
+
+update products set
+  description = 'Homemade Egyptian white cheese.',
+  image_url = 'https://morcosfady.github.io/pharaohs-bites/assets/img/menu-real/white-cheese.webp'
+where slug = 'white-cheese';
