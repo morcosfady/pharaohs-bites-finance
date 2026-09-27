@@ -62,7 +62,11 @@ export function MenuPage() {
         <button className="btn-ghost btn-sm" onClick={() => setShowInactive((v) => !v)}>{showInactive ? <EyeOff size={14} /> : <Eye size={14} />} {showInactive ? "Hide inactive" : "Show inactive"}</button>
         <button className="btn-gold btn-sm" onClick={() => setAdding(true)}><Plus size={16} /> New product</button>
       </>} />
-      <p className="mb-4 text-sm text-charcoal/60">What each dish costs you, what it sells for, and what you keep. Margin = profit ÷ sale price. Tap a dish to edit its price or cost.</p>
+      <p className="mb-2 text-sm text-charcoal/60">What each dish costs you, what it sells for, and what you keep. Margin = profit ÷ sale price. Tap a dish to edit its price or cost.</p>
+      <p className="mb-4 flex items-start gap-2 rounded-lg bg-teal-50 px-3 py-2 text-xs text-teal-900/80">
+        <span aria-hidden="true">ℹ️</span>
+        <span>This is a per-item reference calculator &mdash; it shows what happens if you sell one of each item, not your actual sales. It stays the same before your first order too. Real sales live on <b>Sales by Dish</b> and start at $0 until you launch.</span>
+      </p>
 
       {products.isLoading ? <Skeleton rows={8} className="card p-5" /> : (
         <>

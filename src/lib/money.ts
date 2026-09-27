@@ -32,7 +32,10 @@ export function money(value: number | string | null | undefined): string {
 
 export function pct(ratio: number | null | undefined, digits = 1): string {
   if (ratio == null || !Number.isFinite(ratio)) return "—";
-  return (ratio * 100).toFixed(digits) + "%";
+  const s = (ratio * 100).toFixed(digits);
+  // A tiny negative ratio (e.g. -0.001) rounds to "-0" at low precision, which
+  // reads as a display bug rather than the real (near-zero) loss it is.
+  return (/^-0(\.0+)?$/.test(s) ? s.slice(1) : s) + "%";
 }
 
 /** Safe ratio: returns null when the denominator is zero. */

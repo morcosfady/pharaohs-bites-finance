@@ -7,7 +7,7 @@ import { KpiCard, Section, Skeleton, ErrorBox, Badge, EditButton, Tip } from "..
 import { groupFor, GROUPS } from "../components/menuViz";
 import { useOrderFinancials, useExpenses, usePayments, useRefunds, useSettings, useProductSales, useTaxAdjustments, useTaxSettings, useCategories } from "../hooks/queries";
 import { useAuth } from "../hooks/useAuth";
-import { previousRange, bucketKey, bucketLabel } from "../lib/dates";
+import { previousRange, bucketKey, bucketLabel, PRESETS } from "../lib/dates";
 import { computeKpis, KPI_FORMULAS, rankProducts, REVENUE_STATUSES, OPEN_STATUSES } from "../lib/metrics";
 import { fromCents, toCents, fmt, sum, pct, change, ratio } from "../lib/money";
 import { buildInsights } from "../lib/insights";
@@ -102,6 +102,11 @@ export function DashboardPage() {
   const otherExpenses = k ? k.operatingExpenses + k.processingFees + k.deliveryCost : 0;
   const totalIn = k ? k.netSales + k.deliveryFees : 0;
   const pendingCount = (cur.orders.data ?? []).filter((o) => OPEN_STATUSES.includes(o.status)).length;
+  const periodLabel = PRESETS.find((p) => p.key === range.key)?.label ?? "Custom period";
+  const cumulativeProfit = useMemo(() => series.reduce<{ name: string; value: number }[]>((acc, s) => {
+    acc.push({ name: s.name, value: (acc.length ? acc[acc.length - 1].value : 0) + s.profit });
+    return acc;
+  }, []), [series]);
 
   // "where the money went" — one stacked bar from money in to money kept
   const flow = k ? [
@@ -141,6 +146,12 @@ export function DashboardPage() {
       {error && <ErrorBox error={error} />}
       {loading || !k ? <Skeleton rows={6} className="card p-5" /> : (
         <>
+          {/* ---- total profit showcase ---- */}
+          <ProfitHero profit={k.netProfit} prev={p?.netProfit} periodLabel={periodLabel} trend={cumulativeProfit} />
+
+          {/* ---- profit split ---- */}
+          <ProfitSplit profit={k.netProfit} periodLabel={periodLabel} />
+
           {/* ---- tiles ---- */}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <Tile emoji="💵" label="Sales" value={fmt(k.netSales)} prev={p?.netSales} cur={k.netSales} accent="#0F4C4C" formula={KPI_FORMULAS.netSales} spark={series.map((s) => s.revenue)} />
@@ -319,6 +330,92 @@ function HeroNum({ emoji, label, value, cur, prev, tone = "flat" }: { emoji: str
       <div className="text-xs uppercase tracking-wider text-ivory/60">{emoji} {label}</div>
       <div className={`font-display text-3xl font-semibold leading-none ${tone === "good" ? "text-emerald-300" : tone === "bad" ? "text-rose-300" : "text-gold-soft"}`}>{value}</div>
       <div className="mt-1 [&_span]:!text-ivory/70"><Delta cur={cur} prev={prev} /></div>
+    </div>
+  );
+}
+
+/** The headline number for the whole page: total profit for the selected
+ *  period, with a faint cumulative-profit trend line washed in behind it. */
+function ProfitHero({ profit, prev, periodLabel, trend }: { profit: number; prev?: number | null; periodLabel: string; trend: { name: string; value: number }[] }) {
+  const positive = profit > 0, negative = profit < 0;
+  const color = positive ? "#16855B" : negative ? "#C64040" : "#083838";
+  const tagline = positive
+    ? "🎉 In the green — every dollar past this line is yours to keep."
+    : negative
+      ? "🌱 Pre-launch costs are running ahead of sales — completely normal before day one."
+      : "🌱 A blank slate. Your first order starts the story.";
+  const hasTrend = trend.length > 1;
+  return (
+    <div className="relative mb-4 overflow-hidden rounded-2xl border border-ivory-200" style={{ background: "linear-gradient(135deg,#FCF9F2 0%,#F3E8CE 55%,#F7F0DF 100%)" }}>
+      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-2.5 opacity-50" style={{
+        backgroundImage: "linear-gradient(45deg, #D4A72C 23%, transparent 24%), linear-gradient(135deg, #D4A72C 23%, transparent 24%), linear-gradient(45deg, transparent 74%, #0F4C4C 75%), linear-gradient(135deg, transparent 74%, #0F4C4C 75%)",
+        backgroundSize: "20px 10px",
+      }} />
+      {hasTrend && (
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-20 opacity-25 md:h-28">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={trend} margin={{ left: 0, right: 0, top: 0, bottom: 0 }}>
+              <defs><linearGradient id="heroTrend" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity=".6" /><stop offset="100%" stopColor={color} stopOpacity="0" /></linearGradient></defs>
+              <Area type="monotone" dataKey="value" stroke={color} strokeWidth={2} fill="url(#heroTrend)" isAnimationActive={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+      <div className="relative flex flex-col items-center gap-1.5 px-6 py-8 text-center md:py-10">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[.16em] text-teal-900/70">💰 Total profit · {periodLabel}</span>
+        <span className="font-display font-bold leading-none tabular-nums" style={{ fontSize: "clamp(2.75rem,8vw,4.75rem)", color }}>{fmt(profit)}</span>
+        <div className="[&_span]:!text-sm"><Delta cur={profit} prev={prev} /></div>
+        <p className="mt-1 max-w-md text-sm text-charcoal/60">{tagline}</p>
+      </div>
+    </div>
+  );
+}
+
+/** A fixed 60/40 split of the same total profit between the two owners.
+ *  The pie shape is always 60/40 by definition; only the dollar amounts
+ *  (which can be negative before launch) come from real data. */
+function ProfitSplit({ profit, periodLabel }: { profit: number; periodLabel: string }) {
+  const fady = Math.round(profit * 0.6);
+  const howaida = profit - fady; // remainder keeps the two halves exact to the cent
+  const loss = profit < 0;
+  const shape = [{ name: "Fady", value: 60 }, { name: "Howaida", value: 40 }];
+  const colors = ["#D4A72C", "#0F4C4C"];
+  return (
+    <Section title={`🤝 ${loss ? "Loss" : "Profit"} split — Fady & Howaida`} className="mb-4" right={<span className="text-xs text-charcoal/50">{periodLabel} · 60 / 40</span>}>
+      <div className="flex flex-col items-center gap-5 sm:flex-row sm:justify-center">
+        <div className="relative h-[168px] w-[168px] shrink-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie data={shape} dataKey="value" nameKey="name" innerRadius={54} outerRadius={82} paddingAngle={3} stroke="#fff" strokeWidth={3} startAngle={90} endAngle={-270}>
+                {shape.map((_, i) => <Cell key={i} fill={colors[i]} />)}
+              </Pie>
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+            <span className={`font-display text-xl font-semibold ${loss ? "text-negative" : "text-teal-900"}`}>{fmt(profit)}</span>
+            <span className="text-[10px] uppercase tracking-wider text-charcoal/50">{loss ? "to cover" : "to split"}</span>
+          </div>
+        </div>
+        <div className="flex w-full max-w-sm flex-col gap-3 sm:w-auto">
+          <PersonShare initial="F" name="Fady" pctLabel="60%" amount={fady} color="#D4A72C" loss={loss} />
+          <PersonShare initial="H" name="Howaida" pctLabel="40%" amount={howaida} color="#0F4C4C" loss={loss} />
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+function PersonShare({ initial, name, pctLabel, amount, color, loss }: { initial: string; name: string; pctLabel: string; amount: number; color: string; loss: boolean }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: color + "14" }}>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-display text-base font-semibold text-white" style={{ background: color }}>{initial}</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="font-medium text-charcoal">{name}</span>
+          <span className="text-xs font-semibold text-charcoal/50">{pctLabel}</span>
+        </div>
+        <span className={`font-display text-lg font-semibold ${loss ? "text-negative" : ""}`} style={loss ? undefined : { color }}>{fmt(amount)}</span>
+      </div>
     </div>
   );
 }
