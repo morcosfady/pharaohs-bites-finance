@@ -1759,3 +1759,14 @@ select 'rice-pudding', 'Rice Pudding', 'رز باللبن', c.id,
 from product_categories c where c.name = 'Pudding'
 on conflict (slug) do update set name = excluded.name, name_ar = excluded.name_ar,
   selling_price = excluded.selling_price, image_url = excluded.image_url, is_active = true, deleted_at = null;
+
+-- ============================================================================
+-- 0027_rice_pudding_description.sql : owner sent a better photo/description, 2026-09-27
+-- Mirrors assets/js/data.js on the customer website. Price unchanged ($7).
+-- The image_url is unchanged (same filename, new file); only the wording
+-- changed to mention the optional mixed nuts topping shown in the new photo.
+-- ============================================================================
+
+update products set
+  description = 'Creamy Egyptian rice pudding topped with mixed nuts (optional), served chilled in a small dessert cup.'
+where slug = 'rice-pudding';
