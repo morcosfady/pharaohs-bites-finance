@@ -3,11 +3,12 @@ import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Section } from "./ui";
 import { fmt, pct, change } from "../lib/money";
 
-/* Shared "big number" pieces for showing total profit prominently, reused on
-   both Home (real profit for the selected period) and Menu & Profit (the
-   notional profit if you sold one of every costed item). Which one it is
-   comes entirely from what's passed in -- these components don't know or
-   care which kind of profit they're showing. */
+/* Shared "big number" pieces. StatHero shows any single headline figure
+   prominently (Home's real profit, Sales by Dish's real revenue); the
+   caller always supplies the title and tagline so the words on screen
+   can't drift out of sync with the number. ProfitSplit is narrower on
+   purpose -- it always divides real profit 60/40 between the two owners,
+   never sales or any other figure. */
 
 function Delta({ cur, prev, invert }: { cur: number; prev?: number | null; invert?: boolean }) {
   if (prev == null || (prev === 0 && cur === 0)) return null;
@@ -22,17 +23,21 @@ function Delta({ cur, prev, invert }: { cur: number; prev?: number | null; inver
   );
 }
 
-/** The headline number: total profit, with an optional faint cumulative
- *  trend washed in behind it. Pass `trend={[]}` where there's no time axis
- *  to compare against (e.g. a static per-catalog total). */
-export function ProfitHero({ profit, prev, label, trend = [] }: { profit: number; prev?: number | null; label: string; trend?: { name: string; value: number }[] }) {
-  const positive = profit > 0, negative = profit < 0;
-  const color = positive ? "#16855B" : negative ? "#C64040" : "#083838";
-  const tagline = positive
-    ? "🎉 In the green — every dollar past this line is yours to keep."
-    : negative
-      ? "🌱 Costs are running ahead of sales right now — completely normal before day one."
-      : "🌱 A blank slate. Your first order starts the story.";
+/** The headline number: a big stat (profit, sales, whatever the caller
+ *  passes) with an optional faint cumulative trend washed in behind it.
+ *  Deliberately generic -- `title` and `tagline` are always supplied by the
+ *  caller rather than assumed, so the words on screen can never quietly
+ *  drift out of sync with which metric is actually being shown. Pass
+ *  `trend={[]}` where there's no time axis to compare against (e.g. a
+ *  static per-catalog total), and omit `tone` to colour by sign (the usual
+ *  case for profit) or fix it to a colour that doesn't flip with sign
+ *  (e.g. sales, which is never meaningfully "bad" at zero or above). */
+export function StatHero({ value, prev, label, title, tagline, trend = [], tone }: {
+  value: number; prev?: number | null; label: string; title: string; tagline: string;
+  trend?: { name: string; value: number }[]; tone?: "byValue" | string;
+}) {
+  const positive = value > 0, negative = value < 0;
+  const color = tone && tone !== "byValue" ? tone : positive ? "#16855B" : negative ? "#C64040" : "#083838";
   const hasTrend = trend.length > 1;
   return (
     <div className="relative mb-4 overflow-hidden rounded-2xl border border-ivory-200" style={{ background: "linear-gradient(135deg,#FCF9F2 0%,#F3E8CE 55%,#F7F0DF 100%)" }}>
@@ -51,9 +56,9 @@ export function ProfitHero({ profit, prev, label, trend = [] }: { profit: number
         </div>
       )}
       <div className="relative flex flex-col items-center gap-1.5 px-6 py-8 text-center md:py-10">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[.16em] text-teal-900/70">💰 Total profit · {label}</span>
-        <span className="font-display font-bold leading-none tabular-nums" style={{ fontSize: "clamp(2.75rem,8vw,4.75rem)", color }}>{fmt(profit)}</span>
-        <div className="[&_span]:!text-sm"><Delta cur={profit} prev={prev} /></div>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[.16em] text-teal-900/70">{title} · {label}</span>
+        <span className="font-display font-bold leading-none tabular-nums" style={{ fontSize: "clamp(2.75rem,8vw,4.75rem)", color }}>{fmt(value)}</span>
+        <div className="[&_span]:!text-sm"><Delta cur={value} prev={prev} /></div>
         <p className="mt-1 max-w-md text-sm text-charcoal/60">{tagline}</p>
       </div>
     </div>

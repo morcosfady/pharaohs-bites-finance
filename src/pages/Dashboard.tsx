@@ -5,7 +5,7 @@ import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { DateRangeBar, useDateRange } from "../components/DateRangeBar";
 import { KpiCard, Section, Skeleton, ErrorBox, Badge, EditButton, Tip } from "../components/ui";
 import { groupFor, GROUPS } from "../components/menuViz";
-import { ProfitHero, ProfitSplit } from "../components/ProfitViz";
+import { StatHero, ProfitSplit } from "../components/ProfitViz";
 import { useOrderFinancials, useExpenses, usePayments, useRefunds, useSettings, useProductSales, useTaxAdjustments, useTaxSettings, useCategories } from "../hooks/queries";
 import { useAuth } from "../hooks/useAuth";
 import { previousRange, bucketKey, bucketLabel, PRESETS } from "../lib/dates";
@@ -148,7 +148,15 @@ export function DashboardPage() {
       {loading || !k ? <Skeleton rows={6} className="card p-5" /> : (
         <>
           {/* ---- total profit showcase ---- */}
-          <ProfitHero profit={k.netProfit} prev={p?.netProfit} label={periodLabel} trend={cumulativeProfit} />
+          <StatHero
+            value={k.netProfit} prev={p?.netProfit} label={periodLabel} trend={cumulativeProfit}
+            title="💰 Total profit"
+            tagline={k.netProfit > 0
+              ? "🎉 In the green — every dollar past this line is yours to keep."
+              : k.netProfit < 0
+                ? "🌱 Costs are running ahead of sales right now — completely normal before day one."
+                : "🌱 A blank slate. Your first order starts the story."}
+          />
 
           {/* ---- profit split ---- */}
           <ProfitSplit profit={k.netProfit} label={periodLabel} />

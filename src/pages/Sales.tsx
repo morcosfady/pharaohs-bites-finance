@@ -5,7 +5,7 @@ import { Trophy, ShoppingBag, Sparkles, Coins } from "lucide-react";
 import { PageHeader, Skeleton, ErrorBox } from "../components/ui";
 import { DateRangeBar, useDateRange } from "../components/DateRangeBar";
 import { GROUPS, groupFor, band, BAND, Stat, GroupHeader, Num, DishThumb, type GroupKey } from "../components/menuViz";
-import { ProfitHero, ProfitSplit } from "../components/ProfitViz";
+import { StatHero, ProfitSplit } from "../components/ProfitViz";
 import { useProducts, useSettings, useProductSales } from "../hooks/queries";
 import { REVENUE_STATUSES } from "../lib/metrics";
 import { fmt, toCents, pct, ratio, fromCents } from "../lib/money";
@@ -64,13 +64,21 @@ export function SalesPage() {
       <p className="mb-2 text-sm text-charcoal/60">What actually sold in the period, dish by dish: units, money in, what it cost you, and what you kept. Test orders never count.</p>
       <p className="mb-4 flex items-start gap-2 rounded-lg bg-teal-50 px-3 py-2 text-xs text-teal-900/80">
         <span aria-hidden="true">ℹ️</span>
-        <span>This is profit from dishes sold &mdash; revenue minus ingredient and packaging cost. It doesn&rsquo;t include overhead, delivery cost, payment fees or tax, so it will usually read higher than <b>Home</b>&rsquo;s Total profit.</span>
+        <span>The big number below is <b>total sales</b> &mdash; money customers paid, before any costs. The profit split under it only subtracts ingredient and packaging cost, not overhead, delivery, fees or tax, so it will usually read higher than <b>Home</b>&rsquo;s Total profit.</span>
       </p>
       <DateRangeBar range={range} onChange={setRange} />
 
       {loading ? <Skeleton rows={8} className="card p-5" /> : (
         <>
-          <ProfitHero profit={profit} label={`${periodLabel} · dishes sold`} />
+          <StatHero
+            value={tot.revenue} label={`${periodLabel} · dishes sold`}
+            title="💵 Total sales" tone="#0F4C4C"
+            tagline={tot.revenue > 0
+              ? "🎉 Real orders, real dollars — here's what customers have paid so far."
+              : tot.revenue < 0
+                ? "📉 Refunds outweighed sales this period."
+                : "🌱 A blank slate. Your first order starts the story."}
+          />
           <ProfitSplit profit={profit} label={`${periodLabel} · dishes sold`} />
 
           <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
