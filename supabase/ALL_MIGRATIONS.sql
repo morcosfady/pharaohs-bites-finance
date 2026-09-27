@@ -1721,3 +1721,13 @@ update products set
   description = 'A small, freshly baked plain cake with a golden crust and soft, fluffy crumb.',
   image_url = 'https://morcosfady.github.io/pharaohs-bites/assets/img/menu-real/round-cake.webp'
 where slug = 'round-cake';
+
+-- ============================================================================
+-- 0024_chocolate_pudding_photo_desc.sql : real photo + rewritten copy, 2026-09-27
+-- Mirrors assets/js/data.js on the customer website. Price unchanged ($7).
+-- ============================================================================
+
+update products set
+  description = 'Smooth, rich chocolate pudding served chilled in a small dessert cup.',
+  image_url = 'https://morcosfady.github.io/pharaohs-bites/assets/img/menu-real/chocolate-pudding.webp'
+where slug = 'chocolate-pudding';
