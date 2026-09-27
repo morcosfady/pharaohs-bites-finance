@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, ShoppingBag, BarChart3, Users, Receipt, CreditCard, Truck, FileText, Percent, Settings, Database, LogOut, Menu, Bell, X, Lightbulb, ChefHat, CircleDollarSign } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, BarChart3, Users, Receipt, CreditCard, Truck, FileText, Percent, Settings, Database, LogOut, Menu, Bell, X, Lightbulb, ChefHat, CircleDollarSign, Calculator } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { useAdvanced } from "../hooks/useMode";
 import { useQueryClient } from "@tanstack/react-query";
@@ -14,6 +14,7 @@ const NAV = [
   { to: "/sales", label: "Sales by Dish", icon: CircleDollarSign },
   { to: "/customers", label: "Customers", icon: Users },
   { to: "/expenses", label: "Expenses", icon: Receipt },
+  { to: "/cost", label: "Cost", icon: Calculator },
   { to: "/reports", label: "Reports", icon: FileText },
   { to: "/performance", label: "Best Sellers", icon: BarChart3, advanced: true },
   { to: "/payments", label: "Payments", icon: CreditCard, advanced: true },
