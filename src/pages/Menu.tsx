@@ -5,7 +5,6 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, 
 import { AlertTriangle, Trophy, Eye, EyeOff, Plus } from "lucide-react";
 import { PageHeader, Skeleton, ErrorBox } from "../components/ui";
 import { GROUPS, groupFor, band, BAND, Stat, GroupHeader, Num, DishThumb, type GroupKey } from "../components/menuViz";
-import { ProfitHero, ProfitSplit } from "../components/ProfitViz";
 import { ProductModal } from "./Products";
 import { useProducts, useSettings, useCategories } from "../hooks/queries";
 import { productUnitCost, REVENUE_STATUSES } from "../lib/metrics";
@@ -71,9 +70,6 @@ export function MenuPage() {
 
       {products.isLoading ? <Skeleton rows={8} className="card p-5" /> : (
         <>
-          <ProfitHero profit={totals.sale - totals.cost} label="one of each costed item" />
-          <ProfitSplit profit={totals.sale - totals.cost} label="one of each costed item" />
-
           <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Stat label="Menu items" value={String(rows.length)} sub={`${costed.length} with a cost, ${missing.length} without`} />
             <Stat label="Average margin" value={pct(avgMargin, 0)} sub={`${fmt(totals.sale - totals.cost)} profit if you sold one of each`} tone={band(avgMargin, low)} formula="Total profit ÷ total sale price, one of every costed item." />

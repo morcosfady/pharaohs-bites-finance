@@ -5,9 +5,11 @@ import { Trophy, ShoppingBag, Sparkles, Coins } from "lucide-react";
 import { PageHeader, Skeleton, ErrorBox } from "../components/ui";
 import { DateRangeBar, useDateRange } from "../components/DateRangeBar";
 import { GROUPS, groupFor, band, BAND, Stat, GroupHeader, Num, DishThumb, type GroupKey } from "../components/menuViz";
+import { ProfitHero, ProfitSplit } from "../components/ProfitViz";
 import { useProducts, useSettings, useProductSales } from "../hooks/queries";
 import { REVENUE_STATUSES } from "../lib/metrics";
 import { fmt, toCents, pct, ratio, fromCents } from "../lib/money";
+import { PRESETS } from "../lib/dates";
 import type { Product } from "../lib/types";
 
 /* Sales by Dish: what actually sold in the period, per item, grouped the
@@ -51,6 +53,7 @@ export function SalesPage() {
   const chart = groups.filter((g) => g.revenue > 0).map((g) => ({ name: `${g.emoji} ${g.label}`, cost: fromCents(g.cost), profit: fromCents(g.profit), margin: g.margin }));
   const maxRevenue = Math.max(0, ...rows.map((r) => r.revenue));
   const loading = products.isLoading || sales.isLoading;
+  const periodLabel = PRESETS.find((p) => p.key === range.key)?.label ?? "Custom period";
 
   if (products.error) return <ErrorBox error={products.error} />;
   if (sales.error) return <ErrorBox error={sales.error} />;
@@ -58,11 +61,18 @@ export function SalesPage() {
   return (
     <div>
       <PageHeader title="Sales by Dish" crumbs={["Home", "Sales by Dish"]} />
-      <p className="mb-3 text-sm text-charcoal/60">What actually sold in the period, dish by dish: units, money in, what it cost you, and what you kept. Test orders never count.</p>
+      <p className="mb-2 text-sm text-charcoal/60">What actually sold in the period, dish by dish: units, money in, what it cost you, and what you kept. Test orders never count.</p>
+      <p className="mb-4 flex items-start gap-2 rounded-lg bg-teal-50 px-3 py-2 text-xs text-teal-900/80">
+        <span aria-hidden="true">ℹ️</span>
+        <span>This is profit from dishes sold &mdash; revenue minus ingredient and packaging cost. It doesn&rsquo;t include overhead, delivery cost, payment fees or tax, so it will usually read higher than <b>Home</b>&rsquo;s Total profit.</span>
+      </p>
       <DateRangeBar range={range} onChange={setRange} />
 
       {loading ? <Skeleton rows={8} className="card p-5" /> : (
         <>
+          <ProfitHero profit={profit} label={`${periodLabel} · dishes sold`} />
+          <ProfitSplit profit={profit} label={`${periodLabel} · dishes sold`} />
+
           <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Stat label="Revenue" value={fmt(tot.revenue)} sub={`${tot.units} item${tot.units === 1 ? "" : "s"} across ${orders} order${orders === 1 ? "" : "s"}`} icon={<Coins size={14} />} />
             <Stat label="Profit" value={fmt(profit)} sub={tot.revenue > 0 ? `${pct(ratio(profit, tot.revenue), 0)} margin after ${fmt(tot.cost)} of ingredients` : "after ingredients & packaging"} tone={tot.revenue > 0 ? band(ratio(profit, tot.revenue), low) : "none"} formula="Revenue minus the ingredient, packaging and other direct cost snapshotted on each order line." />
