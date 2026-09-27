@@ -60,15 +60,17 @@ export function computeKpis(i: MetricInputs): Kpis {
   const liveExp = i.expenses.filter((e) => !e.deleted_at);
   const catName = (e: Expense) => (e.expense_categories?.name ?? "").toLowerCase();
   const processingFees = sum(liveExp.filter((e) => catName(e).includes("payment fee") || catName(e).includes("bank")).map((e) => toCents(e.total_amount)));
-  // Auto-generated order-cost rows mirror the COGS snapshot above, so they are shown in Expenses but not added again here.
-  // Bank-imported rows are shown in Expenses but deliberately excluded from every
-  // profit figure for now: real ingredient purchases would double-count against
-  // COGS, which already comes from each order's recipe cost. Remove BANK_EXCLUDED
-  // from these two filters to switch the P&L to cash accounting.
-  const notAuto = (e: Expense) => e.auto_source !== "order_cost" && e.auto_source !== "bank";
-  const otherVariable = sum(liveExp.filter((e) => e.cost_type === "direct_product" && !!e.order_id && notAuto(e)).map((e) => toCents(e.total_amount)));
+  // Auto-generated order-cost rows mirror the COGS snapshot above (COGS comes
+  // straight from each order's recipe cost via order_financials), so an
+  // order_cost row must not also land in otherVariable or it would be counted
+  // twice. Bank-fed rows carry no such duplicate: nothing else in this
+  // function reads them, so unlike order_cost they must count normally
+  // wherever their cost_type puts them -- excluding them entirely (as an
+  // earlier version of this file did) silently dropped every real bank
+  // expense from net profit.
+  const otherVariable = sum(liveExp.filter((e) => e.cost_type === "direct_product" && !!e.order_id && e.auto_source !== "order_cost").map((e) => toCents(e.total_amount)));
   // Operating expenses exclude direct product purchases (those are in COGS via recipes) and refunds (already netted).
-  const operatingExpenses = sum(liveExp.filter((e) => e.cost_type === "operating" && notAuto(e) && !catName(e).includes("refund") && !catName(e).includes("payment fee") && !catName(e).includes("bank")).map((e) => toCents(e.total_amount)));
+  const operatingExpenses = sum(liveExp.filter((e) => e.cost_type === "operating" && !catName(e).includes("refund") && !catName(e).includes("payment fee") && !catName(e).includes("bank")).map((e) => toCents(e.total_amount)));
 
   const grossProfit = netSales - cogs - laborCost;
   const totalRevenue = netSales + deliveryFees;

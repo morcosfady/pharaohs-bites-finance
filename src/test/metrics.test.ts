@@ -48,6 +48,22 @@ describe("computeKpis", () => {
     expect(withTaxRefund.taxLiability).toBe(k.taxCollected - 100 - 50);
   });
   it("margins are null when there are no sales", () => { const e = computeKpis({ orders: [], expenses: [], payments: [], refunds: [], includeLabor: false }); expect(e.grossMargin).toBeNull(); expect(e.avgOrderValue).toBeNull(); });
+  it("counts a bank-fed operating expense in net profit (regression: it was silently dropped)", () => {
+    // A real Chase transaction with no matching rule, category or linked order --
+    // exactly the shape apply_bank_transaction() writes. It has no other channel
+    // (COGS is order-recipe-based, unrelated to this row) so it must reduce
+    // profit like any manually-entered operating expense would.
+    const bankRow = { ...EXPENSES[1], id: "bank1", vendor: "Court Solutions LLC", category_id: null, auto_source: "bank" as const, total_amount: 10, amount_before_tax: 10, expense_categories: null };
+    const withBank = computeKpis({ ...base, expenses: [...EXPENSES, bankRow], orders: [], payments: [], refunds: [] });
+    const withoutBank = computeKpis({ ...base, expenses: EXPENSES, orders: [], payments: [], refunds: [] });
+    expect(withBank.operatingExpenses).toBe(withoutBank.operatingExpenses + 1000);
+    expect(withBank.netProfit).toBe(withoutBank.netProfit - 1000);
+  });
+  it("still excludes an order_cost row from otherVariable so recipe-based COGS is never double-counted", () => {
+    const orderCostRow = { ...EXPENSES[0], id: "oc1", vendor: "Kitchen", order_id: "o1", auto_source: "order_cost" as const, total_amount: 5, amount_before_tax: 5 };
+    const withOrderCost = computeKpis({ ...base, expenses: [...EXPENSES, orderCostRow] });
+    expect(withOrderCost.otherVariable).toBe(k.otherVariable); // unchanged: order_cost never adds to otherVariable
+  });
 });
 
 describe("rankProducts", () => {
