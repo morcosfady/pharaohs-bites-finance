@@ -10,9 +10,6 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 export const ALLOWED_ORIGINS = [
   "https://morcosfady.github.io",
-  "https://pharaohsbites.com",
-  "https://www.pharaohsbites.com",
-  "https://finance.pharaohsbites.com",
   "http://localhost:5173",
   "http://localhost:5174",
 ];

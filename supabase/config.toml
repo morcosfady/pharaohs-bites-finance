@@ -14,8 +14,8 @@ sql_paths = ["./seed.dev.sql"]
 
 [auth]
 enabled = true
-site_url = "https://finance.pharaohsbites.com/"
-additional_redirect_urls = ["https://finance.pharaohsbites.com", "https://finance.pharaohsbites.com/", "http://localhost:5173", "http://localhost:5173/"]
+site_url = "https://morcosfady.github.io/pharaohs-bites-finance/"
+additional_redirect_urls = ["http://localhost:5173", "http://localhost:5173/"]
 # Public signups are DISABLED. The first admin is created from the Supabase
 # dashboard (see README) and then listed in admin_profiles.
 enable_signup = false

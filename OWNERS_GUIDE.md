@@ -1,6 +1,6 @@
 # Pharaoh's Bites Finance Dashboard: Owner's Guide
 
-Sign in at **https://finance.pharaohsbites.com/** with the
+Sign in at **https://morcosfady.github.io/pharaohs-bites-finance/** with the
 email and password created for you in Supabase. Nobody else can register.
 
 ## Simple or advanced
