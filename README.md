@@ -10,6 +10,7 @@ profitability, reports, insights and exports.
 | Dashboard (this repo) | https://finance.pharaohsbites.com/ |
 | Demo with sample data (no login) | https://finance.pharaohsbites.com/demo/ |
 | Customer website | https://pharaohsbites.com (was https://morcosfady.github.io/pharaohs-bites/) (repo `morcosfady/pharaohs-bites`) |
+| **Full project handoff (start here)** | [docs/HANDOFF.md](docs/HANDOFF.md) |
 | Owner's guide | [OWNERS_GUIDE.md](OWNERS_GUIDE.md) |
 | WhatsApp limits & Cloud API plan | [docs/WHATSAPP_CLOUD_API.md](docs/WHATSAPP_CLOUD_API.md) |
 
