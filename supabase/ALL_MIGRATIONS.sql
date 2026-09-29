@@ -1947,3 +1947,15 @@ on conflict (slug) do update set name = excluded.name, name_ar = excluded.name_a
   description = excluded.description, image_url = excluded.image_url,
   selling_price = excluded.selling_price, ingredient_cost = excluded.ingredient_cost,
   other_direct_cost = excluded.other_direct_cost, is_active = true, deleted_at = null;
+
+-- ===== 0039_goulash_beef_photo.sql =====
+-- ============================================================================
+-- 0039_goulash_beef_photo.sql : correct photo for the Goulash Tray with Plant-Based Beef, 2026-09-29
+-- The owner supplied the right photo (tray with beef, olive and green pepper
+-- filling). The image file was replaced on the customer website; the version
+-- tag makes browsers fetch the new picture instead of the cached old one.
+-- ============================================================================
+
+update products set
+  image_url = 'https://morcosfady.github.io/pharaohs-bites/assets/img/menu-real/goulash-beef.webp?v=2'
+where slug = 'goulash-beef';
