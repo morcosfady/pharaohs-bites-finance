@@ -1980,3 +1980,5 @@ select 'test-item', 'TEST ITEM (1 cent)', 'تجربة', c.id,
 from product_categories c where c.name = 'Drinks'
 on conflict (slug) do update set name = excluded.name, selling_price = excluded.selling_price,
   is_active = true, deleted_at = null;
+-- 0043_remove_test_item.sql : removes the temporary 1-cent test item (0041), 2026-09-30.
+update products set is_active = false, deleted_at = now() where slug = 'test-item';
