@@ -116,7 +116,7 @@ export function OrdersPage() {
       {orders.error && <ErrorBox error={orders.error} />}
       {orders.isLoading ? <Skeleton rows={8} className="card p-5" /> : (
         <DataTable rows={filtered} columns={cols} rowKey={(o) => o.id} onRowClick={(o) => nav(`/orders/${o.id}`)} initialSort={{ key: "created_at", dir: "desc" }}
-          empty={<EmptyState title="No orders match" hint="Website orders appear here the moment a customer taps the WhatsApp button. Try widening the date range." action={<Link to="/orders?all=1" className="btn-ghost btn-sm">Show all orders</Link>} />} />
+          empty={<EmptyState title="No orders match" hint="Website orders appear here the moment a customer places an order. Try widening the date range." action={<Link to="/orders?all=1" className="btn-ghost btn-sm">Show all orders</Link>} />} />
       )}
       <NewOrderModal open={newOpen} onClose={() => setNewOpen(false)} />
     </div>
