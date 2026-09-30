@@ -186,6 +186,8 @@ async function notifyAll(supabase: ReturnType<typeof createClient>, orderNumber:
           `🧮 Dishes: ${usd(subtotal)}`,
           `🚗 Delivery (${info.miles} mi): ${usd(info.deliveryFee)}`,
           `✅ <b>TOTAL: ${usd(total)}</b>`,
+          bar,
+          `📦 <b>Total items: ${info.items.reduce((n, i) => n + i.quantity, 0)}</b>`,
         ].join("\n");
         const tr = await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
           method: "POST",
