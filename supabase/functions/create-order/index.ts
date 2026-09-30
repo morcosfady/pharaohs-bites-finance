@@ -108,10 +108,13 @@ async function notifyAll(supabase: ReturnType<typeof createClient>, orderNumber:
 
     const topic = Deno.env.get("NTFY_TOPIC");
     if (topic) {
-      const text = `${info.name} ${info.phone}\n${lines.map((l) => `${l.qty} x ${l.name}`).join(", ")}\n$${total.toFixed(2)} (delivery $${info.deliveryFee.toFixed(2)})\n${info.address}`;
+      const when = new Date(info.requestedAt).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/Chicago" });
+      const win = /Delivery window: ([^|]+?) on /.exec(info.instructions)?.[1] ?? "";
+      const note = info.instructions.replace(/^Delivery window: [^|]+\|?\s*/, "").trim();
+      const text = `${info.name} ${info.phone}\n${info.email}\n${lines.map((l) => `${l.qty} x ${l.name}`).join(", ")}\n$${total.toFixed(2)} (delivery $${info.deliveryFee.toFixed(2)})\nDeliver: ${when}${win ? " " + win : ""}\n${info.address}${note ? "\nNote: " + note : ""}`;
       await fetch(`https://ntfy.sh/${topic}`, {
         method: "POST",
-        headers: { Title: `New order ${orderNumber}`, Priority: "high", Tags: "bell" },
+        headers: { Title: `New order ${orderNumber}`, Priority: "high", Tags: "bell", Click: "https://finance.pharaohsbites.com/#/orders" },
         body: text,
         signal: AbortSignal.timeout(10000),
       }).catch((e) => console.error("ntfy failed", String(e)));
