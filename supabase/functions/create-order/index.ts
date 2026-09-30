@@ -61,6 +61,72 @@ function haversineMiles(a: { lat: number; lon: number }, b: { lat: number; lon: 
   const h = Math.sin(r(b.lat - a.lat) / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(r(b.lon - a.lon) / 2) ** 2;
   return 3958.8 * 2 * Math.asin(Math.sqrt(h));
 }
+
+// ---- notifications -------------------------------------------------------------
+// Owner: free push notification through ntfy.sh (topic kept in NTFY_TOPIC).
+// Customer: a styled receipt email through the business Gmail relay (Apps
+// Script; RECEIPT_URL + RECEIPT_TOKEN, never exposed to the browser).
+// Failures here never block the order.
+type OrderInfo = { name: string; phone: string; email: string; address: string; instructions: string; requestedAt: string; items: Array<{ slug: string; quantity: number; options: string }>; deliveryFee: number; miles: number };
+const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+function receiptHtml(orderNumber: string, info: OrderInfo, lines: Array<{ qty: number; name: string; options: string }>, subtotal: number, total: number): string {
+  const rows = lines.map((l) => `<tr><td style="padding:8px 0;color:#f3e9d2;border-bottom:1px solid #3a3226">${l.qty} &times; ${esc(l.name)}${l.options ? `<br><span style="color:#b9a880;font-size:12px">${esc(l.options)}</span>` : ""}</td></tr>`).join("");
+  const when = new Date(info.requestedAt).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "America/Chicago" });
+  const win = /Delivery window: ([^|]+?) on /.exec(info.instructions)?.[1] ?? "";
+  const money = (n: number) => "$" + n.toFixed(2);
+  return `<!doctype html><html><body style="margin:0;background:#14110c;font-family:Georgia,serif">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#14110c"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#1e1a13;border:1px solid #c9a24a;border-radius:14px;overflow:hidden">
+<tr><td align="center" style="padding:28px 20px 8px;color:#c9a24a;font-size:34px">&#9765;</td></tr>
+<tr><td align="center" style="color:#c9a24a;font-size:26px;letter-spacing:1px;padding:0 20px">Pharaoh&rsquo;s Bites</td></tr>
+<tr><td align="center" style="color:#b9a880;font-size:13px;letter-spacing:3px;padding:4px 20px 22px">EGYPTIAN CLOUD KITCHEN &middot; DALLAS</td></tr>
+<tr><td style="padding:0 28px"><div style="height:1px;background:#c9a24a;opacity:.6"></div></td></tr>
+<tr><td style="padding:22px 28px 6px;color:#f3e9d2;font-size:18px">Thank you, ${esc(info.name.split(" ")[0])}!</td></tr>
+<tr><td style="padding:0 28px 18px;color:#d8ccb0;font-size:15px;line-height:1.6">We received your order and we are getting ready to cook. We will contact you on <b style="color:#f3e9d2">${esc(info.phone)}</b> to confirm.</td></tr>
+<tr><td style="padding:0 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#14110c;border:1px solid #3a3226;border-radius:10px"><tr><td style="padding:14px 16px;color:#b9a880;font-size:12px;letter-spacing:2px">ORDER NUMBER<br><span style="color:#c9a24a;font-size:22px;letter-spacing:1px">${esc(orderNumber)}</span></td></tr></table></td></tr>
+<tr><td style="padding:20px 28px 4px;color:#c9a24a;font-size:12px;letter-spacing:2px">YOUR ORDER</td></tr>
+<tr><td style="padding:0 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr>
+<tr><td style="padding:14px 28px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="color:#d8ccb0;font-size:14px">
+<tr><td style="padding:3px 0">Dishes</td><td align="right">${money(subtotal)}</td></tr>
+<tr><td style="padding:3px 0">Delivery (${info.miles} mi)</td><td align="right">${money(info.deliveryFee)}</td></tr>
+<tr><td style="padding:10px 0 0;color:#c9a24a;font-size:17px;border-top:1px solid #3a3226">Total</td><td align="right" style="padding:10px 0 0;color:#c9a24a;font-size:17px;border-top:1px solid #3a3226"><b>${money(total)}</b></td></tr></table></td></tr>
+<tr><td style="padding:22px 28px 4px;color:#c9a24a;font-size:12px;letter-spacing:2px">DELIVERY</td></tr>
+<tr><td style="padding:0 28px 22px;color:#f3e9d2;font-size:15px;line-height:1.6">${esc(when)}${win ? " &middot; " + esc(win) : ""}<br><span style="color:#b9a880">${esc(info.address)}</span></td></tr>
+<tr><td style="padding:0 28px"><div style="height:1px;background:#c9a24a;opacity:.6"></div></td></tr>
+<tr><td align="center" style="padding:20px 28px 26px;color:#b9a880;font-size:13px;line-height:1.7">Questions? Message us on WhatsApp <a href="https://wa.me/17879684078" style="color:#c9a24a;text-decoration:none">+1 (787) 968-4078</a><br>pharaohsbites.com</td></tr>
+</table></td></tr></table></body></html>`;
+}
+
+async function notifyAll(supabase: ReturnType<typeof createClient>, orderNumber: string, info: OrderInfo) {
+  try {
+    const { data: prods } = await supabase.from("products").select("slug, name").in("slug", info.items.map((i) => i.slug));
+    const names = new Map((prods ?? []).map((p: { slug: string; name: string }) => [p.slug, p.name]));
+    const { data: fin } = await supabase.from("order_financials").select("total, net_product_sales").eq("order_number", orderNumber).maybeSingle();
+    const total = Number(fin?.total ?? 0), subtotal = Number(fin?.net_product_sales ?? 0);
+    const lines = info.items.map((i) => ({ qty: i.quantity, name: names.get(i.slug) ?? i.slug, options: i.options }));
+
+    const topic = Deno.env.get("NTFY_TOPIC");
+    if (topic) {
+      const text = `${info.name} ${info.phone}\n${lines.map((l) => `${l.qty} x ${l.name}`).join(", ")}\n$${total.toFixed(2)} (delivery $${info.deliveryFee.toFixed(2)})\n${info.address}`;
+      await fetch(`https://ntfy.sh/${topic}`, {
+        method: "POST",
+        headers: { Title: `New order ${orderNumber}`, Priority: "high", Tags: "bell" },
+        body: text,
+        signal: AbortSignal.timeout(10000),
+      }).catch((e) => console.error("ntfy failed", String(e)));
+    }
+
+    const rUrl = Deno.env.get("RECEIPT_URL"), rToken = Deno.env.get("RECEIPT_TOKEN");
+    if (rUrl && rToken && info.email) {
+      await fetch(rUrl, {
+        method: "POST",
+        body: JSON.stringify({ token: rToken, kind: "receipt", to: info.email, subject: `Your Pharaoh's Bites order ${orderNumber}`, html: receiptHtml(orderNumber, info, lines, subtotal, total) }),
+        signal: AbortSignal.timeout(20000),
+      }).catch((e) => console.error("receipt failed", String(e)));
+    }
+  } catch (e) { console.error("notify failed", String(e)); }
+}
 const RATE_LIMIT_WINDOW_MIN = 10;
 const RATE_LIMIT_MAX = 8;
 const MAX_ITEMS = 40;
@@ -68,7 +134,7 @@ const MAX_QTY = 50;
 
 type Body = {
   checkout_token?: unknown;
-  customer?: { name?: unknown; phone?: unknown; street?: unknown; apt?: unknown; city?: unknown; state?: unknown; zip?: unknown; instructions?: unknown; requested_at?: unknown };
+  customer?: { name?: unknown; phone?: unknown; street?: unknown; apt?: unknown; city?: unknown; state?: unknown; zip?: unknown; instructions?: unknown; requested_at?: unknown; email?: unknown };
   items?: Array<{ slug?: unknown; quantity?: unknown; options?: unknown }>;
 };
 
@@ -124,6 +190,8 @@ Deno.serve(async (req) => {
   const zip = str(c.zip, 10, true);
   const instructions = str(c.instructions, 500);
   const requestedRaw = str(c.requested_at, 40);
+  const emailRaw = str(c.email, 120);
+  const email = emailRaw && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(emailRaw) ? emailRaw : "";
   if (!name || !phone || !street || apt == null || !city || !state || !zip || instructions == null || requestedRaw == null) {
     return json({ ok: false, error: "missing or invalid customer fields" }, 400, headers);
   }
@@ -198,6 +266,10 @@ Deno.serve(async (req) => {
 
   const { error: feeErr } = await supabase.from("orders").update({ delivery_fee: deliveryFee }).eq("order_number", data as string);
   if (feeErr) console.error("delivery fee update failed", feeErr.message);
+  const notify = notifyAll(supabase, data as string, { name, phone, email, address: `${street}${apt ? ", " + apt : ""}, ${city}, ${state} ${zip}`, instructions, requestedAt, items, deliveryFee, miles });
+  // keep the function alive until the email is sent, without making the customer wait
+  // deno-lint-ignore no-explicit-any
+  const rt = (globalThis as any).EdgeRuntime; if (rt?.waitUntil) rt.waitUntil(notify); else await notify;
   return json({ ok: true, order_number: data as string, delivery_fee: deliveryFee, miles }, 200, headers);
 });
 
