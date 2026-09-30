@@ -6,6 +6,7 @@
 // Secrets: STRIPE_WEBHOOK_SECRET (whsec_...).
 // ---------------------------------------------------------------------------
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { notifyAll } from "../_shared/notify.ts";
 
 async function verify(raw: string, header: string | null, secret: string): Promise<boolean> {
   if (!header) return false;
@@ -44,5 +45,11 @@ Deno.serve(async (req) => {
     return new Response("error", { status: 500 }); // Stripe will retry
   }
   await supabase.from("orders").update({ payment_method: "card" }).eq("id", orderId);
+  // First confirmation of this order: confirm it and send the owner alert + customer receipt.
+  const { data: ord } = await supabase.from("orders").select("order_number, notify_payload").eq("id", orderId).maybeSingle();
+  if (ord?.notify_payload) {
+    await supabase.from("orders").update({ status: "confirmed", notify_payload: null }).eq("id", orderId);
+    await notifyAll(supabase, ord.order_number, ord.notify_payload);
+  }
   return new Response("ok", { status: 200 });
 });
