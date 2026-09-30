@@ -135,7 +135,9 @@ async function notifyAll(supabase: ReturnType<typeof createClient>, orderNumber:
     const lines = info.items.map((i) => ({ qty: i.quantity, name: names.get(i.slug) ?? i.slug, options: i.options }));
 
     const topic = Deno.env.get("NTFY_TOPIC");
-    if (topic) {
+    const tgToken = Deno.env.get("TELEGRAM_BOT_TOKEN"), tgChat = Deno.env.get("TELEGRAM_CHAT_ID");
+    const status: string[] = [];
+    if (topic || (tgToken && tgChat)) {
       const when = new Date(info.requestedAt).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/Chicago" });
       const win = /Delivery window: ([^|]+?) on /.exec(info.instructions)?.[1] ?? "";
       const note = info.instructions.replace(/^Delivery window: [^|]+\|?\s*/, "").trim();
@@ -162,23 +164,40 @@ async function notifyAll(supabase: ReturnType<typeof createClient>, orderNumber:
         `🚗 Delivery (${info.miles} mi): ${usd(info.deliveryFee)}`,
         `✅ TOTAL: ${usd(total)}`,
       ].join("\n");
-      await fetch(`https://ntfy.sh/${topic}`, {
-        method: "POST",
-        headers: { Title: `New order ${orderNumber}`, Priority: "urgent", Tags: "bell", Click: "https://finance.pharaohsbites.com/#/orders" },
-        body: text,
-        signal: AbortSignal.timeout(10000),
-      }).catch((e) => console.error("ntfy failed", String(e)));
+      // Telegram (primary): no shared-IP limits.
+      if (tgToken && tgChat) {
+        const tr = await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: tgChat, text: `🔔 NEW ORDER ${orderNumber}\n${text}`, disable_web_page_preview: true, reply_markup: { inline_keyboard: [[{ text: "Open dashboard", url: "https://finance.pharaohsbites.com/#/orders" }]] } }),
+          signal: AbortSignal.timeout(10000),
+        }).catch((e) => { console.error("telegram failed", String(e)); return null; });
+        if (!tr) status.push("telegram: network error");
+        else if (!tr.ok) { const t = await tr.text(); console.error("telegram status", tr.status, t); status.push(`telegram ${tr.status}: ${t.slice(0, 160)}`); }
+      }
+      // ntfy (backup). A failure here must never stop the receipt email.
+      if (topic) {
+        const nr = await fetch(`https://ntfy.sh/${topic}`, {
+          method: "POST",
+          headers: { Title: `New order ${orderNumber}`, Priority: "urgent", Tags: "bell", Click: "https://finance.pharaohsbites.com/#/orders", ...(Deno.env.get("NTFY_TOKEN") ? { Authorization: `Bearer ${Deno.env.get("NTFY_TOKEN")!.trim()}` } : {}) },
+          body: text,
+          signal: AbortSignal.timeout(10000),
+        }).catch((e) => { console.error("ntfy failed", String(e)); return null; });
+        if (!nr) status.push("ntfy: network error");
+        else if (!nr.ok) { const t = await nr.text(); console.error("ntfy status", nr.status, t); status.push(`ntfy ${nr.status}`); }
+      }
     }
 
     const rUrl = Deno.env.get("RECEIPT_URL"), rToken = Deno.env.get("RECEIPT_TOKEN");
-    if (rUrl && rToken && info.email) {
+    if (rUrl && rToken && info.email && !info.email.toLowerCase().endsWith("@example.com")) {
       await fetch(rUrl, {
         method: "POST",
         body: JSON.stringify({ token: rToken, kind: "receipt", to: info.email, subject: `Your Pharaoh's Bites order ${orderNumber}`, html: receiptHtml(orderNumber, info, lines, subtotal, total) }),
         signal: AbortSignal.timeout(20000),
       }).catch((e) => console.error("receipt failed", String(e)));
     }
-  } catch (e) { console.error("notify failed", String(e)); }
+    return status.length ? status.join("; ") : "ok";
+  } catch (e) { console.error("notify failed", String(e)); return "notify failed: " + String(e); }
 }
 const RATE_LIMIT_WINDOW_MIN = 10;
 const RATE_LIMIT_MAX = 8;
@@ -324,7 +343,8 @@ Deno.serve(async (req) => {
   // keep the function alive until the email is sent, without making the customer wait
   // deno-lint-ignore no-explicit-any
   const rt = (globalThis as any).EdgeRuntime; if (rt?.waitUntil) rt.waitUntil(notify); else await notify;
-  return json({ ok: true, order_number: data as string, delivery_fee: deliveryFee, miles }, 200, headers);
+  const dbg = Deno.env.get("NOTIFY_DEBUG") ? await notify : undefined;
+  return json({ ok: true, order_number: data as string, delivery_fee: deliveryFee, miles, ...(dbg ? { notify: dbg } : {}) }, 200, headers);
 });
 
 function json(payload: unknown, status: number, headers: Record<string, string>) {
