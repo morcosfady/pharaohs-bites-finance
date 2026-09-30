@@ -360,7 +360,7 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: "could not save order" }, 500, headers);
   }
 
-  const { error: feeErr } = await supabase.from("orders").update({ delivery_fee: deliveryFee }).eq("order_number", data as string);
+  const { error: feeErr } = await supabase.from("orders").update({ delivery_fee: deliveryFee, status: "confirmed" }).eq("order_number", data as string);
   if (feeErr) console.error("delivery fee update failed", feeErr.message);
   const notify = notifyAll(supabase, data as string, { name, phone, email, address: `${street}${apt ? ", " + apt : ""}, ${city}, ${state} ${zip}`, instructions, requestedAt, items, deliveryFee, miles });
   // keep the function alive until the email is sent, without making the customer wait

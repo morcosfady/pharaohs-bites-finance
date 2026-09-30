@@ -41,7 +41,7 @@ export function Layout() {
   const pending = orders?.filter((o) => o.status === "pending_whatsapp_confirmation").length ?? 0;
   const taxDays = tax?.next_due_date ? differenceInCalendarDays(new Date(tax.next_due_date), new Date()) : null;
   const notices = [
-    pending > 0 ? { text: `${pending} pending WhatsApp order${pending > 1 ? "s" : ""} to confirm`, to: "/orders?status=pending_whatsapp_confirmation" } : null,
+    pending > 0 ? { text: `${pending} pending order${pending > 1 ? "s" : ""} to confirm`, to: "/orders?status=pending_whatsapp_confirmation" } : null,
     taxDays != null && taxDays <= (tax?.reminder_days_before ?? 14) ? { text: taxDays < 0 ? "Sales-tax due date has passed" : `Sales-tax return due in ${taxDays} day${taxDays === 1 ? "" : "s"}`, to: "/tax" } : null,
   ].filter(Boolean) as { text: string; to: string }[];
   const [bell, setBell] = useState(false);

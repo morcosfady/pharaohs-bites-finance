@@ -1,7 +1,7 @@
 import type { OrderStatus, PaymentStatus, PaymentMethod, DeliveryProvider, DeliveryStatus, TaxStatus, CustomerStatus } from "./types";
 
 export const ORDER_STATUSES: { value: OrderStatus; label: string; cls: string }[] = [
-  { value: "pending_whatsapp_confirmation", label: "Pending WhatsApp Confirmation", cls: "bg-amber-100 text-amber-900 ring-1 ring-amber-300" },
+  { value: "pending_whatsapp_confirmation", label: "Pending", cls: "bg-amber-100 text-amber-900 ring-1 ring-amber-300" },
   { value: "contacted", label: "Contacted", cls: "bg-sky-100 text-sky-900" },
   { value: "delivery_fee_pending", label: "Delivery Fee Pending", cls: "bg-orange-100 text-orange-900" },
   { value: "awaiting_customer_approval", label: "Awaiting Customer Approval", cls: "bg-violet-100 text-violet-900" },

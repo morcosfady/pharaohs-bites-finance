@@ -80,7 +80,7 @@ describe("insights", () => {
     const prev = computeKpis({ orders: FIN.slice(0, 2), expenses: [], payments: [], refunds: [], includeLabor: false });
     const out = buildInsights({ current: cur, previous: prev, products: rankProducts(SALES, false), prevProducts: [], pendingWhatsapp: 1, unpaidCount: 2, lowMarginPct: 0.3, taxDueDate: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10), periodLabel: "month" });
     const text = out.map((i) => i.text).join("\n");
-    expect(text).toContain("best seller by units"); expect(text).toContain("1 pending WhatsApp order has not been confirmed"); expect(text).toContain("2 orders remain unpaid"); expect(text).toMatch(/due in [45] days/);
+    expect(text).toContain("best seller by units"); expect(text).toContain("1 pending order has not been confirmed"); expect(text).toContain("2 orders remain unpaid"); expect(text).toMatch(/due in [45] days/);
     expect(out.every((i) => !/NaN|undefined/.test(i.text))).toBe(true);
   });
 });

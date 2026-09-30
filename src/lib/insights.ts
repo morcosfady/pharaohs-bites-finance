@@ -37,7 +37,7 @@ export function buildInsights(args: {
   }
   if (c.deliveryCost > c.deliveryFees && c.deliveryCost > 0) out.push({ tone: "negative", text: `Delivery costs (${fmt(c.deliveryCost)}) exceeded delivery fees collected (${fmt(c.deliveryFees)}) this ${args.periodLabel}.`, href: "#/deliveries" });
   if (args.unpaidCount > 0) out.push({ tone: "warning", text: `${args.unpaidCount} order${args.unpaidCount === 1 ? " remains" : "s remain"} unpaid (${fmt(c.outstandingBalance)} outstanding).`, href: "#/orders?payment=unpaid" });
-  if (args.pendingWhatsapp > 0) out.push({ tone: "warning", text: `${args.pendingWhatsapp} pending WhatsApp order${args.pendingWhatsapp === 1 ? " has" : "s have"} not been confirmed.`, href: "#/orders?status=pending_whatsapp_confirmation" });
+  if (args.pendingWhatsapp > 0) out.push({ tone: "warning", text: `${args.pendingWhatsapp} pending order${args.pendingWhatsapp === 1 ? " has" : "s have"} not been confirmed.`, href: "#/orders?status=pending_whatsapp_confirmation" });
   if (args.ingredientCostChange != null && args.ingredientCostChange > 0.05) out.push({ tone: "warning", text: `Ingredient costs increased ${pct(args.ingredientCostChange, 0)} this ${args.periodLabel}.`, href: "#/expenses" });
   if (args.taxDueDate) {
     const days = differenceInCalendarDays(new Date(args.taxDueDate), new Date());
