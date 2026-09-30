@@ -166,10 +166,33 @@ async function notifyAll(supabase: ReturnType<typeof createClient>, orderNumber:
       ].join("\n");
       // Telegram (primary): no shared-IP limits.
       if (tgToken && tgChat) {
+        const bigDate = new Date(info.requestedAt).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "America/Chicago" }).toUpperCase();
+        const bar = "🟥🟥🟥🟥🟥🟥🟥🟥🟥";
+        const tgHtml = [
+          `🔔 <b>NEW ORDER ${esc(orderNumber)}</b>`,
+          bar,
+          "⏰ <b>DELIVER ON</b>",
+          `📅 <b><u>${esc(bigDate)}</u></b>`,
+          `🕐 <code>${esc(win || "time not set")}</code>`,
+          bar,
+          "<b>👤 CUSTOMER</b>",
+          `🙋 <b>${esc(info.name)}</b>`,
+          `📱 ${esc(info.phone)}`,
+          `✉️ ${esc(info.email)}`,
+          `🏠 ${esc(info.address)}`,
+          ...(note ? [`📝 <i>${esc(note)}</i>`] : []),
+          "",
+          "<b>🛒 ITEMS</b>",
+          ...info.items.flatMap((i) => [`🍽️ <b>${i.quantity} ×</b> ${esc(names.get(i.slug) ?? i.slug)}${i.options ? " (" + esc(i.options) + ")" : ""} — ${usd(i.quantity * (prices.get(i.slug) ?? 0))}`, ...(AR_NAMES[i.slug] ? [`🇪🇬 <i>${esc(AR_NAMES[i.slug])}</i>`] : [])]),
+          "",
+          `🧮 Dishes: ${usd(subtotal)}`,
+          `🚗 Delivery (${info.miles} mi): ${usd(info.deliveryFee)}`,
+          `✅ <b>TOTAL: ${usd(total)}</b>`,
+        ].join("\n");
         const tr = await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chat_id: tgChat, text: `🔔 NEW ORDER ${orderNumber}\n${text}`, disable_web_page_preview: true, reply_markup: { inline_keyboard: [[{ text: "Open dashboard", url: "https://finance.pharaohsbites.com/#/orders" }]] } }),
+          body: JSON.stringify({ chat_id: tgChat, text: tgHtml, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: { inline_keyboard: [[{ text: "Open dashboard", url: "https://finance.pharaohsbites.com/#/orders" }]] } }),
           signal: AbortSignal.timeout(10000),
         }).catch((e) => { console.error("telegram failed", String(e)); return null; });
         if (!tr) status.push("telegram: network error");
