@@ -164,7 +164,7 @@ async function notifyAll(supabase: ReturnType<typeof createClient>, orderNumber:
       ].join("\n");
       await fetch(`https://ntfy.sh/${topic}`, {
         method: "POST",
-        headers: { Title: `New order ${orderNumber}`, Priority: "high", Tags: "bell", Click: "https://finance.pharaohsbites.com/#/orders" },
+        headers: { Title: `New order ${orderNumber}`, Priority: "urgent", Tags: "bell", Click: "https://finance.pharaohsbites.com/#/orders" },
         body: text,
         signal: AbortSignal.timeout(10000),
       }).catch((e) => console.error("ntfy failed", String(e)));
