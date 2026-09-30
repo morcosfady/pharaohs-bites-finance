@@ -253,7 +253,7 @@ function DeliveryPanel({ orderId, record, fee, locked, onSave, mileageCost, deli
   );
 }
 
-function PaymentModal({ open, onClose, orderId, balance, defaultMethod, onSave }: { open: boolean; onClose: () => void; orderId: string; balance: number; defaultMethod: PaymentMethod | null; onSave: (fn: () => Promise<unknown>, msg?: string) => Promise<void> }) {
+export function PaymentModal({ open, onClose, orderId, balance, defaultMethod, onSave }: { open: boolean; onClose: () => void; orderId: string; balance: number; defaultMethod: PaymentMethod | null; onSave: (fn: () => Promise<unknown>, msg?: string) => Promise<void> }) {
   const [amount, setAmount] = useState(fromCents(Math.max(balance, 0)));
   const [method, setMethod] = useState<PaymentMethod>(defaultMethod ?? "zelle");
   const [ref, setRef] = useState(""); const [notes, setNotes] = useState(""); const [date, setDate] = useState(new Date().toISOString().slice(0, 16));

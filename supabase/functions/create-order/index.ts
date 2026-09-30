@@ -39,6 +39,28 @@ function deliveryDateProblem(requested: Date, now: Date = new Date()): string | 
   const farEnough = requested.getTime() - now.getTime() >= 12 * 3600 * 1000;
   return laterDay || farEnough ? null : "delivery must be tomorrow or later";
 }
+
+// ---- delivery fee: $5 + $1.75 per mile from the kitchen ---------------------
+// Miles = straight-line distance x 1.3 (approximate road distance). Address is
+// looked up with the free US Census geocoder. Kitchen coordinates live in the
+// KITCHEN_LAT / KITCHEN_LON secrets so the address is not in the public repo.
+const FEE_BASE = 5;
+const FEE_PER_MILE = 1.75;
+const ROAD_FACTOR = 1.3;
+async function geocode(address: string): Promise<{ lat: number; lon: number } | null | "error"> {
+  try {
+    const url = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?benchmark=Public_AR_Current&format=json&address=" + encodeURIComponent(address);
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return "error";
+    const m = (await res.json())?.result?.addressMatches?.[0];
+    return m ? { lat: m.coordinates.y, lon: m.coordinates.x } : null;
+  } catch { return "error"; }
+}
+function haversineMiles(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
+  const r = (d: number) => d * Math.PI / 180;
+  const h = Math.sin(r(b.lat - a.lat) / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(r(b.lon - a.lon) / 2) ** 2;
+  return 3958.8 * 2 * Math.asin(Math.sqrt(h));
+}
 const RATE_LIMIT_WINDOW_MIN = 10;
 const RATE_LIMIT_MAX = 8;
 const MAX_ITEMS = 40;
@@ -136,8 +158,17 @@ Deno.serve(async (req) => {
   });
 
   // ---- idempotency: same token => same order ------------------------------
-  const { data: existing } = await supabase.from("orders").select("order_number").eq("checkout_token", token).maybeSingle();
-  if (existing) return json({ ok: true, order_number: existing.order_number, duplicate: true }, 200, headers);
+  const { data: existing } = await supabase.from("orders").select("order_number, delivery_fee").eq("checkout_token", token).maybeSingle();
+  if (existing) return json({ ok: true, order_number: existing.order_number, delivery_fee: Number(existing.delivery_fee), duplicate: true }, 200, headers);
+
+  // ---- delivery fee (before we save anything) ---------------------------------
+  const kLat = Number(Deno.env.get("KITCHEN_LAT")), kLon = Number(Deno.env.get("KITCHEN_LON"));
+  if (!isFinite(kLat) || !isFinite(kLon) || !kLat || !kLon) return json({ ok: false, error: "delivery pricing is not configured" }, 503, headers);
+  const where = await geocode(`${street}, ${city}, ${state} ${zip}`);
+  if (where === "error") return json({ ok: false, error: "could not check the delivery address, please try again" }, 503, headers);
+  if (!where) return json({ ok: false, error: "we could not find that address, please check the street, city and ZIP" }, 400, headers);
+  const miles = Math.round(haversineMiles({ lat: kLat, lon: kLon }, where) * ROAD_FACTOR * 10) / 10;
+  const deliveryFee = Math.round((FEE_BASE + FEE_PER_MILE * miles) * 100) / 100;
 
   // ---- rate limit per IP -------------------------------------------------
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";
@@ -165,7 +196,9 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: "could not save order" }, 500, headers);
   }
 
-  return json({ ok: true, order_number: data as string }, 200, headers);
+  const { error: feeErr } = await supabase.from("orders").update({ delivery_fee: deliveryFee }).eq("order_number", data as string);
+  if (feeErr) console.error("delivery fee update failed", feeErr.message);
+  return json({ ok: true, order_number: data as string, delivery_fee: deliveryFee, miles }, 200, headers);
 });
 
 function json(payload: unknown, status: number, headers: Record<string, string>) {
