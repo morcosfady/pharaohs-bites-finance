@@ -6,7 +6,7 @@
 // Secrets: STRIPE_WEBHOOK_SECRET (whsec_...).
 // ---------------------------------------------------------------------------
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { notifyAll } from "../_shared/notify.ts";
+import { recordPaidSession } from "../_shared/payments.ts";
 
 async function verify(raw: string, header: string | null, secret: string): Promise<boolean> {
   if (!header) return false;
@@ -29,27 +29,9 @@ Deno.serve(async (req) => {
   if (event.type !== "checkout.session.completed" && event.type !== "checkout.session.async_payment_succeeded") return new Response("ignored", { status: 200 });
   const s = event.data?.object;
   if (!s || s.payment_status !== "paid") return new Response("not paid", { status: 200 });
-  const orderId = s.metadata?.order_id;
-  if (!orderId) return new Response("no order", { status: 200 });
+  if (!s.metadata?.order_id) return new Response("no order", { status: 200 });
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
-  const { error } = await supabase.from("payments").insert({
-    order_id: orderId,
-    amount: (s.amount_total ?? 0) / 100,
-    method: "card",
-    reference: `stripe:${s.payment_intent ?? s.id}`,
-    notes: "Paid online (Stripe Checkout)",
-  });
-  if (error && !error.message.includes("payments_stripe_ref_uniq")) {
-    console.error("record payment failed", error.message);
-    return new Response("error", { status: 500 }); // Stripe will retry
-  }
-  await supabase.from("orders").update({ payment_method: "card" }).eq("id", orderId);
-  // First confirmation of this order: confirm it and send the owner alert + customer receipt.
-  const { data: ord } = await supabase.from("orders").select("order_number, notify_payload").eq("id", orderId).maybeSingle();
-  if (ord?.notify_payload) {
-    await supabase.from("orders").update({ status: "confirmed", notify_payload: null }).eq("id", orderId);
-    await notifyAll(supabase, ord.order_number, ord.notify_payload);
-  }
+  if (!(await recordPaidSession(supabase, s))) return new Response("error", { status: 500 }); // Stripe will retry
   return new Response("ok", { status: 200 });
 });

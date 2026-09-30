@@ -8,6 +8,7 @@
 // Secrets: STRIPE_SECRET_KEY (set with `supabase secrets set`).
 // ---------------------------------------------------------------------------
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { recordPaidSession } from "../_shared/payments.ts";
 
 const ALLOWED_ORIGINS = [
   "https://morcosfady.github.io",
@@ -46,11 +47,21 @@ Deno.serve(async (req) => {
   }
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
-  const { data: order } = await supabase.from("orders").select("id, order_number, status, delivery_method").eq("order_number", order_number).eq("checkout_token", checkout_token).maybeSingle();
+  const { data: order } = await supabase.from("orders").select("id, order_number, status, delivery_method, stripe_session_id").eq("order_number", order_number).eq("checkout_token", checkout_token).maybeSingle();
   if (!order) return json({ ok: false, error: "order not found" }, 404, headers);
   const { data: fin } = await supabase.from("order_financials").select("balance_due, amount_paid").eq("id", order.id).maybeSingle();
   const balanceCents = Math.round(Number(fin?.balance_due ?? 0) * 100);
-  const paid = balanceCents <= 0 && Number(fin?.amount_paid ?? 0) > 0;
+  let paid = balanceCents <= 0 && Number(fin?.amount_paid ?? 0) > 0;
+
+  // Safety net: if Stripe's confirmation (webhook) has not arrived, ask Stripe directly.
+  if (action === "status" && !paid && order.stripe_session_id) {
+    try {
+      const k = (Deno.env.get("STRIPE_SECRET_KEY") ?? "").replace(/[^A-Za-z0-9_]/g, "");
+      const r = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(order.stripe_session_id)}`, { headers: { Authorization: `Bearer ${k}` }, signal: AbortSignal.timeout(10000) });
+      const sess = await r.json();
+      if (r.ok && sess.payment_status === "paid" && sess.metadata?.order_id === order.id) paid = await recordPaidSession(supabase, sess);
+    } catch (e) { console.error("status fallback failed", String(e)); }
+  }
 
   // The pickup address is shown only to a customer who has paid for a pickup order.
   if (action === "status") return json({ ok: true, paid, ...(paid && order.delivery_method === "pickup" ? { pickup_address: Deno.env.get("KITCHEN_ADDRESS") ?? "" } : {}) }, 200, headers);
