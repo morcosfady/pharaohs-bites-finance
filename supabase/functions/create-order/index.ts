@@ -167,13 +167,11 @@ async function notifyAll(supabase: ReturnType<typeof createClient>, orderNumber:
       // Telegram (primary): no shared-IP limits.
       if (tgToken && tgChat) {
         const bigDate = new Date(info.requestedAt).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "America/Chicago" }).toUpperCase();
-        const bar = "🟥🟥🟥🟥🟥🟥🟥🟥🟥";
+        const bar = "━━━━━━━━━━━━━━━━";
         const tgHtml = [
           `🔔 <b>NEW ORDER ${esc(orderNumber)}</b>`,
-          bar,
-          "⏰ <b>DELIVER ON</b>",
-          `📅 <b><u>${esc(bigDate)}</u></b>`,
-          `🕐 <code>${esc(win || "time not set")}</code>`,
+          "",
+          `<blockquote>⏰ <b>DELIVER ON</b>\n📅 <b><u>${esc(bigDate)}</u></b>\n🕐 <code>${esc(win || "time not set")}</code></blockquote>`,
           bar,
           "<b>👤 CUSTOMER</b>",
           `🙋 <b>${esc(info.name)}</b>`,
@@ -181,10 +179,10 @@ async function notifyAll(supabase: ReturnType<typeof createClient>, orderNumber:
           `✉️ ${esc(info.email)}`,
           `🏠 ${esc(info.address)}`,
           ...(note ? [`📝 <i>${esc(note)}</i>`] : []),
-          "",
+          bar,
           "<b>🛒 ITEMS</b>",
           ...info.items.flatMap((i) => [`🍽️ <b>${i.quantity} ×</b> ${esc(names.get(i.slug) ?? i.slug)}${i.options ? " (" + esc(i.options) + ")" : ""} — ${usd(i.quantity * (prices.get(i.slug) ?? 0))}`, ...(AR_NAMES[i.slug] ? [`🇪🇬 <i>${esc(AR_NAMES[i.slug])}</i>`] : [])]),
-          "",
+          bar,
           `🧮 Dishes: ${usd(subtotal)}`,
           `🚗 Delivery (${info.miles} mi): ${usd(info.deliveryFee)}`,
           `✅ <b>TOTAL: ${usd(total)}</b>`,
