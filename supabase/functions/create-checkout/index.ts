@@ -46,13 +46,14 @@ Deno.serve(async (req) => {
   }
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
-  const { data: order } = await supabase.from("orders").select("id, order_number, status").eq("order_number", order_number).eq("checkout_token", checkout_token).maybeSingle();
+  const { data: order } = await supabase.from("orders").select("id, order_number, status, delivery_method").eq("order_number", order_number).eq("checkout_token", checkout_token).maybeSingle();
   if (!order) return json({ ok: false, error: "order not found" }, 404, headers);
   const { data: fin } = await supabase.from("order_financials").select("balance_due, amount_paid").eq("id", order.id).maybeSingle();
   const balanceCents = Math.round(Number(fin?.balance_due ?? 0) * 100);
   const paid = balanceCents <= 0 && Number(fin?.amount_paid ?? 0) > 0;
 
-  if (action === "status") return json({ ok: true, paid }, 200, headers);
+  // The pickup address is shown only to a customer who has paid for a pickup order.
+  if (action === "status") return json({ ok: true, paid, ...(paid && order.delivery_method === "pickup" ? { pickup_address: Deno.env.get("KITCHEN_ADDRESS") ?? "" } : {}) }, 200, headers);
   if (action !== "create") return json({ ok: false, error: "invalid action" }, 400, headers);
   if (order.status === "cancelled") return json({ ok: false, error: "order cancelled" }, 400, headers);
   if (paid) return json({ ok: true, paid: true }, 200, headers);
