@@ -77,16 +77,25 @@ Deno.serve(async (req) => {
     success_url: `${back}?paid=1&order=${encodeURIComponent(order.order_number)}`,
     cancel_url: `${back}?cancelled=1&order=${encodeURIComponent(order.order_number)}`,
   });
-  const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Idempotency-Key": `co_${order.order_number}_${balanceCents}_${Math.floor(Date.now() / 3_600_000)}`,
-    },
-    body: form,
-  });
-  const session = await res.json();
+  let res: Response;
+  // deno-lint-ignore no-explicit-any
+  let session: any;
+  try {
+    res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key.replace(/[^A-Za-z0-9_]/g, "")}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Idempotency-Key": `co_${order.order_number}_${balanceCents}_${Math.floor(Date.now() / 3_600_000)}`,
+      },
+      body: form,
+      signal: AbortSignal.timeout(15000),
+    });
+    session = await res.json();
+  } catch (e) {
+    console.error("stripe call threw", String(e));
+    return json({ ok: false, error: "could not reach the payment provider" }, 502, headers);
+  }
   if (!res.ok || !session.url) {
     console.error("stripe session failed", JSON.stringify(session?.error ?? session));
     return json({ ok: false, error: "could not start payment" }, 502, headers);
