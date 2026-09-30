@@ -36,3 +36,7 @@ verify_jwt = false
 [functions.stripe-webhook]
 # Called by Stripe; authenticated by the Stripe signature instead of a JWT.
 verify_jwt = false
+
+[functions.delivery-quote]
+# Public read-only price quote for the order page; applies its own origin allow-list.
+verify_jwt = false

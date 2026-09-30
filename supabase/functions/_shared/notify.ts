@@ -7,7 +7,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 // Customer: a styled receipt email through the business Gmail relay (Apps
 // Script; RECEIPT_URL + RECEIPT_TOKEN, never exposed to the browser).
 // Failures here never block the order.
-export type OrderInfo = { name: string; phone: string; email: string; address: string; instructions: string; requestedAt: string; items: Array<{ slug: string; quantity: number; options: string }>; deliveryFee: number; miles: number };
+export type OrderInfo = { pickup?: boolean; name: string; phone: string; email: string; address: string; instructions: string; requestedAt: string; items: Array<{ slug: string; quantity: number; options: string }>; deliveryFee: number; miles: number };
 const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 function receiptHtml(orderNumber: string, info: OrderInfo, lines: Array<{ qty: number; name: string; options: string }>, subtotal: number, total: number): string {
@@ -29,10 +29,10 @@ function receiptHtml(orderNumber: string, info: OrderInfo, lines: Array<{ qty: n
 <tr><td style="padding:0 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr>
 <tr><td style="padding:14px 28px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="color:#d8ccb0;font-size:14px">
 <tr><td style="padding:3px 0">Dishes</td><td align="right">${money(subtotal)}</td></tr>
-<tr><td style="padding:3px 0">Delivery (${info.miles} mi)</td><td align="right">${money(info.deliveryFee)}</td></tr>
+<tr><td style="padding:3px 0">${info.pickup ? "Pickup" : `Delivery (${info.miles} mi)`}</td><td align="right">${info.pickup ? "Free" : money(info.deliveryFee)}</td></tr>
 <tr><td style="padding:10px 0 0;color:#c9a24a;font-size:17px;border-top:1px solid #3a3226">Total</td><td align="right" style="padding:10px 0 0;color:#c9a24a;font-size:17px;border-top:1px solid #3a3226"><b>${money(total)}</b></td></tr></table></td></tr>
-<tr><td style="padding:22px 28px 4px;color:#c9a24a;font-size:12px;letter-spacing:2px">DELIVERY</td></tr>
-<tr><td style="padding:0 28px 22px;color:#f3e9d2;font-size:15px;line-height:1.6">${esc(when)}${win ? " &middot; " + esc(win) : ""}<br><span style="color:#b9a880">${esc(info.address)}</span></td></tr>
+<tr><td style="padding:22px 28px 4px;color:#c9a24a;font-size:12px;letter-spacing:2px">${info.pickup ? "PICKUP" : "DELIVERY"}</td></tr>
+<tr><td style="padding:0 28px 22px;color:#f3e9d2;font-size:15px;line-height:1.6">${esc(when)}${win ? " &middot; " + esc(win) : ""}<br><span style="color:#b9a880">${esc(info.pickup ? (Deno.env.get("KITCHEN_ADDRESS") ?? "We will send you the pickup address") : info.address)}</span></td></tr>
 <tr><td style="padding:0 28px"><div style="height:1px;background:#c9a24a;opacity:.6"></div></td></tr>
 <tr><td align="center" style="padding:20px 28px 26px;color:#b9a880;font-size:13px;line-height:1.7">Questions? Message us on WhatsApp <a href="https://wa.me/17879684078" style="color:#c9a24a;text-decoration:none">+1 (787) 968-4078</a><br>pharaohsbites.com</td></tr>
 </table></td></tr></table></body></html>`;
@@ -111,20 +111,20 @@ export async function notifyAll(supabase: ReturnType<typeof createClient>, order
         const tgHtml = [
           `🔔 <b>NEW ORDER ${esc(orderNumber)}</b>`,
           "",
-          `<blockquote>⏰ <b>DELIVER ON</b>\n📅 <b><u>${esc(bigDate)}</u></b>\n🕐 <code>${esc(win || "time not set")}</code></blockquote>`,
+          `<blockquote>⏰ <b>${info.pickup ? "PICKUP ON" : "DELIVER ON"}</b>\n📅 <b><u>${esc(bigDate)}</u></b>\n🕐 <code>${esc(win || "time not set")}</code></blockquote>`,
           bar,
           "<b>👤 CUSTOMER</b>",
           `🙋 <b>${esc(info.name)}</b>`,
           `📱 ${esc(info.phone)}`,
           `✉️ ${esc(info.email)}`,
-          `🏠 ${esc(info.address)}`,
+          info.pickup ? "🛍️ <b>PICKUP</b> (no delivery)" : `🏠 ${esc(info.address)}`,
           ...(note ? [`📝 <i>${esc(note)}</i>`] : []),
           bar,
           "<b>🛒 ITEMS</b>",
           ...info.items.flatMap((i) => [`🍽️ <b>${i.quantity} ×</b> ${esc(names.get(i.slug) ?? i.slug)}${i.options ? " (" + esc(i.options) + ")" : ""} — ${usd(i.quantity * (prices.get(i.slug) ?? 0))}`, ...(AR_NAMES[i.slug] ? [`🇪🇬 <i>${esc(AR_NAMES[i.slug])}</i>`] : [])]),
           bar,
           `🧮 Dishes: ${usd(subtotal)}`,
-          `🚗 Delivery (${info.miles} mi): ${usd(info.deliveryFee)}`,
+          info.pickup ? "🛍️ Pickup: free" : `🚗 Delivery (${info.miles} mi): ${usd(info.deliveryFee)}`,
           `✅ <b>TOTAL: ${usd(total)}</b>`,
           bar,
           `📦 <b>Total items: ${info.items.reduce((n, i) => n + i.quantity, 0)}</b>`,

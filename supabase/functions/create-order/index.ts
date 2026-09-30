@@ -17,6 +17,7 @@
 // ---------------------------------------------------------------------------
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { notifyAll, type OrderInfo } from "../_shared/notify.ts";
+import { quoteDelivery } from "../_shared/delivery.ts";
 
 const ALLOWED_ORIGINS = [
   "https://morcosfady.github.io",
@@ -41,28 +42,6 @@ function deliveryDateProblem(requested: Date, now: Date = new Date()): string | 
   return laterDay || farEnough ? null : "delivery must be tomorrow or later";
 }
 
-// ---- delivery fee: $5 + $1.75 per mile from the kitchen ---------------------
-// Miles = straight-line distance x 1.3 (approximate road distance). Address is
-// looked up with the free US Census geocoder. Kitchen coordinates live in the
-// KITCHEN_LAT / KITCHEN_LON secrets so the address is not in the public repo.
-const FEE_BASE = 5;
-const FEE_PER_MILE = 1.75;
-const ROAD_FACTOR = 1.3;
-async function geocode(address: string): Promise<{ lat: number; lon: number } | null | "error"> {
-  try {
-    const url = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?benchmark=Public_AR_Current&format=json&address=" + encodeURIComponent(address);
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return "error";
-    const m = (await res.json())?.result?.addressMatches?.[0];
-    return m ? { lat: m.coordinates.y, lon: m.coordinates.x } : null;
-  } catch { return "error"; }
-}
-function haversineMiles(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
-  const r = (d: number) => d * Math.PI / 180;
-  const h = Math.sin(r(b.lat - a.lat) / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(r(b.lon - a.lon) / 2) ** 2;
-  return 3958.8 * 2 * Math.asin(Math.sqrt(h));
-}
-
 const RATE_LIMIT_WINDOW_MIN = 10;
 const RATE_LIMIT_MAX = 8;
 const MAX_ITEMS = 40;
@@ -71,6 +50,7 @@ const MAX_QTY = 50;
 type Body = {
   checkout_token?: unknown;
   pay_online?: unknown;
+  fulfillment?: unknown;
   customer?: { name?: unknown; phone?: unknown; street?: unknown; apt?: unknown; city?: unknown; state?: unknown; zip?: unknown; instructions?: unknown; requested_at?: unknown; email?: unknown };
   items?: Array<{ slug?: unknown; quantity?: unknown; options?: unknown }>;
 };
@@ -115,17 +95,19 @@ Deno.serve(async (req) => {
 
   // ---- validate ----------------------------------------------------------
   const payOnline = body.pay_online === true;
+  const isPickup = body.fulfillment === "pickup";
   const token = str(body.checkout_token, 80, true);
   if (!token || !/^[A-Za-z0-9_-]{16,80}$/.test(token)) return json({ ok: false, error: "invalid checkout token" }, 400, headers);
 
   const c = body.customer ?? {};
   const name = str(c.name, 120, true);
   const phone = str(c.phone, 40, true);
-  const street = str(c.street, 200, true);
-  const apt = str(c.apt, 60);
-  const city = str(c.city, 80, true);
-  const state = str(c.state, 2, true)?.toUpperCase() ?? null;
-  const zip = str(c.zip, 10, true);
+  // Pickup orders carry no address (placeholders keep the database columns filled).
+  const street = isPickup ? "Pickup order" : str(c.street, 200, true);
+  const apt = isPickup ? "" : str(c.apt, 60);
+  const city = isPickup ? "Pickup" : str(c.city, 80, true);
+  const state = isPickup ? "TX" : (str(c.state, 2, true)?.toUpperCase() ?? null);
+  const zip = isPickup ? "00000" : str(c.zip, 10, true);
   const instructions = str(c.instructions, 500);
   const requestedRaw = str(c.requested_at, 40);
   const emailRaw = str(c.email, 120);
@@ -168,14 +150,13 @@ Deno.serve(async (req) => {
   const { data: existing } = await supabase.from("orders").select("order_number, delivery_fee").eq("checkout_token", token).maybeSingle();
   if (existing) return json({ ok: true, order_number: existing.order_number, delivery_fee: Number(existing.delivery_fee), duplicate: true }, 200, headers);
 
-  // ---- delivery fee (before we save anything) ---------------------------------
-  const kLat = Number(Deno.env.get("KITCHEN_LAT")), kLon = Number(Deno.env.get("KITCHEN_LON"));
-  if (!isFinite(kLat) || !isFinite(kLon) || !kLat || !kLon) return json({ ok: false, error: "delivery pricing is not configured" }, 503, headers);
-  const where = await geocode(`${street}, ${city}, ${state} ${zip}`);
-  if (where === "error") return json({ ok: false, error: "could not check the delivery address, please try again" }, 503, headers);
-  if (!where) return json({ ok: false, error: "we could not find that address, please check the street, city and ZIP" }, 400, headers);
-  const miles = Math.round(haversineMiles({ lat: kLat, lon: kLon }, where) * ROAD_FACTOR * 10) / 10;
-  const deliveryFee = Math.round((FEE_BASE + FEE_PER_MILE * miles) * 100) / 100;
+  // ---- delivery fee (before we save anything); pickup is free ----------------
+  let miles = 0, deliveryFee = 0;
+  if (!isPickup) {
+    const q = await quoteDelivery(street, city, state, zip);
+    if (!q.ok) return json({ ok: false, error: q.error }, q.status, headers);
+    miles = q.miles; deliveryFee = q.fee;
+  }
 
   // ---- rate limit per IP -------------------------------------------------
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";
@@ -203,10 +184,10 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: "could not save order" }, 500, headers);
   }
 
-  const info: OrderInfo = { name, phone, email, address: `${street}${apt ? ", " + apt : ""}, ${city}, ${state} ${zip}`, instructions, requestedAt, items, deliveryFee, miles };
+  const info: OrderInfo = { pickup: isPickup, name, phone, email, address: `${street}${apt ? ", " + apt : ""}, ${city}, ${state} ${zip}`, instructions, requestedAt, items, deliveryFee, miles };
   // Pay-online orders stay "pending" and silent until Stripe confirms payment (stripe-webhook
   // then confirms the order and sends the alert + receipt). Other orders are confirmed now.
-  const { error: feeErr } = await supabase.from("orders").update(payOnline ? { delivery_fee: deliveryFee, notify_payload: info } : { delivery_fee: deliveryFee, status: "confirmed" }).eq("order_number", data as string);
+  const { error: feeErr } = await supabase.from("orders").update({ delivery_fee: deliveryFee, ...(isPickup ? { delivery_method: "pickup" } : {}), ...(payOnline ? { notify_payload: info } : { status: "confirmed" }) }).eq("order_number", data as string);
   if (feeErr) console.error("delivery fee update failed", feeErr.message);
   if (!payOnline) {
     const notify = notifyAll(supabase, data as string, info);
