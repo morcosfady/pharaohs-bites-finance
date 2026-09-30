@@ -98,10 +98,38 @@ function receiptHtml(orderNumber: string, info: OrderInfo, lines: Array<{ qty: n
 </table></td></tr></table></body></html>`;
 }
 
+// Arabic dish names (same as the website menu) for the owner alert.
+const AR_NAMES: Record<string, string> = {
+  "feteer-meshaltet": "فطير مشلتت",
+  "feteer-beef": "فطير محشي لحمة",
+  "macarona-bechamel": "صينية مكرونة بشاميل",
+  "goulash-beef": "صينية جلاش باللحمة",
+  "kofta-tray": "صينية كفتة بالصلصة والأرز",
+  "meatballs-spaghetti": "كرات لحم نباتية بالمكرونة",
+  "lentil-soup": "شوربة عدس",
+  "om-ali": "أم علي",
+  "goulash-nuts": "صينية جلاش بالمكسرات",
+  "round-cake": "كيكة صغيرة",
+  "chocolate-pudding": "بودينج شوكولاتة",
+  "banana-pudding": "بودينج موز",
+  "rice-pudding": "رز باللبن",
+  "creme-caramel": "كريم كراميل",
+  "white-cheese": "جبنة بيضاء",
+  "black-honey": "عسل أسود",
+  "white-honey": "عسل أبيض",
+  "tahini": "طحينة",
+  "baba-ganoush": "بابا غنوج",
+  "hummus": "حمص",
+  "protein-shake": "مشروب البروتين بالشوكولاتة",
+  "avocado-drink": "عصير أفوكادو",
+  "diet-coke": "دايت كوكاكولا",
+};
+
 async function notifyAll(supabase: ReturnType<typeof createClient>, orderNumber: string, info: OrderInfo) {
   try {
-    const { data: prods } = await supabase.from("products").select("slug, name").in("slug", info.items.map((i) => i.slug));
+    const { data: prods } = await supabase.from("products").select("slug, name, selling_price").in("slug", info.items.map((i) => i.slug));
     const names = new Map((prods ?? []).map((p: { slug: string; name: string }) => [p.slug, p.name]));
+    const prices = new Map((prods ?? []).map((p: { slug: string; selling_price: number | string }) => [p.slug, Number(p.selling_price)]));
     const { data: fin } = await supabase.from("order_financials").select("total, net_product_sales").eq("order_number", orderNumber).maybeSingle();
     const total = Number(fin?.total ?? 0), subtotal = Number(fin?.net_product_sales ?? 0);
     const lines = info.items.map((i) => ({ qty: i.quantity, name: names.get(i.slug) ?? i.slug, options: i.options }));
@@ -111,7 +139,29 @@ async function notifyAll(supabase: ReturnType<typeof createClient>, orderNumber:
       const when = new Date(info.requestedAt).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/Chicago" });
       const win = /Delivery window: ([^|]+?) on /.exec(info.instructions)?.[1] ?? "";
       const note = info.instructions.replace(/^Delivery window: [^|]+\|?\s*/, "").trim();
-      const text = `${info.name} ${info.phone}\n${info.email}\n${lines.map((l) => `${l.qty} x ${l.name}`).join(", ")}\n$${total.toFixed(2)} (delivery $${info.deliveryFee.toFixed(2)})\nDeliver: ${when}${win ? " " + win : ""}\n${info.address}${note ? "\nNote: " + note : ""}`;
+      const placed = new Date().toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" });
+      const usd = (n: number) => "$" + n.toFixed(2);
+      const itemLines = info.items.flatMap((i) => [`🍽️ ${i.quantity} × ${names.get(i.slug) ?? i.slug}${i.options ? " (" + i.options + ")" : ""} — ${usd(i.quantity * (prices.get(i.slug) ?? 0))}`, ...(AR_NAMES[i.slug] ? [`🇪🇬 ${AR_NAMES[i.slug]}`] : [])]);
+      const rule = "━━━━━━━━━━━━━━━━";
+      const text = [
+        `🔖 Order: ${orderNumber}`,
+        `🕒 Placed: ${placed}`,
+        rule,
+        "👤 CUSTOMER",
+        `🙋 ${info.name}`,
+        `📱 ${info.phone}`,
+        `✉️ ${info.email}`,
+        `🏠 ${info.address}`,
+        `🗓️ Delivery: ${when}${win ? " · " + win : ""}`,
+        ...(note ? [`📝 Note: ${note}`] : []),
+        rule,
+        "🛒 ITEMS",
+        ...itemLines,
+        rule,
+        `🧮 Dishes: ${usd(subtotal)}`,
+        `🚗 Delivery (${info.miles} mi): ${usd(info.deliveryFee)}`,
+        `✅ TOTAL: ${usd(total)}`,
+      ].join("\n");
       await fetch(`https://ntfy.sh/${topic}`, {
         method: "POST",
         headers: { Title: `New order ${orderNumber}`, Priority: "high", Tags: "bell", Click: "https://finance.pharaohsbites.com/#/orders" },
