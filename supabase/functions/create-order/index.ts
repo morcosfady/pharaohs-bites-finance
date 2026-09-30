@@ -83,7 +83,7 @@ function receiptHtml(orderNumber: string, info: OrderInfo, lines: Array<{ qty: n
 <tr><td align="center" style="color:#b9a880;font-size:13px;letter-spacing:3px;padding:4px 20px 22px">EGYPTIAN CLOUD KITCHEN &middot; DALLAS</td></tr>
 <tr><td style="padding:0 28px"><div style="height:1px;background:#c9a24a;opacity:.6"></div></td></tr>
 <tr><td style="padding:22px 28px 6px;color:#f3e9d2;font-size:18px">Thank you, ${esc(info.name.split(" ")[0])}!</td></tr>
-<tr><td style="padding:0 28px 18px;color:#d8ccb0;font-size:15px;line-height:1.6">We received your order and we are getting ready to cook. We will contact you on <b style="color:#f3e9d2">${esc(info.phone)}</b> to confirm.</td></tr>
+<tr><td style="padding:0 28px 18px;color:#d8ccb0;font-size:15px;line-height:1.6">We received your order and we are getting ready to cook. Here is your receipt.</td></tr>
 <tr><td style="padding:0 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#14110c;border:1px solid #3a3226;border-radius:10px"><tr><td style="padding:14px 16px;color:#b9a880;font-size:12px;letter-spacing:2px">ORDER NUMBER<br><span style="color:#c9a24a;font-size:22px;letter-spacing:1px">${esc(orderNumber)}</span></td></tr></table></td></tr>
 <tr><td style="padding:20px 28px 4px;color:#c9a24a;font-size:12px;letter-spacing:2px">YOUR ORDER</td></tr>
 <tr><td style="padding:0 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr>
@@ -192,6 +192,7 @@ Deno.serve(async (req) => {
   const requestedRaw = str(c.requested_at, 40);
   const emailRaw = str(c.email, 120);
   const email = emailRaw && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(emailRaw) ? emailRaw : "";
+  if (!email) return json({ ok: false, error: "a valid email is required" }, 400, headers);
   if (!name || !phone || !street || apt == null || !city || !state || !zip || instructions == null || requestedRaw == null) {
     return json({ ok: false, error: "missing or invalid customer fields" }, 400, headers);
   }
