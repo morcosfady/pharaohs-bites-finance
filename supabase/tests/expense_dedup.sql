@@ -161,7 +161,7 @@ declare b uuid; before_n bigint;
 begin
   select count(*) into before_n from expenses where deleted_at is null;
   b := _bank('t-in', 'DEPOSIT ID NUMBER 999', -20, '2026-10-14');
-  perform _expect('money in: kind', (select (kind = 'money_in')::int from bank_transactions where id = b), 1);
+  perform _expect('money in with no rule is owner money (never income, never an expense)', (select (kind = 'owner_contribution')::int from bank_transactions where id = b), 1);
   perform _expect('money in: no expense', _count('select count(*) from expenses where deleted_at is null'), before_n);
 end $$;
 
