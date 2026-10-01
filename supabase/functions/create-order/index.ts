@@ -19,6 +19,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { notifyAll, type OrderInfo } from "../_shared/notify.ts";
 import { quoteDelivery } from "../_shared/delivery.ts";
 import { checkPromo, markPromoUsed, normCode } from "../_shared/promo.ts";
+import { normAddress } from "../_shared/address.ts";
 
 const ALLOWED_ORIGINS = [
   "https://morcosfady.github.io",
@@ -161,10 +162,11 @@ Deno.serve(async (req) => {
   }
 
   // ---- promo code (FIRSTBITE = free delivery, once per customer) ---------------
-  let promoCode = "", promoEmail = "", feeWaived = 0;
+  let promoCode = "", promoEmail = "", feeWaived = 0, promoAddr = "";
   if (normCode(body.promo)) {
     if (isPickup) return json({ ok: false, error: "promo codes apply to delivery orders" }, 400, headers);
-    const pc = await checkPromo(supabase, body.promo, phoneDigits, email, miles);
+    promoAddr = normAddress(street, apt, zip);
+    const pc = await checkPromo(supabase, body.promo, phoneDigits, email, miles, promoAddr);
     if (!pc.ok) return json({ ok: false, error: pc.error }, 400, headers);
     promoCode = pc.code; promoEmail = pc.email_norm; feeWaived = deliveryFee; deliveryFee = 0;
   }
@@ -203,7 +205,7 @@ Deno.serve(async (req) => {
   if (promoCode) {
     const { data: po } = await supabase.from("orders").select("id").eq("order_number", data as string).maybeSingle();
     if (po?.id) {
-      const { error: rErr } = await supabase.from("promo_redemptions").insert({ code: promoCode, order_id: po.id, phone_digits: phoneDigits, email_norm: promoEmail, fee_waived: feeWaived });
+      const { error: rErr } = await supabase.from("promo_redemptions").insert({ code: promoCode, order_id: po.id, phone_digits: phoneDigits, email_norm: promoEmail, address_norm: promoAddr, fee_waived: feeWaived });
       if (rErr) console.error("promo redemption failed", rErr.message);
       else if (!payOnline) await markPromoUsed(supabase, po.id);
     }

@@ -7,6 +7,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { quoteDelivery } from "../_shared/delivery.ts";
 import { checkPromo, normCode } from "../_shared/promo.ts";
+import { normAddress } from "../_shared/address.ts";
 
 const ALLOWED_ORIGINS = [
   "https://morcosfady.github.io",
@@ -37,7 +38,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ ok: false, error: "method" }, 405, headers);
   if (!origin || !ALLOWED_ORIGINS.includes(origin)) return json({ ok: false, error: "origin not allowed" }, 403, headers);
 
-  let body: { street?: unknown; city?: unknown; state?: unknown; zip?: unknown; promo?: unknown; phone?: unknown; email?: unknown };
+  let body: { street?: unknown; city?: unknown; state?: unknown; zip?: unknown; promo?: unknown; apt?: unknown; phone?: unknown; email?: unknown };
   try { body = await req.json(); } catch { return json({ ok: false, error: "invalid json" }, 400, headers); }
   const street = clean(body.street, 200), city = clean(body.city, 80), state = clean(body.state, 2).toUpperCase(), zip = clean(body.zip, 10);
   if (!street || !city || !/^[A-Z]{2}$/.test(state) || !/^\d{5}(-\d{4})?$/.test(zip)) return json({ ok: false, error: "incomplete address" }, 400, headers);
@@ -48,7 +49,7 @@ Deno.serve(async (req) => {
   let promo: { valid: boolean; code?: string; message?: string } | undefined;
   if (normCode(body.promo)) {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
-    const r = await checkPromo(supabase, body.promo, clean(body.phone, 40).replace(/\D/g, ""), clean(body.email, 120), q.miles);
+    const r = await checkPromo(supabase, body.promo, clean(body.phone, 40).replace(/\D/g, ""), clean(body.email, 120), q.miles, normAddress(street, clean(body.apt, 60), zip));
     promo = r.ok ? { valid: true, code: r.code } : { valid: false, message: r.error };
   }
   return json({ ok: true, delivery_fee: q.fee, miles: q.miles, ...(promo ? { promo } : {}) }, 200, headers);
