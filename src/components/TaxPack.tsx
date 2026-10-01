@@ -178,6 +178,10 @@ function SettingsAndMapping() {
             <Field label="Possible asset from ($)" hint="Single purchases at or above this are flagged."><input className="input" type="number" min="0" step="1" defaultValue={Number(s.asset_threshold)} onBlur={(e) => Number(e.target.value) !== Number(s.asset_threshold) && saveSetting({ asset_threshold: Number(e.target.value) })} /></Field>
             <Field label="Startup limit ($)" hint="Draft first-year limit. Ask accountant."><input className="input" type="number" min="0" step="1" defaultValue={Number(s.startup_limit)} onBlur={(e) => Number(e.target.value) !== Number(s.startup_limit) && saveSetting({ startup_limit: Number(e.target.value) })} /></Field>
           </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="Card fee % (Stripe)" hint="Used to estimate the fee on every paid order until Stripe gives the exact number."><input className="input" type="number" min="0" max="10" step="0.1" defaultValue={Number(s.stripe_fee_pct)} onBlur={(e) => Number(e.target.value) !== Number(s.stripe_fee_pct) && saveSetting({ stripe_fee_pct: Number(e.target.value) })} /></Field>
+            <Field label="Card fee fixed ($)" hint="Stripe's flat part per payment (30 cents)."><input className="input" type="number" min="0" max="5" step="0.05" defaultValue={Number(s.stripe_fee_fixed)} onBlur={(e) => Number(e.target.value) !== Number(s.stripe_fee_fixed) && saveSetting({ stripe_fee_fixed: Number(e.target.value) })} /></Field>
+          </div>
           <ul className="divide-y divide-ivory-200">
             {(cats.data ?? []).map((c) => (
               <li key={c.id} className="grid gap-2 py-2 sm:grid-cols-[1fr_1.4fr_auto] sm:items-center">

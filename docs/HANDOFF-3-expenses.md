@@ -65,6 +65,13 @@ Bookkeeping support for the accountant (Schedule C, sole proprietor). **Not tax 
 - **Tests:** `supabase db query --linked -f supabase/tests/receipts.sql` (rolled back): brief cases 1, 2, 3, 4, 6 (both directions), 7 (refund, double-reported refund both orders), 9, mixed cart split, personal item, items-not-adding-up, owner memory, unreadable total, medium-confidence duplicate, needs-a-receipt list, invariants. All four SQL suites + 64 vitest tests pass.
 - **Not verified live yet:** the Claude reading itself (needs the key). First real receipt after the key is the proof; check the Receipts tab for "Check items" / "Needs attention".
 
+## Forgotten costs (2026-10-01, migration 0054)
+
+- **Stripe fee** is automatic per paid order (webhook) and now a **setting** (`expense_settings.stripe_fee_pct` 2.9 and `stripe_fee_fixed` 0.30, editable in Expenses -> Tax -> Tax settings). A daily job (`stripe-fee-backfill`, `backfill_stripe_fees()`) creates a fee for any paid Stripe order that has none (skips test names, deleted orders, voided payments). Estimates are replaced by exact fees when the Stripe key can read charges (owner: edit the restricted key, Charges = Read).
+- New categories: Insurance (Line 15), Parking & tolls (Line 9, stays deductible with standard mileage), Postage & shipping, Rent / commissary (Line 20b, ask accountant).
+- ~60 bank rules for common costs (software/hosting/domains/Plaid, bank fees, insurance, tolls, shipping, delivery apps, phone/internet, accounting, training, marketing, supplies). Owner income-tax payments (IRS USATAXPYMT) are classified personal. Unknown charges fall to "Other" and show under Ask accountant.
+- Test: `supabase/tests/stripe_fees.sql` (rolled back). Costs the system cannot see on its own (cash, a new vendor) still need a receipt or a rule.
+
 ## Next
 
 Phase 4 food cost intelligence is not built. It needs receipt line items (now stored in `expense_items`) to have data, so start it after some real receipts have been read.

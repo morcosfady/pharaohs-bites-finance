@@ -23,7 +23,11 @@ async function recordFee(supabase: ReturnType<typeof createClient>, s: any, orde
         if (typeof f === "number" && f > 0) { fee = f / 100; estimated = false; }
       }
     }
-    if (fee <= 0) fee = Math.round((total * 0.029 + 0.3) * 100) / 100;
+    if (fee <= 0) {
+      const { data: st } = await supabase.from("expense_settings").select("stripe_fee_pct, stripe_fee_fixed").limit(1).maybeSingle();
+      const pct = Number(st?.stripe_fee_pct ?? 2.9), fixed = Number(st?.stripe_fee_fixed ?? 0.3);
+      fee = Math.round((total * pct / 100 + fixed) * 100) / 100;
+    }
     const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(new Date());
     const { error } = await supabase.rpc("record_stripe_fee", { p_ref: ref, p_fee: fee, p_date: day, p_order_id: orderId, p_estimated: estimated });
     if (error) console.error("stripe fee failed", error.message);
