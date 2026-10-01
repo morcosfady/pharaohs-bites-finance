@@ -224,3 +224,16 @@ Method: signed-in owner session in the in-app browser, every route opened at des
 - Settings → Owner name, Address and Email are empty.
 - Simple mode hides Payments/Deliveries/Tax pages (Settings → Advanced mode shows them).
 - Dashboard login cannot be automated; the owner must sign in on the pane for any future live QA.
+
+---
+
+## 15. Update 2026-10-01: Pickup is ON again, with its own time windows
+
+Owner decision (message in Franglais): **offer both Pickup (free) and Delivery (fee unchanged: $5 + $1.75/mile)**, with different windows:
+- **Delivery windows:** 8:00 AM–11:00 AM or 8:00 PM–11:00 PM (ids `d1`, `d2`)
+- **Pickup windows:** 11:00 AM–2:00 PM, 2:00 PM–5:00 PM, 5:00 PM–8:00 PM (ids `p1`, `p2`, `p3`)
+
+Changes (website repo): `config.js` → `enablePickup: true`; `main.js` → `WINDOWS` now has a `mode` per window, `windowsForMode()`, `renderWindows()` inside `initSchedule` (re-rendered by `applyFulfillment()` through `rerenderSchedule`), `scheduleComplete()` requires the window to match the chosen mode, hints/notes say "pickup"/"delivery" accordingly. Switching the mode clears the chosen window but keeps the date. The site wording was reverted from "delivery only" back to "pickup and delivery" (git revert of the wording commit). The server needed no change (it already supports `fulfillment: "pickup"`). Pickup address is shown on the page when Pickup is selected (`config.pickupAddress`) and in the receipt/confirmation. Telegram says "PICKUP ON", the dashboard shows a "Pickup …" chip.
+
+Note: the instruction tag is still written as "Delivery window: … on …" for pickups too (the dashboard and Telegram parse that exact prefix), so do not rename it without updating `src/lib/slot.ts` and `_shared/notify.ts`.
+Sections 4, 10 above that say "pickup hidden / delivery only" are **superseded by this section**.
