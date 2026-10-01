@@ -50,7 +50,8 @@ export function qualityIssues(q: TaxQuality | undefined): { key: string; text: s
   add("uncat", q.uncategorized, (n) => `${n} expense${n === 1 ? " has" : "s have"} no category`, true);
   add("in", q.money_in_unclassified, (n) => `${n} deposit${n === 1 ? "" : "s"} not classified yet`, true);
   add("rate", q.mileage_without_rate, (n) => `${n} mileage trip${n === 1 ? " has" : "s have"} no IRS rate`, true);
-  add("receipts", q.missing_receipts, (n) => `${n} expense${n === 1 ? " has" : "s have"} no receipt on file`, false);
+  const min = Number(q.receipt_min ?? 0), from = min > 0 ? ` of $${min % 1 === 0 ? min : min.toFixed(2)} or more` : "";
+  add("receipts", q.missing_receipts, (n) => `${n} expense${n === 1 ? "" : "s"}${from} ${n === 1 ? "has" : "have"} no receipt on file`, false);
   add("est", q.mileage_estimated, (n) => `${n} mileage trip${n === 1 ? " uses" : "s use"} estimated miles`, false);
   return out;
 }

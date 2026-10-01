@@ -173,9 +173,10 @@ function SettingsAndMapping() {
       </button>
       {open && s && (
         <div className="space-y-4 px-5 pb-5">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Field label="Business start date" hint="Expenses before this date are startup costs."><input className="input" type="date" defaultValue={s.business_start_date} onBlur={(e) => e.target.value && e.target.value !== s.business_start_date && saveSetting({ business_start_date: e.target.value })} /></Field>
             <Field label="Possible asset from ($)" hint="Single purchases at or above this are flagged."><input className="input" type="number" min="0" step="1" defaultValue={Number(s.asset_threshold)} onBlur={(e) => Number(e.target.value) !== Number(s.asset_threshold) && saveSetting({ asset_threshold: Number(e.target.value) })} /></Field>
+            <Field label="Receipt needed from ($)" hint="Smaller purchases do not need a receipt on file: the bank record is enough. 75 is the IRS line. Ask accountant."><input className="input" type="number" min="0" step="1" defaultValue={Number(s.receipt_min_amount ?? 75)} onBlur={(e) => Number(e.target.value) !== Number(s.receipt_min_amount ?? 75) && saveSetting({ receipt_min_amount: Number(e.target.value) })} /></Field>
             <Field label="Startup limit ($)" hint="Draft first-year limit. Ask accountant."><input className="input" type="number" min="0" step="1" defaultValue={Number(s.startup_limit)} onBlur={(e) => Number(e.target.value) !== Number(s.startup_limit) && saveSetting({ startup_limit: Number(e.target.value) })} /></Field>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">

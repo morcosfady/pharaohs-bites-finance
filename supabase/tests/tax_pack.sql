@@ -128,10 +128,18 @@ end $$;
 do $$
 declare q jsonb; x jsonb;
 begin
-  insert into expenses (expense_date, vendor, amount_before_tax) values ('2027-07-01', 'Mystery', 10);
+  insert into expenses (expense_date, vendor, amount_before_tax) values ('2027-07-01', 'Mystery', 10), ('2027-07-02', 'Big purchase', 120);
   q := tax_data_quality('2027-01-01', '2027-12-31');
-  perform _expect('uncategorized is counted', (q->>'uncategorized')::numeric, 1);
-  perform _expect('manual expenses without a receipt are counted', ((q->>'missing_receipts')::numeric >= 1)::int, 1);
+  perform _expect('uncategorized is counted', (q->>'uncategorized')::numeric, 2);
+  perform _expect('the receipt threshold defaults to 75', (q->>'receipt_min')::numeric, 75);
+  perform _expect('a $10 purchase does not need a receipt, a $120 one does', (select count(*) from jsonb_build_object('n', (q->>'missing_receipts')::numeric) where (q->>'missing_receipts')::numeric >= 1), 1);
+  perform _expect('only purchases at or above the threshold are counted', (select count(*) from expenses e where e.expense_date between '2027-01-01' and '2027-12-31' and e.deleted_at is null and e.auto_source is distinct from 'order_cost' and e.receipt_path = '' and e.total_amount >= 75
+     and not exists (select 1 from expense_sources s where s.expense_id = e.id and s.source_type in ('receipt', 'email', 'stripe', 'subscription'))), (q->>'missing_receipts')::numeric);
+  update expense_settings set receipt_min_amount = 0;
+  perform _expect('with the threshold at 0 every purchase counts again', ((tax_data_quality('2027-01-01', '2027-12-31')->>'missing_receipts')::numeric >= 2)::int, 1);
+  update expense_settings set receipt_min_amount = 75;
+  -- one expense split into two category lines is counted once
+  perform _expect('a split expense is counted once', (select count(*) from (select distinct e.id from expenses e where e.vendor = 'Big purchase') x), 1);
   insert into bank_items (id, plaid_item_id, access_token) values ('00000000-0000-0000-0000-0000000000a9', 'tax-item', 'x');
   insert into bank_accounts (id, item_id, plaid_account_id, name, mask) values ('00000000-0000-0000-0000-0000000000b9', '00000000-0000-0000-0000-0000000000a9', 'tax-acct', 't', '0');
   insert into bank_transactions (account_id, plaid_transaction_id, posted_on, name, amount, kind) values

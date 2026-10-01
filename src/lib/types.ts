@@ -102,9 +102,9 @@ export interface ExpenseTaxRow {
   line_no: number;
 }
 export interface TaxSummaryRow { line_key: string; entries: Num; total: Num; deductible: Num }
-export interface TaxQuality { needs_review: number; possible_duplicates: number; uncategorized: number; missing_receipts: number; money_in_unclassified: number; mileage_without_rate: number; mileage_estimated: number; ask_accountant: number }
+export interface TaxQuality { receipt_min?: number; needs_review: number; possible_duplicates: number; uncategorized: number; missing_receipts: number; money_in_unclassified: number; mileage_without_rate: number; mileage_estimated: number; ask_accountant: number }
 export interface TaxExtras { personal_total: number; personal_count: number; owner_contributions: number; stripe_payouts: number; transfers: number }
-export interface ExpenseSettings { id: boolean; match_window_days: number; amount_tolerance: Num; business_start_date: string; asset_threshold: Num; startup_limit: Num; stripe_fee_pct: Num; stripe_fee_fixed: Num }
+export interface ExpenseSettings { id: boolean; match_window_days: number; amount_tolerance: Num; business_start_date: string; asset_threshold: Num; startup_limit: Num; stripe_fee_pct: Num; stripe_fee_fixed: Num; receipt_min_amount?: Num }
 
 export interface Expense {
   id: string; expense_date: string; vendor: string; category_id: string | null; description: string;

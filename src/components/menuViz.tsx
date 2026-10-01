@@ -6,10 +6,12 @@ import { fmt, pct } from "../lib/money";
    groups the owner thinks in, the margin colour bands, and the small cards. */
 
 export const GROUPS = [
-  { key: "savory", label: "Savory", ar: "الحادق", emoji: "🥧", cats: ["Feteer", "Feteer & Trays", "Soups"], hint: "Feteer, trays and soups" },
+  { key: "savory", label: "Savory", ar: "الحادق", emoji: "🥧", cats: ["Feteer", "Feteer & Trays"], hint: "Feteer and trays" },
+  { key: "soups", label: "Soups", ar: "الشوربة", emoji: "🍲", cats: ["Soups"], hint: "Warm and simmered" },
   { key: "sweet", label: "Sweet", ar: "الحلو", emoji: "🍰", cats: ["Cakes", "Desserts", "Pudding"], hint: "Cakes, desserts and puddings" },
   { key: "sides", label: "Sides", ar: "على الجنب", emoji: "🍯", cats: ["Sides"], hint: "Cheese, honey and tahini" },
   { key: "drinks", label: "Drinks", ar: "المشروبات", emoji: "🥤", cats: ["Drinks"], hint: "Shakes and juices" },
+  { key: "combos", label: "Combos", ar: "العروض", emoji: "🎁", cats: ["Combos"], hint: "Bundled deals" },
   { key: "other", label: "Other", ar: "أخرى", emoji: "🍽️", cats: [], hint: "Seasonal and everything else" },
 ] as const;
 export type GroupKey = (typeof GROUPS)[number]["key"];

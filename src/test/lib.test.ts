@@ -154,6 +154,11 @@ describe("tax pack helpers", () => {
     expect(issues.filter((i) => !i.blocking).map((i) => i.key)).toEqual(["receipts", "est"]);
     expect(qualityIssues({ needs_review: 0, possible_duplicates: 0, uncategorized: 0, missing_receipts: 0, money_in_unclassified: 0, mileage_without_rate: 0, mileage_estimated: 0, ask_accountant: 0 })).toEqual([]);
     expect(qualityIssues(undefined)).toEqual([]);
+    const rc = (n: number, min?: number) => qualityIssues({ needs_review: 0, possible_duplicates: 0, uncategorized: 0, missing_receipts: n, money_in_unclassified: 0, mileage_without_rate: 0, mileage_estimated: 0, ask_accountant: 0, receipt_min: min })[0]?.text;
+    expect(rc(1, 75)).toBe("1 expense of $75 or more has no receipt on file");
+    expect(rc(3, 75)).toBe("3 expenses of $75 or more have no receipt on file");
+    expect(rc(2, 0)).toBe("2 expenses have no receipt on file");
+    expect(rc(0, 75)).toBeUndefined();
   });
   it("builds accountant CSV rows with the line, deduction and flags", () => {
     const r = { expense_id: "e", expense_date: "2027-03-01", vendor: "Verizon", description: "", category_id: "c", category_name: "Phone & internet", total_amount: 100, business_pct: 40, receipt_path: "", review_status: "ok", auto_source: null, is_startup: false, line_key: "l25_utilities", treatment: "deductible", gas_excluded: false, asset_candidate: false, deductible_amount: 40, ask_reason: "Business use 40%." } as ExpenseTaxRow;

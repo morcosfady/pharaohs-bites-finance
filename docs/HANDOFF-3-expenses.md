@@ -93,6 +93,10 @@ The owner asked to delete the top-level **Cost** page. It only listed the automa
 - **Weekly Telegram summary:** Edge Function `weekly-summary` (cron job `weekly-summary`, Mondays 13:00 UTC = 8am CDT / 7am CST, authenticated with `SYNC_CRON_SECRET`, created by copying the plaid-daily-sync command: it is not in a migration because it embeds the secret). Message = last Mon-Sun spent vs previous week, sales, left, top 3 categories, biggest charge, budgets >= 80%, ingredient price jumps >= 15% (same store, last 14 days, `ingredient_price_jumps()`), possible duplicates, charges without a receipt, receipts waiting, bills in the next 7 days. Manual run: `select command from cron.job where jobname='weekly-summary'` then execute it; add `"preview": true` to the body to return the text without sending.
 - Tests: `supabase/tests/insights.sql` (rolled back) and 18 vitest cases (formatter, bills, budgets, trends, vendors, ingredient parsing). All 8 SQL suites and 105 vitest tests pass.
 
+## Receipt threshold (2026-10-01, migration 0057)
+
+The Tax tab warning "N expenses have no receipt on file" now counts only purchases at or above `expense_settings.receipt_min_amount` (default **$75**, the IRS line for documentary evidence; editable in Expenses -> Tax -> Tax settings, marked Ask accountant). Smaller charges still have the bank record as proof of payment. A split expense counts once. To satisfy the warning for a bigger purchase: open the expense and attach a photo/PDF (sets `receipt_path`), or upload it on the Receipts tab once the Claude key is set.
+
 ## Next
 
 Phase 4 food cost intelligence is not built. It needs receipt line items (now stored in `expense_items`) to have data, so start it after some real receipts have been read.
