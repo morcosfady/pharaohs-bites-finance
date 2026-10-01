@@ -86,17 +86,21 @@ function Row({ c, top, color, open, onToggle }: { c: CategoryShare; top: number;
         <div className="flex items-center gap-2">
           <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: color }} aria-hidden />
           <span aria-hidden>{categoryEmoji(c.name)}</span>
-          <span className="min-w-0 flex-1 truncate font-medium">{c.name}</span>
-          {c.change != null && (up || down) && (
-            <span className={`inline-flex items-center text-xs ${up ? "text-negative" : "text-positive"}`} title="Compared with the previous period">
-              {up ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}{Math.abs(Math.round(c.change * 100))}%
-            </span>
-          )}
-          <b className="w-20 shrink-0 text-right tabular-nums">{fmt(c.cents)}</b>
-          <span className="w-10 shrink-0 text-right text-xs text-charcoal/50">{pct(c.share)}</span>
+          <span className="min-w-0 flex-1 font-medium [overflow-wrap:anywhere]">{c.name}</span>
           <ChevronDown size={14} className={`shrink-0 text-charcoal/40 transition ${open ? "rotate-180" : ""}`} />
         </div>
-        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-ivory-100"><div className="h-full rounded-full" style={{ width: `${width}%`, background: color }} /></div>
+        <div className="mt-1.5 flex items-center gap-3">
+          <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-ivory-100"><div className="h-full rounded-full" style={{ width: `${width}%`, background: color }} /></div>
+          <span className="flex shrink-0 items-baseline gap-2">
+            {c.change != null && (up || down) && (
+              <span className={`inline-flex items-center text-xs ${up ? "text-negative" : "text-positive"}`} title="Compared with the previous period">
+                {up ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}{Math.abs(Math.round(c.change * 100))}%
+              </span>
+            )}
+            <b className="tabular-nums">{fmt(c.cents)}</b>
+            <span className="w-9 text-right text-xs text-charcoal/50">{pct(c.share)}</span>
+          </span>
+        </div>
       </button>
       {open && (
         <ul className="mb-2 ml-5 space-y-1 rounded-lg bg-ivory-50 px-3 py-2 text-sm">
