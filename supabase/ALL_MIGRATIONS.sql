@@ -4421,3 +4421,5 @@ on conflict (slug) do update set name = excluded.name, name_ar = excluded.name_a
 update products set packaging_cost = 2.00 where slug = 'feteer-and-dip-trio';
 update products set packaging_cost = 3.00 where slug = 'feteer-dip-trio';
 update products set packaging_cost = 1.50, selling_price = 15 where slug = 'pick-3-puddings';
+-- 0064: Feteer + Dip Trio is retired (too close to Egyptian Breakfast). Made inactive, not deleted, so old orders keep their history.
+update products set is_active = false where slug = 'feteer-and-dip-trio';
