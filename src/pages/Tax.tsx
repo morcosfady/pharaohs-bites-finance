@@ -11,7 +11,7 @@ import { toInputDate } from "../lib/dates";
 import type { TaxStatus } from "../lib/types";
 
 export function TaxPage() {
-  const ts = useTaxSettings(); const products = useProducts(); const adj = useTaxAdjustments(); const sums = useTaxSummaries();
+  const ts = useTaxSettings(); const products = useProducts(false); const adj = useTaxAdjustments(); const sums = useTaxSummaries();
   const fin = useAllOrderFinancials(); const refunds = useRefunds();
   const write = useWrite(); const toast = useToast();
   const [adjOpen, setAdjOpen] = useState(false);
