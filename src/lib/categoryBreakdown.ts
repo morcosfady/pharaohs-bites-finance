@@ -65,10 +65,13 @@ export const QUICK_GROUPS: { key: string; label: string; emoji: string; names: s
 ];
 
 export function quickTotals(b: Breakdown) {
-  return QUICK_GROUPS.map((g) => {
+  const groups = QUICK_GROUPS.map((g) => {
     const cents = b.categories.filter((c) => g.names.includes(c.name)).reduce((s, c) => s + c.cents, 0);
     return { ...g, cents, share: b.totalCents > 0 ? cents / b.totalCents : 0 };
   });
+  // everything not in a headline group (kitchen supplies, delivery, licences...) so the tiles always add up to the total
+  const rest = b.totalCents - groups.reduce((s, g) => s + g.cents, 0);
+  return [...groups, { key: "other", label: "Everything else", emoji: "🧾", names: [] as string[], cents: rest, share: b.totalCents > 0 ? rest / b.totalCents : 0 }];
 }
 
 /** Donut slices: the biggest few categories, everything smaller folded into one slice. */
