@@ -28,7 +28,6 @@ export function MileageTab({ range, gas }: { range: DateRange; gas: { count: num
   const rows = useMemo(() => logs.data ?? [], [logs.data]);
   const sum = useMemo(() => summarizeMileage(rows), [rows]);
   const s = settings.data;
-  const unconfirmedRates = (rates.data ?? []).filter((r) => !r.confirmed);
   const pickedRows = rows.filter((r) => picked.includes(r.id));
   const sameDay = pickedRows.length > 1 && new Set(pickedRows.map((r) => r.trip_date)).size === 1;
   const toggle = (id: string) => setPicked((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
@@ -50,9 +49,8 @@ export function MileageTab({ range, gas }: { range: DateRange; gas: { count: num
         <div className="card flex flex-col gap-1 px-4 py-3"><span className="text-xs font-medium uppercase leading-tight tracking-wider text-teal-900/70">IRS rate</span><span className="font-display text-2xl font-semibold text-teal-900">{formatCents((rates.data ?? []).find((r) => r.effective_from <= toInputDate(range.to) && r.effective_to >= toInputDate(range.to))?.cents_per_mile)}</span><span className="text-xs text-charcoal/50">per mile, on the period end date</span></div>
       </div>
 
-      {(unconfirmedRates.length > 0 || sum.missingRate > 0 || sum.estimatedMiles > 0 || (s?.method === "standard" && gas.count > 0)) && (
+      {(sum.missingRate > 0 || sum.estimatedMiles > 0 || (s?.method === "standard" && gas.count > 0)) && (
         <div className="space-y-2 rounded-xl border border-warning/40 bg-gold-100 px-4 py-3 text-sm">
-          {unconfirmedRates.length > 0 && <p className="flex gap-2"><AlertTriangle size={16} className="mt-0.5 shrink-0 text-warning" /><span><b>Confirm the IRS rate.</b> I copied it from irs.gov on 2026-10-01 (72.5¢ Jan to Jun, 76¢ Jul to Dec). Check it below and tap Confirm.</span></p>}
           {sum.missingRate > 0 && <p className="flex gap-2"><AlertTriangle size={16} className="mt-0.5 shrink-0 text-warning" /><span><b>{sum.missingRate} trip{sum.missingRate === 1 ? " has" : "s have"} no IRS rate</b> for its date, so no deduction is counted yet. Add the rate below.</span></p>}
           {sum.estimatedMiles > 0 && <p className="flex gap-2"><AlertTriangle size={16} className="mt-0.5 shrink-0 text-warning" /><span><b>{sum.estimatedMiles.toFixed(1)} of {sum.miles.toFixed(1)} miles are estimates</b> (from the delivery fee formula, not an odometer or a map). <i>Ask accountant</i> if that is acceptable. Edit a trip and tick “measured” once you have the real number.</span></p>}
           {s?.method === "standard" && gas.count > 0 && <p className="flex gap-2"><AlertTriangle size={16} className="mt-0.5 shrink-0 text-warning" /><span><b>Gas is not deducted separately.</b> With the standard mileage method, the {gas.count} gas purchase{gas.count === 1 ? "" : "s"} in this period ({fmt(Math.round(gas.total * 100))}) are excluded from deductions. <i>Ask accountant</i> before choosing the method.</span></p>}
