@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { breakdown, quickTotals, donutSlices, colorFor, categoryEmoji, PALETTE, OTHER_COLOR } from "../lib/categoryBreakdown";
+import type { ExpenseTaxRow } from "../lib/types";
 import { fileProblem, receiptStatus, safeName, sha256Hex } from "../lib/receiptUpload";
 import { buildSystemPrompt, parseModelJson, normalizeParsed, totalsAddUp, friendlyApiError } from "../../supabase/functions/_shared/receiptSchema";
 
@@ -78,4 +80,48 @@ describe("receipt upload helpers", () => {
     expect(receiptStatus({ status: "parsed", outcome: "created", totals_ok: false }).text).toMatch(/Check items/);
     expect(receiptStatus({ status: "parsed", outcome: "possible_duplicate", totals_ok: true }).tone).toBe("bad");
   });
+});
+
+const row = (category_name: string, total_amount: number, vendor = "V"): ExpenseTaxRow => ({ expense_id: "e", expense_date: "2026-10-01", vendor, description: "", category_id: null, category_name, total_amount, business_pct: 100, receipt_path: "", review_status: "ok", auto_source: null, is_startup: false, line_key: "x", treatment: "deductible", gas_excluded: false, asset_candidate: false, deductible_amount: total_amount, ask_reason: null, line_no: 1 });
+
+describe("category breakdown", () => {
+  it("adds each category in cents, biggest first, with its share", () => {
+    const b = breakdown([row("Ingredients", 60.1), row("Ingredients", 39.9), row("Gas / mileage", 25), row("Marketing", 75)]);
+    expect(b.totalCents).toBe(20000);
+    expect(b.categories.map((c) => c.name)).toEqual(["Ingredients", "Marketing", "Gas / mileage"]);
+    expect(b.categories[0]).toMatchObject({ cents: 10000, count: 2, share: 0.5 });
+  });
+  it("sets personal items aside instead of counting them", () => {
+    const b = breakdown([row("Ingredients", 30), row("Personal (not business)", 5)]);
+    expect(b.totalCents).toBe(3000); expect(b.personalCents).toBe(500);
+    expect(b.categories.find((c) => c.name.startsWith("Personal"))).toBeUndefined();
+  });
+  it("compares with the previous period", () => {
+    const b = breakdown([row("Gas / mileage", 60), row("Marketing", 10)], [row("Gas / mileage", 40), row("Marketing", 10)]);
+    expect(b.categories.find((c) => c.name === "Gas / mileage")?.change).toBeCloseTo(0.5);
+    expect(b.categories.find((c) => c.name === "Marketing")?.change).toBe(0);
+    expect(breakdown([row("New thing", 5)], []).categories[0].change).toBeNull();
+  });
+  it("lists the vendors behind a category", () => {
+    const v = breakdown([row("Ingredients", 10, "Costco"), row("Ingredients", 30, "Walmart"), row("Ingredients", 5, "Costco")]).categories[0].vendors;
+    expect(v.map((x) => x.vendor)).toEqual(["Walmart", "Costco"]); expect(v[1]).toMatchObject({ cents: 1500, count: 2 });
+  });
+  it("answers the headline questions: ingredients, packaging, gas, software, fees", () => {
+    const q = Object.fromEntries(quickTotals(breakdown([row("Ingredients", 50), row("Packaging", 20), row("Pizza boxes", 10), row("Gas / mileage", 15), row("Website / technology", 100), row("Payment processing fees", 3), row("Bank / payment fees", 2)])).map((g) => [g.key, g.cents]));
+    expect(q).toEqual({ ingredients: 5000, packaging: 3000, gas: 1500, software: 10000, fees: 500 });
+  });
+  it("folds the small categories into one donut slice and keeps the total", () => {
+    const cats = breakdown(Array.from({ length: 10 }, (_, i) => row(`Cat ${i}`, 100 - i * 5))).categories;
+    const s = donutSlices(cats, 7);
+    expect(s).toHaveLength(7); expect(s[6].name).toBe("Everything else");
+    expect(s.reduce((t, x) => t + x.cents, 0)).toBe(cats.reduce((t, x) => t + x.cents, 0));
+    expect(donutSlices(cats.slice(0, 3), 7)).toHaveLength(3);
+  });
+  it("gives a category the same colour everywhere, and a grey to the leftovers", () => {
+    const order = ["Ingredients", "Packaging"];
+    expect(colorFor("Packaging", order)).toBe(PALETTE[1]); expect(colorFor("Packaging", order)).toBe(colorFor("Packaging", order));
+    expect(colorFor("Everything else", order)).toBe(OTHER_COLOR);
+    expect(categoryEmoji("Gas / mileage")).toBe("⛽"); expect(categoryEmoji("Something new")).toBe("🧾");
+  });
+  it("copes with no spending", () => { const b = breakdown([]); expect(b.totalCents).toBe(0); expect(b.categories).toEqual([]); });
 });

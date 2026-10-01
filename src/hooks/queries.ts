@@ -127,6 +127,12 @@ export function useNeedsReceipt() {
     unwrap(await supabase.from("needs_receipt_view").select("*").order("expense_date", { ascending: false })) as NeedsReceiptRow[] });
 }
 
+/** Spending lines for a period, one per category (a mixed receipt is split by item). Feeds the category breakdown. */
+export function useCategoryRows(range: DateRange) {
+  return useQuery({ queryKey: ["category_rows", iso(range.from), iso(range.to)], queryFn: async () =>
+    unwrap(await supabase.from("expense_tax_view").select("expense_id, expense_date, vendor, category_name, total_amount, line_no").gte("expense_date", range.from.toISOString().slice(0, 10)).lte("expense_date", range.to.toISOString().slice(0, 10))) as unknown as ExpenseTaxRow[] });
+}
+
 /* ---- tax pack (income-tax side of expenses) ---- */
 const yr = (y: number) => ({ from: `${y}-01-01`, to: `${y}-12-31` });
 export function useTaxSummaryYear(y: number) {

@@ -9,6 +9,7 @@ import { BankFeed } from "../components/BankFeed";
 import { ReviewInbox } from "../components/ExpenseReview";
 import { MileageTab } from "../components/Mileage";
 import { TaxTab } from "../components/TaxPack";
+import { CategoryBreakdown } from "../components/CategoryBreakdown";
 import { ReceiptsTab } from "../components/Receipts";
 import { sourceBadges } from "../lib/expenseReview";
 import { PAYMENT_METHODS, label } from "../lib/status";
@@ -80,6 +81,7 @@ export function ExpensesPage() {
       {tab === "all" && <>
         <DateRangeBar range={range} onChange={setRange} />
         <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4"><KpiCard label="Total expenses" value={total} />{advanced && <><KpiCard label="Direct product costs" value={direct} /><KpiCard label="Operating expenses" value={total - direct} /></>}<KpiCard label="Entries" value={rows.length} kind="int" />{toReview > 0 && <button type="button" className="text-left" onClick={() => setTab("review")}><KpiCard label="Items to review" value={toReview} kind="int" /></button>}</div>
+        <CategoryBreakdown range={range} />
         {expenses.error && <ErrorBox error={expenses.error} />}
         {expenses.isLoading ? <Skeleton rows={8} className="card p-5" /> : <DataTable rows={rows} columns={cols} rowKey={(r) => r.id} onRowClick={(r) => setEdit(r)} initialSort={{ key: "expense_date", dir: "desc" }} />}
       </>}
