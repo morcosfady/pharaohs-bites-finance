@@ -1,4 +1,5 @@
 # Pharaoh's Bites: full project handoff
+> **Newer:** see `docs/HANDOFF-2026-09-30-payments-alerts.md` for everything that changed after this file (online payment, delivery fee, alerts, receipts, cleanup).
 
 **Written:** 2026-09-29 (end of a long working session).
 **Purpose:** everything a fresh chat (or a new person) needs to keep working on the business's website, dashboard and backend without re-discovering anything. Read sections 1 to 3 first; use the rest as reference and runbooks.
