@@ -182,6 +182,7 @@ export function ExpenseModal({ expense, subscription, marketing, channel, catego
   };
   return (
     <Modal open onClose={onClose} title={expense ? "Edit expense" : subscription ? "Add subscription" : marketing ? "Add marketing expense" : "Add expense"} wide>
+      {Number(expense?.personal_amount ?? 0) > 0 && <p className="mb-3 rounded-lg bg-gold-100 px-3 py-2 text-xs text-charcoal/80">Not counted: <b>{fmt(toCents(expense?.personal_amount ?? 0))}</b> of this purchase was personal. The bank charge was {fmt(toCents(expense!.total_amount) + toCents(expense!.personal_amount ?? 0))}. To change it, mark the item personal or business on the Receipts tab.</p>}
       {locked && <p className="mb-3 rounded-lg bg-ivory-50 px-3 py-2 text-xs text-charcoal/70">Imported automatically: date, vendor and amount come from the {expense?.auto_source === "stripe" ? "payment" : "bank"} and refresh on sync. You can change the category, business use % and notes.</p>}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Date"><input className="input" type="date" disabled={locked} value={f.expense_date} onChange={u("expense_date")} /></Field>

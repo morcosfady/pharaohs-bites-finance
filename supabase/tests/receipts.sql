@@ -204,8 +204,35 @@ begin
   e := _exp_of(r);
   perform _expect('split: the Expenses list still has ONE expense', (select count(*) from expenses where id = e), 1);
   perform _expect('split: cost of goods = flour + foil', (select coalesce(sum(deductible_amount), 0) from expense_tax_view where expense_id = e and line_key = 'cogs_purchases'), 30);
-  perform _expect('split: personal item is not deducted', (select coalesce(sum(deductible_amount), 0) from expense_tax_view where expense_id = e and line_key = 'personal'), 0);
-  perform _expect('split: the lines add up to the receipt total', (select sum(total_amount) from expense_tax_view where expense_id = e), 35);
+  perform _expect('split: the expense shows only the business money (flour + foil)', (select total_amount from expenses where id = e), 30);
+  perform _expect('split: the personal candy bar is remembered, not counted', (select personal_amount from expenses where id = e), 5);
+  perform _expect('split: the lines add up to the business total', (select sum(total_amount) from expense_tax_view where expense_id = e), 30);
+  perform _expect('split: no personal line in the tax view', (select count(*) from expense_tax_view where expense_id = e and line_key = 'personal'), 0);
+end $$;
+
+-- ---- a personal item in the basket: bank charge still matches, totals exclude it, tax is shared out ----
+do $$
+declare r jsonb; e uuid; b uuid; before_n numeric;
+begin
+  r := _rcpt('sha-pers', 'upload', '{"vendor":"Costco Wholesale","date":"2027-03-01","total":99.48,"tax":2.55,"items":[
+        {"name":"Rice 10 lb","total":50,"category":"Ingredients"},{"name":"Foil","total":42.26,"category":"Kitchen supplies"},
+        {"name":"Breyers ice cream","total":4.67,"category":"Ingredients","personal":true}]}');
+  e := _exp_of(r);
+  perform _expect('personal: the business total leaves out the ice cream and its share of the tax', (select total_amount from expenses where id = e), 94.69);
+  perform _expect('personal: the personal part is kept (4.67 + 0.12 tax)', (select personal_amount from expenses where id = e), 4.79);
+  before_n := _live();
+  b := _bank('r-pers', 'COSTCO WHSE #684 W PLANO TX', 99.48, '2027-03-02');
+  perform _expect('personal: the full 99.48 bank charge attaches to the SAME expense', (select (expense_id = e)::int from bank_transactions where id = b), 1);
+  perform _expect('personal: no second expense', _live(), before_n);
+  perform apply_bank_transaction(b);
+  perform _expect('personal: a bank re-sync keeps the personal part out', (select total_amount from expenses where id = e), 94.69);
+  perform _expect('personal: no bank mismatch flagged', (expense_integrity()->>'bank_amount_mismatch')::numeric, 0);
+  -- the owner flips the item to business later: the expense grows back, by itself
+  update expense_items set is_business = true, category_id = (select id from expense_categories where name = 'Ingredients') where expense_id = e and description = 'Breyers ice cream';
+  perform _expect('personal: marking it business adds it back', (select total_amount from expenses where id = e), 99.48);
+  perform _expect('personal: and nothing is personal any more', (select personal_amount from expenses where id = e), 0);
+  update expense_items set is_business = false where expense_id = e and description = 'Breyers ice cream';
+  perform _expect('personal: marking it personal again takes it out', (select total_amount from expenses where id = e), 94.69);
 end $$;
 
 -- ---- items that do not add up: flagged, and the tax lines still equal the total ----

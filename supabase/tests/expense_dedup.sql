@@ -58,7 +58,7 @@ declare m uuid; b uuid;
 begin
   insert into expenses (expense_date, vendor, amount_before_tax, description) values ('2026-10-02', 'Walmart', 100, 'groceries') returning id into m;
   b := _bank('t-c1', 'WAL-MART #1234 DALLAS TX', 100, '2026-10-05');
-  perform _expect('case1: single expense', _count($q$select count(*) from expenses where deleted_at is null and vendor in ('Walmart') and expense_date between '2026-10-01' and '2026-10-06'$q$), 1);
+  perform _expect('case1: single expense', _count($q$select count(*) from expenses where deleted_at is null and vendor in ('Walmart') and amount_before_tax = 100 and expense_date between '2026-10-01' and '2026-10-06'$q$), 1);
   perform _expect('case1: bank linked to manual row', (select (expense_id = m)::int from bank_transactions where id = b), 1);
   perform _expect('case1: two evidence rows', _count(format('select count(*) from expense_sources where expense_id = %L', m)), 2);
 end $$;
