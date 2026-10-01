@@ -5,7 +5,7 @@ import { supabase, unwrap } from "../lib/supabase";
 import type {
   BusinessSettings, TaxSettings, Product, ProductCategory, Ingredient, Recipe, Customer, Order, OrderFinancial,
   ProductSale, Payment, Refund, Expense, ExpenseCategory, DeliveryRecord, TaxAdjustment, TaxPeriodSummary, AuditLog,
-  BankAccount, BankTransaction, BankRule,
+  BankAccount, BankTransaction, BankRule, MileageLog, MileageSettings, IrsMileageRate, MileagePlace,
 } from "../lib/types";
 import type { DateRange } from "../lib/dates";
 
@@ -113,6 +113,24 @@ export interface ExpenseIntegrity { possible_duplicates: number; needs_review: n
 export function useExpenseIntegrity() {
   return useQuery({ queryKey: ["expense_integrity"], queryFn: async () => unwrap(await supabase.rpc("expense_integrity")) as unknown as ExpenseIntegrity });
 }
+/* ---- mileage ---- */
+export function useMileageLogs(range?: DateRange) {
+  return useQuery({ queryKey: ["mileage_logs", range ? iso(range.from) : "all", range ? iso(range.to) : ""], queryFn: async () => {
+    let q = supabase.from("mileage_log_view").select("*").is("deleted_at", null).order("trip_date", { ascending: false }).order("created_at", { ascending: false });
+    if (range) q = q.gte("trip_date", range.from.toISOString().slice(0, 10)).lte("trip_date", range.to.toISOString().slice(0, 10));
+    return unwrap(await q) as MileageLog[];
+  }});
+}
+export function useMileageSettings() {
+  return useQuery({ queryKey: ["mileage_settings"], queryFn: async () => unwrap(await supabase.from("mileage_settings").select("*").limit(1).single()) as MileageSettings });
+}
+export function useIrsRates() {
+  return useQuery({ queryKey: ["irs_mileage_rates"], queryFn: async () => unwrap(await supabase.from("irs_mileage_rates").select("*").order("effective_from", { ascending: false })) as IrsMileageRate[] });
+}
+export function useMileagePlaces() {
+  return useQuery({ queryKey: ["mileage_places"], queryFn: async () => unwrap(await supabase.from("mileage_places").select("*").order("name")) as MileagePlace[] });
+}
+
 export function useExpenseCategories() {
   return useQuery({ queryKey: ["expense_categories"], queryFn: async () => unwrap(await supabase.from("expense_categories").select("*").order("sort_order")) as ExpenseCategory[], staleTime: 300_000 });
 }

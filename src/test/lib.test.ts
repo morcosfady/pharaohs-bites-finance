@@ -105,3 +105,26 @@ describe("expense review helpers", () => {
     expect(ruleActionLabel("whatever")).toBe("whatever");
   });
 });
+
+/* ---- mileage helpers -------------------------------------------------------- */
+import { summarizeMileage, routeCandidates, formatCents } from "../lib/mileage";
+import type { MileageLog } from "../lib/types";
+const trip = (o: Partial<MileageLog>): MileageLog => ({ id: "t", trip_date: "2026-10-10", kind: "delivery", purpose: "", from_label: "", to_label: "", miles: 10, order_id: null, vehicle: "", notes: "", estimated: false, auto: false, route_id: null, deleted_at: null, cents_per_mile: 76, rate_confirmed: true, deduction: 7.6, counted: true, ...o });
+describe("mileage summary", () => {
+  it("adds only counted trips and prices them in cents", () => {
+    const s = summarizeMileage([trip({ miles: 10.1, deduction: 7.68 }), trip({ miles: 5, deduction: 3.8 }), trip({ miles: 99, deduction: 75.24, counted: false })]);
+    expect(s.miles).toBe(15.1); expect(s.deduction).toBe(11.48); expect(s.trips).toBe(2);
+  });
+  it("flags missing and unconfirmed rates instead of treating them as zero", () => {
+    const s = summarizeMileage([trip({ deduction: null, cents_per_mile: null, rate_confirmed: null }), trip({ rate_confirmed: false })]);
+    expect(s.missingRate).toBe(1); expect(s.unconfirmed).toBe(true);
+  });
+  it("tracks how many miles are estimates", () => {
+    expect(summarizeMileage([trip({ miles: 4, estimated: true }), trip({ miles: 6 })]).estimatedMiles).toBe(4);
+  });
+  it("offers only same-day, live, un-routed deliveries for a route", () => {
+    const rows = [trip({ id: "a" }), trip({ id: "b", route_id: "r" }), trip({ id: "c", trip_date: "2026-10-11" }), trip({ id: "d", kind: "supply" })];
+    expect(routeCandidates(rows, "2026-10-10").map((r) => r.id)).toEqual(["a"]);
+  });
+  it("formats rates", () => { expect(formatCents(76)).toBe("76¢"); expect(formatCents(72.5)).toBe("72.5¢"); expect(formatCents(null)).toBe("no rate"); });
+});

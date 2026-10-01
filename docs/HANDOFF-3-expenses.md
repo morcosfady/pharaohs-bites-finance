@@ -31,6 +31,17 @@ Read with `docs/HANDOFF.md` and `docs/HANDOFF-2026-09-30-payments-alerts.md`. Pl
 
 5 expenses: Anthropic $100 (monthly template), Court Solutions $10, Walmart $1.08, WebstaurantStore $66.51, Cloudflare $10.46. Two items in Review: Cloudflare and Court Solutions need a category; one $200 deposit needs classifying. The Anthropic $100 charge has not hit Chase yet; when it does it must link to the subscription (tested).
 
+## Phase 3 mileage (done 2026-10-01)
+
+- Migration `0049_mileage.sql`: `orders.delivery_miles` (saved by `create-order` from now on; older orders have none), `mileage_logs`, `irs_mileage_rates` (by DATE RANGE, because the 2026 rate changed on Jul 1: 72.5 cents Jan-Jun, 76 cents Jul-Dec, checked on irs.gov 2026-10-01, **unconfirmed until the owner taps Confirm**), `mileage_places`, `mileage_settings`, view `mileage_log_view` (prices each trip with the rate on its date; `counted` = live and not folded into a route).
+- **Delivery trips are automatic**: when an order becomes `completed` (delivery, miles > 0, not a test name) a trip is created, round trip x2 (setting), unique per order forever (a trip the owner deleted never returns; cancelling retires only the system's own entry and restoring brings it back). Marked `estimated` because miles = straight line x 1.3, not an odometer; the UI shows an **Ask accountant** note.
+- **Routes:** select 2+ same-day deliveries, enter the real total miles, they combine into one counted route (`combine_mileage_route` / `split_mileage_route`); no double counting.
+- **One-tap supply trips** from saved places; `mileage-place` Edge Function (admin only) estimates one-way miles from the kitchen secrets, owner can overwrite.
+- **Method:** standard vs actual with an "accountant confirmed" box; with standard, gas purchases (category "Gas / mileage") are flagged as not deductible on top.
+- Mileage is a deduction, **never added into expense totals**. It is reported beside them (Tax Pack, phase 5).
+- Tests: `supabase db query --linked -f supabase/tests/mileage.sql` (rolled back): rates by date, auto trip, idempotency, cancel/restore, owner-delete stays deleted, test/pickup/no-miles make no trip, one-way setting, route combine/split. Plus 5 vitest cases (48 total).
+- Not verified against a real order yet: the first real completed delivery will prove `create-order` saves `delivery_miles` (the column and update are in place; the function still answers normally).
+
 ## Next
 
-Phase 2 receipts (upload + SHA-256 dedupe, Gmail label inbox, Claude vision parsing with a key the owner pastes into Supabase, item splits, matching), then mileage, food cost intelligence, tax pack. Not started: nothing from phases 2-5 is built.
+Phase 2 receipts (skipped for now by the owner; upload + SHA-256 dedupe, Gmail label inbox, Claude vision parsing with a key the owner pastes into Supabase, item splits, matching), then mileage, food cost intelligence, tax pack. Not started: nothing from phases 2-5 is built.

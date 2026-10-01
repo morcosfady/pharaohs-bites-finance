@@ -148,3 +148,14 @@ export interface ProductSale {
 }
 
 export interface AuditLog { id: number; table_name: string; record_id: string; action: string; changed_by: string | null; old_data: Record<string, unknown> | null; new_data: Record<string, unknown> | null; created_at: string }
+
+/* ---- mileage (migration 0049) ---- */
+/** Row of the mileage_log_view: a trip priced with the IRS rate in force on its date. */
+export interface MileageLog {
+  id: string; trip_date: string; kind: "delivery" | "supply" | "other"; purpose: string; from_label: string; to_label: string;
+  miles: Num; order_id: string | null; vehicle: string; notes: string; estimated: boolean; auto: boolean; route_id: string | null;
+  deleted_at: string | null; cents_per_mile: Num | null; rate_confirmed: boolean | null; deduction: Num | null; counted: boolean;
+}
+export interface MileageSettings { id: boolean; method: "standard" | "actual"; method_confirmed: boolean; delivery_round_trip: boolean; vehicle: string }
+export interface IrsMileageRate { id: string; effective_from: string; effective_to: string; cents_per_mile: Num; confirmed: boolean; source: string }
+export interface MileagePlace { id: string; name: string; address: string; one_way_miles: Num; created_at: string }

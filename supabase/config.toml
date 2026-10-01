@@ -49,3 +49,7 @@ verify_jwt = false
 verify_jwt = false
 [functions.plaid-exchange]
 verify_jwt = false
+
+[functions.mileage-place]
+# Admin-only; checks the signed-in admin itself.
+verify_jwt = false

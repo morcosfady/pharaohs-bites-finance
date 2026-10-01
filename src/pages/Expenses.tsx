@@ -7,6 +7,7 @@ import { useExpenses, useExpenseCategories, useProducts, useWrite, useExpenseInt
 import { useQuery } from "@tanstack/react-query";
 import { BankFeed } from "../components/BankFeed";
 import { ReviewInbox } from "../components/ExpenseReview";
+import { MileageTab } from "../components/Mileage";
 import { sourceBadges } from "../lib/expenseReview";
 import { PAYMENT_METHODS, label } from "../lib/status";
 import { fmt, toCents, sum } from "../lib/money";
@@ -37,6 +38,9 @@ export function ExpensesPage() {
     .filter((e) => e.auto_source !== "order_cost")
     .map((e) => ({ ...e, category: e.expense_categories?.name ?? "—" })), [expenses.data]);
   const total = sum(rows.map((r) => toCents(r.total_amount)));
+  /* gas bought in the period: not deductible on top of the standard mileage rate */
+  const gasRows = rows.filter((r) => r.category === "Gas / mileage");
+  const gas = { count: gasRows.length, total: sum(gasRows.map((r) => toCents(r.total_amount))) / 100 };
   const direct = sum(rows.filter((r) => r.cost_type === "direct_product").map((r) => toCents(r.total_amount)));
   const allCols: Column<Row>[] = [
     { key: "expense_date", header: "Date", render: (r) => fmtDate(r.expense_date) },
@@ -62,6 +66,7 @@ export function ExpensesPage() {
       <TabBar tab={tab} onChange={setTab} reviewCount={toReview} />
       {tab === "review" && <ReviewInbox />}
       {tab === "bank" && <BankFeed />}
+      {tab === "mileage" && <><DateRangeBar range={range} onChange={setRange} /><MileageTab range={range} gas={gas} /></>}
       {tab === "subs" && <FixedCosts rows={fixed.data ?? []} loading={fixed.isLoading} onOpen={(e) => setEdit(e)} />}
       {tab === "all" && <>
         <DateRangeBar range={range} onChange={setRange} />
@@ -76,8 +81,8 @@ export function ExpensesPage() {
 }
 
 /* ---------- tabs ---------- */
-type Tab = "all" | "review" | "subs" | "bank";
-const TABS: { key: Tab; label: string; short: string }[] = [{ key: "all", label: "All expenses", short: "All" }, { key: "review", label: "Review", short: "Review" }, { key: "subs", label: "Subscriptions", short: "Subs" }, { key: "bank", label: "Bank feed", short: "Bank" }];
+type Tab = "all" | "review" | "mileage" | "subs" | "bank";
+const TABS: { key: Tab; label: string; short: string }[] = [{ key: "all", label: "All expenses", short: "All" }, { key: "review", label: "Review", short: "Review" }, { key: "mileage", label: "Mileage", short: "Miles" }, { key: "subs", label: "Subscriptions", short: "Subs" }, { key: "bank", label: "Bank feed", short: "Bank" }];
 
 function TabBar({ tab, onChange, reviewCount }: { tab: Tab; onChange: (t: Tab) => void; reviewCount: number }) {
   return (
