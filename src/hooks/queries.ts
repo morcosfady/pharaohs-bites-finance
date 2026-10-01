@@ -5,7 +5,7 @@ import { supabase, unwrap } from "../lib/supabase";
 import type {
   BusinessSettings, TaxSettings, Product, ProductCategory, Ingredient, Recipe, Customer, Order, OrderFinancial,
   ProductSale, Payment, Refund, Expense, ExpenseCategory, DeliveryRecord, TaxAdjustment, TaxPeriodSummary, AuditLog,
-  BankAccount, BankTransaction, BankRule, ExpenseTaxRow, TaxSummaryRow, TaxQuality, TaxExtras, ExpenseSettings, MileageLog, MileageSettings, IrsMileageRate, MileagePlace,
+  BankAccount, BankTransaction, BankRule, ReceiptFile, ExpenseItem, NeedsReceiptRow, ExpenseTaxRow, TaxSummaryRow, TaxQuality, TaxExtras, ExpenseSettings, MileageLog, MileageSettings, IrsMileageRate, MileagePlace,
 } from "../lib/types";
 import type { DateRange } from "../lib/dates";
 
@@ -113,6 +113,20 @@ export interface ExpenseIntegrity { possible_duplicates: number; needs_review: n
 export function useExpenseIntegrity() {
   return useQuery({ queryKey: ["expense_integrity"], queryFn: async () => unwrap(await supabase.rpc("expense_integrity")) as unknown as ExpenseIntegrity });
 }
+/* ---- receipts ---- */
+export function useReceipts() {
+  return useQuery({ queryKey: ["receipt_files"], queryFn: async () =>
+    unwrap(await supabase.from("receipt_files").select("id, sha256, storage_path, original_name, mime, size_bytes, source, email_subject, status, outcome, expense_id, parsed, totals_ok, error, created_at").order("created_at", { ascending: false }).limit(200)) as ReceiptFile[] });
+}
+export function useExpenseItems(expenseId: string | null) {
+  return useQuery({ queryKey: ["expense_items", expenseId], enabled: !!expenseId, queryFn: async () =>
+    unwrap(await supabase.from("expense_items").select("*").eq("expense_id", expenseId!).order("created_at")) as ExpenseItem[] });
+}
+export function useNeedsReceipt() {
+  return useQuery({ queryKey: ["needs_receipt"], queryFn: async () =>
+    unwrap(await supabase.from("needs_receipt_view").select("*").order("expense_date", { ascending: false })) as NeedsReceiptRow[] });
+}
+
 /* ---- tax pack (income-tax side of expenses) ---- */
 const yr = (y: number) => ({ from: `${y}-01-01`, to: `${y}-12-31` });
 export function useTaxSummaryYear(y: number) {

@@ -42,7 +42,7 @@ export async function buildTaxPdf(d: TaxPackData): Promise<Blob> {
 
   // 2. totals by line
   const lines = sortLines(d.summary);
-  const deductibleLines = lines.filter((l) => !["startup", "uncategorized", "refunds"].includes(l.line_key));
+  const deductibleLines = lines.filter((l) => !["startup", "uncategorized", "refunds", "personal"].includes(l.line_key));
   const totalDeductible = deductibleLines.reduce((s, l) => s + Math.round(Number(l.deductible) * 100), 0) / 100;
   heading("2. Expenses by Schedule C line (draft mapping)");
   autoTable(doc, {

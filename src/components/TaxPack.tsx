@@ -30,7 +30,7 @@ export function TaxTab({ onOpenExpense }: { onOpenExpense: (id: string) => void 
   const blocking = issues.filter((i) => i.blocking);
   const msum = useMemo(() => summarizeMileage(mileage.data ?? []), [mileage.data]);
   const startup = startupStatus(Number(lines.find((l) => l.line_key === "startup")?.deductible ?? 0), Number(settings.data?.startup_limit ?? 5000));
-  const totalDeductible = lines.filter((l) => !["startup", "uncategorized", "refunds"].includes(l.line_key)).reduce((s, l) => s + cents(l.deductible), 0);
+  const totalDeductible = lines.filter((l) => !["startup", "uncategorized", "refunds", "personal"].includes(l.line_key)).reduce((s, l) => s + cents(l.deductible), 0);
   const asks = (rows.data ?? []).filter((r) => r.ask_reason);
   const assets = (rows.data ?? []).filter((r) => r.asset_candidate);
   const loading = summary.isLoading || rows.isLoading;
@@ -117,14 +117,14 @@ export function TaxTab({ onOpenExpense }: { onOpenExpense: (id: string) => void 
       {assets.length > 0 && (
         <section className="card">
           <div className="card-head"><div><h2 className="card-title">Possible assets ({assets.length})</h2><p className="text-xs text-charcoal/50">Purchases of {fmt(cents(settings.data?.asset_threshold ?? 500))} or more. <i>Ask accountant:</i> depreciate or expense?</p></div></div>
-          <ul className="divide-y divide-ivory-200 px-5 pb-3 text-sm">{assets.map((r) => <Item key={r.expense_id} id={r.expense_id} date={r.expense_date} vendor={r.vendor} amount={r.total_amount} sub={r.description} onOpen={onOpenExpense} />)}</ul>
+          <ul className="divide-y divide-ivory-200 px-5 pb-3 text-sm">{assets.map((r) => <Item key={`${r.expense_id}-${r.line_no}`} id={r.expense_id} date={r.expense_date} vendor={r.vendor} amount={r.total_amount} sub={r.description} onOpen={onOpenExpense} />)}</ul>
         </section>
       )}
 
       {asks.length > 0 && (
         <section className="card">
           <div className="card-head"><div><h2 className="card-title">Ask accountant ({asks.length})</h2><p className="text-xs text-charcoal/50">Tap one to set its category or business use %.</p></div></div>
-          <ul className="divide-y divide-ivory-200 px-5 pb-3 text-sm">{asks.map((r) => <Item key={r.expense_id} id={r.expense_id} date={r.expense_date} vendor={r.vendor} amount={r.total_amount} sub={r.ask_reason ?? ""} onOpen={onOpenExpense} />)}</ul>
+          <ul className="divide-y divide-ivory-200 px-5 pb-3 text-sm">{asks.map((r) => <Item key={`${r.expense_id}-${r.line_no}`} id={r.expense_id} date={r.expense_date} vendor={r.vendor} amount={r.total_amount} sub={r.ask_reason ?? ""} onOpen={onOpenExpense} />)}</ul>
         </section>
       )}
 

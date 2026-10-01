@@ -119,9 +119,9 @@ begin
   perform _expect('splitting restores the individual trips', total_counted, 22.0);
 end $$;
 
--- ---- rate-year edge: 2026 rates are unconfirmed until the owner confirms -------------------
+-- ---- the 2026 rates were verified on irs.gov and are confirmed from the start -------------------
 do $$ begin
-  perform _expect('seeded rates start unconfirmed', (select count(*) from irs_mileage_rates where confirmed), 0);
+  perform _expect('seeded rates are confirmed (checked on irs.gov, no manual step)', (select count(*) from irs_mileage_rates where not confirmed), 0);
 end $$;
 
 rollback;

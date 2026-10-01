@@ -98,6 +98,8 @@ export interface ExpenseTaxRow {
   expense_id: string; expense_date: string; vendor: string; description: string; category_id: string | null; category_name: string;
   total_amount: Num; business_pct: Num; receipt_path: string; review_status: string; auto_source: string | null;
   is_startup: boolean; line_key: string; treatment: string; gas_excluded: boolean | null; asset_candidate: boolean; deductible_amount: Num; ask_reason: string | null;
+  /** an expense split across categories has one row per category line */
+  line_no: number;
 }
 export interface TaxSummaryRow { line_key: string; entries: Num; total: Num; deductible: Num }
 export interface TaxQuality { needs_review: number; possible_duplicates: number; uncategorized: number; missing_receipts: number; money_in_unclassified: number; mileage_without_rate: number; mileage_estimated: number; ask_accountant: number }
@@ -174,3 +176,16 @@ export interface MileageLog {
 export interface MileageSettings { id: boolean; method: "standard" | "actual"; method_confirmed: boolean; delivery_round_trip: boolean; vehicle: string }
 export interface IrsMileageRate { id: string; effective_from: string; effective_to: string; cents_per_mile: Num; confirmed: boolean; source: string }
 export interface MileagePlace { id: string; name: string; address: string; one_way_miles: Num; created_at: string }
+
+/* ---- receipts (migration 0053) ---- */
+export interface ReceiptFile {
+  id: string; sha256: string; storage_path: string; original_name: string; mime: string; size_bytes: number;
+  source: "upload" | "email"; email_subject: string; status: "uploaded" | "parsing" | "parsed" | "failed" | "waiting_key";
+  outcome: string; expense_id: string | null; parsed: { vendor?: string; date?: string | null; total?: number; tax?: number; items?: { name: string }[] } & Record<string, unknown>;
+  totals_ok: boolean | null; error: string; created_at: string;
+}
+export interface ExpenseItem {
+  id: string; expense_id: string; source_id: string | null; description: string; quantity: Num; unit_price: Num; line_total: Num;
+  tax_amount: Num; category_id: string | null; is_business: boolean;
+}
+export interface NeedsReceiptRow { expense_id: string; expense_date: string; vendor: string; total_amount: Num; description: string; days_waiting: number }

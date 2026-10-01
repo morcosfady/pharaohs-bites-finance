@@ -53,3 +53,10 @@ verify_jwt = false
 [functions.mileage-place]
 # Admin-only; checks the signed-in admin itself.
 verify_jwt = false
+
+[functions.receipt-parse]
+# Admin-only; checks the signed-in admin itself.
+verify_jwt = false
+[functions.receipt-email]
+# Called by the Gmail Apps Script; authenticated by RECEIPT_INBOX_TOKEN.
+verify_jwt = false

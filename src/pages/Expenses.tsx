@@ -9,6 +9,7 @@ import { BankFeed } from "../components/BankFeed";
 import { ReviewInbox } from "../components/ExpenseReview";
 import { MileageTab } from "../components/Mileage";
 import { TaxTab } from "../components/TaxPack";
+import { ReceiptsTab } from "../components/Receipts";
 import { sourceBadges } from "../lib/expenseReview";
 import { PAYMENT_METHODS, label } from "../lib/status";
 import { fmt, toCents, sum } from "../lib/money";
@@ -73,6 +74,7 @@ export function ExpensesPage() {
       {tab === "review" && <ReviewInbox />}
       {tab === "bank" && <BankFeed />}
       {tab === "tax" && <TaxTab onOpenExpense={openById} />}
+      {tab === "receipts" && <ReceiptsTab onOpenExpense={openById} />}
       {tab === "mileage" && <><DateRangeBar range={range} onChange={setRange} /><MileageTab range={range} gas={gas} /></>}
       {tab === "subs" && <FixedCosts rows={fixed.data ?? []} loading={fixed.isLoading} onOpen={(e) => setEdit(e)} />}
       {tab === "all" && <>
@@ -88,8 +90,8 @@ export function ExpensesPage() {
 }
 
 /* ---------- tabs ---------- */
-type Tab = "all" | "review" | "mileage" | "tax" | "subs" | "bank";
-const TABS: { key: Tab; label: string; short: string }[] = [{ key: "all", label: "All expenses", short: "All" }, { key: "review", label: "Review", short: "Review" }, { key: "mileage", label: "Mileage", short: "Miles" }, { key: "tax", label: "Tax", short: "Tax" }, { key: "subs", label: "Subscriptions", short: "Subs" }, { key: "bank", label: "Bank feed", short: "Bank" }];
+type Tab = "all" | "receipts" | "review" | "mileage" | "tax" | "subs" | "bank";
+const TABS: { key: Tab; label: string; short: string }[] = [{ key: "all", label: "All expenses", short: "All" }, { key: "receipts", label: "Receipts", short: "Receipts" }, { key: "review", label: "Review", short: "Review" }, { key: "mileage", label: "Mileage", short: "Miles" }, { key: "tax", label: "Tax", short: "Tax" }, { key: "subs", label: "Subscriptions", short: "Subs" }, { key: "bank", label: "Bank feed", short: "Bank" }];
 
 function TabBar({ tab, onChange, reviewCount }: { tab: Tab; onChange: (t: Tab) => void; reviewCount: number }) {
   return (

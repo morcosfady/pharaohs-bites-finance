@@ -18,6 +18,7 @@ export const SCHEDULE_C_LINES: { key: string; label: string; form: string }[] = 
   { key: "l27a_other", label: "Other expenses", form: "Line 27a" },
   { key: "l30_home", label: "Business use of home", form: "Line 30" },
   { key: "refunds", label: "Customer refunds (reduce sales, not an expense)", form: "Line 2" },
+  { key: "personal", label: "Personal items (not deducted)", form: "Excluded" },
   { key: "startup", label: "Startup costs (before the business start date)", form: "Special" },
   { key: "uncategorized", label: "Uncategorized: needs a category", form: "?" },
 ];
