@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { toGalleryItems, groupByMonth, filterGallery, monthsOf, monthLabel } from "../lib/gallery";
+import { toGalleryItems, mergeByPicture, groupByMonth, filterGallery, monthsOf, monthLabel } from "../lib/gallery";
 import { dueLabel, totalDue, budgetTone, budgetView } from "../lib/bills";
 import { trendData, topVendors } from "../lib/trends";
 import { parseSize, itemKey, unitPrice, buildIngredientPrices } from "../lib/ingredients";
@@ -178,5 +178,25 @@ describe("receipt gallery", () => {
   it("falls back to the file name when the vendor is unknown", () => {
     const g = toGalleryItems([{ ...f("9", "x.jpg", "", "2026-09-01", 0), parsed: {} }]);
     expect(g[0].title).toBe("file"); expect(g[0].totalCents).toBeNull();
+  });
+});
+
+describe("gallery: one tile per picture", () => {
+  const f = (id: string, name: string, path: string, total: number, vendor = "Amazon") => ({ id, storage_path: path, extra_paths: [] as string[], mime: "image/jpeg", parsed: { vendor, date: "2026-09-18", total }, email_subject: "", original_name: name, created_at: "2026-10-01T10:00:00Z", expense_id: "e" + id, source: "upload" as const });
+  const files = [f("1", "Amazon: Kootek 15 Pack Cake Boxes", "order.jpg", 30.99), f("2", "Amazon: Cheese Cloths 100 Grade", "order.jpg", 9.99), f("3", "Amazon: Stapler", "stapler.jpg", 16.98), f("4", "Costco West Plano 2026-09-12 (photo)", "costco.jpg", 23.48, "Costco")];
+  it("merges receipts that share a picture and keeps the total", () => {
+    const m = mergeByPicture(toGalleryItems(files));
+    expect(m).toHaveLength(3);
+    const order = m.find((x) => x.paths[0] === "order.jpg")!;
+    expect(order.members.map((x) => x.label)).toEqual(["Kootek 15 Pack Cake Boxes", "Cheese Cloths 100 Grade"]);
+    expect(order.totalCents).toBe(3099 + 999); expect(order.title).toBe("Amazon · 2 items"); expect(order.expenseId).toBeNull();
+  });
+  it("leaves a single receipt alone and links it to its expense", () => {
+    const one = mergeByPicture(toGalleryItems(files)).find((x) => x.paths[0] === "costco.jpg")!;
+    expect(one.members).toHaveLength(1); expect(one.title).toBe("Costco"); expect(one.expenseId).toBe("e4");
+  });
+  it("does not change the month totals", () => {
+    const groups = groupByMonth(mergeByPicture(toGalleryItems(files)));
+    expect(groups[0].totalCents).toBe(3099 + 999 + 1698 + 2348);
   });
 });

@@ -2,8 +2,11 @@
 import type { ReceiptFile } from "./types";
 import { toCents } from "./money";
 
+export interface GalleryMember { id: string; label: string; totalCents: number | null; expenseId: string | null }
 export interface GalleryItem {
   id: string; title: string; date: string; totalCents: number | null; mime: string; paths: string[]; expenseId: string | null; source: ReceiptFile["source"];
+  /** the receipts that share this picture (an Amazon order page covering several items); one entry for a normal receipt */
+  members: GalleryMember[];
 }
 export interface GalleryMonth { key: string; label: string; items: GalleryItem[]; totalCents: number }
 
@@ -19,6 +22,7 @@ export function toGalleryItems(files: Pick<ReceiptFile, "id" | "storage_path" | 
     date: (f.parsed?.date || f.created_at).slice(0, 10),
     totalCents: f.parsed?.total ? toCents(f.parsed.total) : null,
     mime: f.mime, paths: [f.storage_path, ...(f.extra_paths ?? [])], expenseId: f.expense_id, source: f.source,
+    members: [{ id: f.id, label: (f.original_name || "").replace(/^[^:]{1,20}:\s*/, "") || (f.parsed?.vendor || "Receipt"), totalCents: f.parsed?.total ? toCents(f.parsed.total) : null, expenseId: f.expense_id }],
   })).sort((a, b) => b.date.localeCompare(a.date) || a.title.localeCompare(b.title));
 }
 
@@ -47,3 +51,22 @@ export function filterGallery(items: GalleryItem[], f: GalleryFilter): GalleryIt
 
 /** The months that have pictures, for the month picker. */
 export const monthsOf = (items: GalleryItem[]) => [...new Set(items.map((i) => i.date.slice(0, 7)))].sort().reverse();
+
+
+/** One tile per PICTURE: receipts that point at the same main picture (several Amazon items on one order page) become one
+ *  tile that lists its items, instead of the same picture repeated. */
+export function mergeByPicture(items: GalleryItem[]): GalleryItem[] {
+  const byPath = new Map<string, GalleryItem>();
+  const out: GalleryItem[] = [];
+  for (const it of items) {
+    const first = byPath.get(it.paths[0]);
+    if (!first) { const copy = { ...it, members: [...it.members] }; byPath.set(it.paths[0], copy); out.push(copy); continue; }
+    first.members.push(...it.members);
+    first.totalCents = (first.totalCents ?? 0) + (it.totalCents ?? 0);
+    if (it.date > first.date) first.date = it.date;
+    first.expenseId = null;                      // several expenses: pick one from the list
+    for (const p of it.paths) if (!first.paths.includes(p)) first.paths.push(p);
+  }
+  for (const it of out) if (it.members.length > 1) it.title = `${it.title} · ${it.members.length} items`;
+  return out;
+}

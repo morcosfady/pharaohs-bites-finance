@@ -3,7 +3,7 @@ import { FileText, ChevronLeft, ChevronRight, Download, ExternalLink, Search, Im
 import { Skeleton, EmptyState, Modal } from "./ui";
 import { useReceipts } from "../hooks/queries";
 import { supabase } from "../lib/supabase";
-import { toGalleryItems, groupByMonth, filterGallery, monthsOf, monthLabel, isImage, type GalleryItem } from "../lib/gallery";
+import { toGalleryItems, mergeByPicture, groupByMonth, filterGallery, monthsOf, monthLabel, isImage, type GalleryItem } from "../lib/gallery";
 import { fmt } from "../lib/money";
 import { fmtDate } from "../lib/dates";
 
@@ -16,7 +16,7 @@ export function GalleryTab({ onOpenExpense, onGoReceipts }: { onOpenExpense: (id
   const [q, setQ] = useState(""); const [month, setMonth] = useState(""); const [kind, setKind] = useState<"all" | "photos" | "pdf">("all");
   const [openId, setOpenId] = useState<string | null>(null);
 
-  const all = useMemo(() => toGalleryItems(receipts.data ?? []), [receipts.data]);
+  const all = useMemo(() => mergeByPicture(toGalleryItems(receipts.data ?? [])), [receipts.data]);
   const shown = useMemo(() => filterGallery(all, { q, month, kind }), [all, q, month, kind]);
   const groups = useMemo(() => groupByMonth(shown), [shown]);
   const missing = (receipts.data ?? []).filter((r) => !r.storage_path).length;
@@ -125,6 +125,16 @@ function Viewer({ items, index, onIndex, onClose, onOpenExpense }: { items: Gall
             ? <img src={url} alt={`${it.title} receipt, page ${page + 1}`} className="max-h-[68vh] w-auto max-w-full rounded object-contain" />
             : <iframe src={url} title={`${it.title} PDF`} className="h-[68vh] w-full rounded" />}
         </div>
+        {it.members.length > 1 && (
+          <div className="rounded-lg border border-ivory-200 bg-white px-3 py-2 text-sm">
+            <div className="mb-1 text-xs font-medium uppercase tracking-wider text-teal-900/70">On this page</div>
+            <ul className="divide-y divide-ivory-200">{it.members.map((m) => (
+              <li key={m.id} className="flex items-center justify-between gap-3 py-1.5">
+                <span className="min-w-0 truncate">{m.label}</span>
+                <span className="flex shrink-0 items-center gap-3">{m.totalCents != null && <b className="tabular-nums">{fmt(m.totalCents)}</b>}{m.expenseId && <button className="text-xs text-teal-700 hover:underline" onClick={() => onOpenExpense(m.expenseId!)}>Open expense</button>}</span>
+              </li>))}</ul>
+          </div>
+        )}
         <div className="flex flex-wrap justify-end gap-2">
           {it.expenseId && <button className="btn-gold btn-sm" onClick={() => onOpenExpense(it.expenseId!)}>Open the expense</button>}
           {url && <a className="btn-ghost btn-sm" href={url} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open full size</a>}
