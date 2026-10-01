@@ -161,7 +161,7 @@ export function useDeliveryOrders(range: DateRange) {
 /* ---- receipts ---- */
 export function useReceipts() {
   return useQuery({ queryKey: ["receipt_files"], queryFn: async () =>
-    unwrap(await supabase.from("receipt_files").select("id, sha256, storage_path, original_name, mime, size_bytes, source, email_subject, status, outcome, expense_id, parsed, totals_ok, error, created_at").order("created_at", { ascending: false }).limit(200)) as ReceiptFile[] });
+    unwrap(await supabase.from("receipt_files").select("id, sha256, storage_path, extra_paths, original_name, mime, size_bytes, source, email_subject, status, outcome, expense_id, parsed, totals_ok, error, created_at").order("created_at", { ascending: false }).limit(200)) as ReceiptFile[] });
 }
 export function useExpenseItems(expenseId: string | null) {
   return useQuery({ queryKey: ["expense_items", expenseId], enabled: !!expenseId, queryFn: async () =>

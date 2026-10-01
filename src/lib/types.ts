@@ -183,7 +183,7 @@ export interface MileagePlace { id: string; name: string; address: string; one_w
 
 /* ---- receipts (migration 0053) ---- */
 export interface ReceiptFile {
-  id: string; sha256: string; storage_path: string; original_name: string; mime: string; size_bytes: number;
+  id: string; sha256: string; storage_path: string; /** more pictures of the same receipt (extra pages) */ extra_paths: string[]; original_name: string; mime: string; size_bytes: number;
   source: "upload" | "email"; email_subject: string; status: "uploaded" | "parsing" | "parsed" | "failed" | "waiting_key";
   outcome: string; expense_id: string | null; parsed: { vendor?: string; date?: string | null; total?: number; tax?: number; items?: { name: string }[] } & Record<string, unknown>;
   totals_ok: boolean | null; error: string; created_at: string;

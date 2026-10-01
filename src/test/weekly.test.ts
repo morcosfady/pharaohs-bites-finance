@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { toGalleryItems, groupByMonth, filterGallery, monthsOf, monthLabel } from "../lib/gallery";
 import { dueLabel, totalDue, budgetTone, budgetView } from "../lib/bills";
 import { trendData, topVendors } from "../lib/trends";
 import { parseSize, itemKey, unitPrice, buildIngredientPrices } from "../lib/ingredients";
@@ -149,4 +150,33 @@ describe("price book: receipts to dish costs", () => {
     expect(d[0].deltaCents).toBe(44);   // (2.0 - 1.6) * 1.1
   });
   it("measures the price change", () => { expect(priceChange(20, 25)).toBeCloseTo(0.25); expect(priceChange(0, 5)).toBeNull(); });
+});
+
+
+describe("receipt gallery", () => {
+  const f = (id: string, storage_path: string, vendor: string, date: string, total: number, mime = "image/jpeg", extra: string[] = []) => ({ id, storage_path, extra_paths: extra, mime, parsed: { vendor, date, total }, email_subject: "", original_name: "file", created_at: "2026-10-01T10:00:00Z", expense_id: "e" + id, source: "upload" as const });
+  const files = [f("1", "a.jpg", "Costco", "2026-09-12", 23.48), f("2", "b.pdf", "Walmart", "2026-09-30", 94.69, "application/pdf"), f("3", "", "No picture", "2026-09-30", 5), f("4", "c.jpg", "Ace Mart", "2026-09-12", 241.51, "image/jpeg", ["c2.jpg"]), f("5", "d.png", "Walgreens", "2026-10-01", 12.96, "image/png")];
+  it("lists only receipts that have a picture, newest first", () => {
+    const g = toGalleryItems(files);
+    expect(g.map((i) => i.title)).toEqual(["Walgreens", "Walmart", "Ace Mart", "Costco"]);
+    expect(g.find((i) => i.title === "Ace Mart")?.paths).toEqual(["c.jpg", "c2.jpg"]);
+  });
+  it("groups by month with a label and a total", () => {
+    const groups = groupByMonth(toGalleryItems(files));
+    expect(groups.map((x) => x.label)).toEqual(["October 2026", "September 2026"]);
+    expect(groups[1].items).toHaveLength(3); expect(groups[1].totalCents).toBe(2348 + 9469 + 24151);
+    expect(monthLabel("2026-09")).toBe("September 2026");
+  });
+  it("filters by store name, month and type", () => {
+    const all = toGalleryItems(files);
+    expect(filterGallery(all, { q: "cost", month: "", kind: "all" }).map((i) => i.title)).toEqual(["Costco"]);
+    expect(filterGallery(all, { q: "", month: "2026-10", kind: "all" }).map((i) => i.title)).toEqual(["Walgreens"]);
+    expect(filterGallery(all, { q: "", month: "", kind: "pdf" }).map((i) => i.title)).toEqual(["Walmart"]);
+    expect(filterGallery(all, { q: "", month: "", kind: "photos" })).toHaveLength(3);
+    expect(monthsOf(all)).toEqual(["2026-10", "2026-09"]);
+  });
+  it("falls back to the file name when the vendor is unknown", () => {
+    const g = toGalleryItems([{ ...f("9", "x.jpg", "", "2026-09-01", 0), parsed: {} }]);
+    expect(g[0].title).toBe("file"); expect(g[0].totalCents).toBeNull();
+  });
 });

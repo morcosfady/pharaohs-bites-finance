@@ -158,15 +158,18 @@ function ReceiptDetail({ receipt, onClose, onOpenExpense }: { receipt: ReceiptFi
   const items = useExpenseItems(receipt.expense_id);
   const cats = useExpenseCategories();
   const write = useWrite(); const toast = useToast(); const qc = useQueryClient();
-  const [url, setUrl] = useState<string>("");
+  const [urls, setUrls] = useState<string[]>([]);
+  const url = urls[0] ?? "";
   const [busy, setBusy] = useState(false);
   const st = receiptStatus(receipt);
+  const paths = [receipt.storage_path, ...(receipt.extra_paths ?? [])].filter(Boolean);
   useEffect(() => {
-    if (!receipt.storage_path) return;
+    if (!paths.length) return;
     let live = true;
-    void supabase.storage.from("receipts").createSignedUrl(receipt.storage_path, 600).then(({ data }) => { if (live && data?.signedUrl) setUrl(data.signedUrl); });
+    void supabase.storage.from("receipts").createSignedUrls(paths, 600).then(({ data }) => { if (live && data) setUrls(data.map((d) => d.signedUrl ?? "")); });
     return () => { live = false; };
-  }, [receipt.storage_path]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [receipt.storage_path, (receipt.extra_paths ?? []).join("|")]);
 
   const setCategory = async (itemId: string, name: string, categoryId: string) => {
     const c = cats.data?.find((x) => x.id === categoryId); if (!c) return;
@@ -191,7 +194,7 @@ function ReceiptDetail({ receipt, onClose, onOpenExpense }: { receipt: ReceiptFi
     <Modal open onClose={onClose} title={p?.vendor || receipt.email_subject || "Receipt"} wide>
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          {url && receipt.mime.startsWith("image/") && <a href={url} target="_blank" rel="noreferrer"><img src={url} alt="Receipt" className="max-h-[55vh] w-full rounded-lg border border-ivory-200 object-contain" /></a>}
+          {receipt.mime.startsWith("image/") && urls.map((u, i) => u && <a key={i} href={u} target="_blank" rel="noreferrer" className="mb-2 block"><img src={u} alt={`Receipt page ${i + 1}`} className="max-h-[55vh] w-full rounded-lg border border-ivory-200 object-contain" /></a>)}
           {url && receipt.mime === "application/pdf" && <a className="btn-ghost" href={url} target="_blank" rel="noreferrer"><FileText size={16} /> Open the PDF</a>}
           {!receipt.storage_path && <p className="rounded-lg bg-ivory-50 px-3 py-2 text-sm text-charcoal/60">Read from the email text. {receipt.email_subject}</p>}
         </div>

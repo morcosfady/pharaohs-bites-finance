@@ -15,6 +15,7 @@ import { ProfitBox, UpcomingBills, BudgetsCard } from "../components/ExpenseInsi
 import { TrendsTab } from "../components/TrendsTab";
 import { CHANNELS } from "../lib/marketing";
 import { ReceiptsTab } from "../components/Receipts";
+import { GalleryTab } from "../components/GalleryTab";
 import { sourceBadges } from "../lib/expenseReview";
 import { PAYMENT_METHODS, label } from "../lib/status";
 import { fmt, toCents, sum } from "../lib/money";
@@ -81,6 +82,7 @@ export function ExpensesPage() {
       {tab === "bank" && <BankFeed />}
       {tab === "tax" && <TaxTab onOpenExpense={openById} />}
       {tab === "receipts" && <ReceiptsTab onOpenExpense={openById} />}
+      {tab === "gallery" && <GalleryTab onOpenExpense={openById} onGoReceipts={() => setTab("receipts")} />}
       {tab === "trends" && <TrendsTab range={range} onRange={setRange} />}
       {tab === "marketing" && <><DateRangeBar range={range} onChange={setRange} /><MarketingTab range={range} onAdd={(ch) => { setMkChannel(ch ?? ""); setEdit("marketing"); }} onOpenExpense={openById} /></>}
       {tab === "mileage" && <><DateRangeBar range={range} onChange={setRange} /><MileageTab range={range} gas={gas} /></>}
@@ -101,8 +103,8 @@ export function ExpensesPage() {
 }
 
 /* ---------- tabs ---------- */
-type Tab = "all" | "trends" | "marketing" | "receipts" | "review" | "mileage" | "tax" | "subs" | "bank";
-const TABS: { key: Tab; label: string; short: string }[] = [{ key: "all", label: "All expenses", short: "All" }, { key: "trends", label: "Trends", short: "Trends" }, { key: "marketing", label: "Marketing", short: "Marketing" }, { key: "receipts", label: "Receipts", short: "Receipts" }, { key: "review", label: "Review", short: "Review" }, { key: "mileage", label: "Mileage", short: "Miles" }, { key: "tax", label: "Tax", short: "Tax" }, { key: "subs", label: "Subscriptions", short: "Subs" }, { key: "bank", label: "Bank feed", short: "Bank" }];
+type Tab = "all" | "trends" | "marketing" | "receipts" | "gallery" | "review" | "mileage" | "tax" | "subs" | "bank";
+const TABS: { key: Tab; label: string; short: string }[] = [{ key: "all", label: "All expenses", short: "All" }, { key: "trends", label: "Trends", short: "Trends" }, { key: "marketing", label: "Marketing", short: "Marketing" }, { key: "receipts", label: "Receipts", short: "Receipts" }, { key: "gallery", label: "Gallery", short: "Gallery" }, { key: "review", label: "Review", short: "Review" }, { key: "mileage", label: "Mileage", short: "Miles" }, { key: "tax", label: "Tax", short: "Tax" }, { key: "subs", label: "Subscriptions", short: "Subs" }, { key: "bank", label: "Bank feed", short: "Bank" }];
 
 function TabBar({ tab, onChange, reviewCount }: { tab: Tab; onChange: (t: Tab) => void; reviewCount: number }) {
   return (

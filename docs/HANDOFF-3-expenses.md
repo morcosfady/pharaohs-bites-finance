@@ -111,6 +111,12 @@ A receipt can contain the owner's own things (e.g. ice cream in a Walmart order)
 
 Until `ANTHROPIC_API_KEY` is set, receipts the owner sends are read by the assistant and entered through the same pipeline (`receipt_files` + `apply_parsed_receipt`, evidence type receipt, items kept): Walgreens flyer prints $12.96 (Marketing / Flyers & print), Amazon x8 ($151.85, another card), Walmart delivery order #2000154-94671986 ($94.69 business + $4.79 personal ice cream/tax), Costco Plano 9/12 butter $23.48, Ace Mart Restaurant Supply 9/12 $241.51 (new alias + bank rule "ACE MART"), plus a Walmart delivery subscription $10/month (recurring template, start date assumed Oct 1: owner to correct). Amazon item prices are as shown on the order pages (no tax shown); Amazon dates are delivery dates except the stickers (order date).
 
+## Gallery tab and original receipt files (2026-10-01, migration 0060)
+
+**Expenses -> Gallery:** the originals (photos and PDFs) of every receipt that has a picture, newest first, grouped by month, with search by store, month and photo/PDF filters; tap to enlarge, flip with the arrows (or keyboard), see every page of a multi-page receipt, download, open full size, or jump to the expense. Files live in the private `receipts` bucket (admin-only, short-lived signed links). `receipt_files.extra_paths` holds additional pages (main picture stays in `storage_path`). Logic `src/lib/gallery.ts` (4 vitest cases), UI `src/components/GalleryTab.tsx`.
+
+**Originals uploaded 2026-10-01** (10 files, 8 MB, `originals/` in the bucket): Walgreens order, 5 Amazon order pages, Walmart order PDF, Costco photo, Ace Mart photos (2 pages). All 12 receipt rows now have their picture and every matching expense shows the paperclip. The Amazon list pages without prices were not stored. The upload used a throw-away Edge Function with a one-time token, deleted afterwards (the CLI cannot upload files and the browser pane blocks local files); to repeat: recreate a similar temporary function, or just use Receipts -> Upload file.
+
 ## Next
 
 Phase 4 food cost intelligence is not built. It needs receipt line items (now stored in `expense_items`) to have data, so start it after some real receipts have been read.
