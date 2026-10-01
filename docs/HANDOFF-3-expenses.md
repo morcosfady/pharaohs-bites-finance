@@ -132,6 +132,8 @@ Until `ANTHROPIC_API_KEY` is set, receipts the owner sends are read by the assis
 - DBA filing done Sep 24: Collin County Clerk $18.50, Licenses and permits, with the picture in the Gallery. Oct 2 deadline is closed.
 - The assistant uploads pictures itself (owner never uploads): temporary Edge Function, then delete it and unset its secret.
 
+- The two $2.50 live Stripe test payments (PB-2026-00129/00130) were refunded by the owner on 2026-10-01. No fee expenses existed for them.
+
 ## Next
 
 Phase 4 food cost intelligence is not built. It needs receipt line items (now stored in `expense_items`) to have data, so start it after some real receipts have been read.
