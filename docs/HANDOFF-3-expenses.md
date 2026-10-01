@@ -72,6 +72,10 @@ Bookkeeping support for the accountant (Schedule C, sole proprietor). **Not tax 
 - ~60 bank rules for common costs (software/hosting/domains/Plaid, bank fees, insurance, tolls, shipping, delivery apps, phone/internet, accounting, training, marketing, supplies). Owner income-tax payments (IRS USATAXPYMT) are classified personal. Unknown charges fall to "Other" and show under Ask accountant.
 - Test: `supabase/tests/stripe_fees.sql` (rolled back). Costs the system cannot see on its own (cash, a new vendor) still need a receipt or a rule.
 
+## Delivery profit (Menu & Profit -> Delivery tab, 2026-10-01)
+
+Per delivery order: **paid** (delivery fee the customer paid) minus **gas** = profit. Gas = round-trip miles x `business_settings.default_mileage_cost_per_mile` (Settings, $0.67); a real cost typed on the order (`delivery_records.actual_cost`) replaces the estimate. Miles come from `orders.delivery_miles` (saved by `create-order` since phase 3), else `delivery_records.distance_miles`; an order with no miles is flagged "no miles saved" and gas is NOT guessed. Only confirmed/preparing/ready/out_for_delivery/completed orders count. Logic in `src/lib/deliveryProfit.ts` (9 vitest cases), UI `src/components/DeliveryProfit.tsx`. Separate from the IRS mileage deduction (Expenses -> Mileage), which uses the IRS rate. Verified with the demo build (sample data) at desktop and 320px; the live shop had no orders yet, so the live tab shows the empty state until the first delivery.
+
 ## Next
 
 Phase 4 food cost intelligence is not built. It needs receipt line items (now stored in `expense_items`) to have data, so start it after some real receipts have been read.

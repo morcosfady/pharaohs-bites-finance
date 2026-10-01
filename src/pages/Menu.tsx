@@ -6,6 +6,7 @@ import { AlertTriangle, Trophy, Eye, EyeOff, Plus } from "lucide-react";
 import { PageHeader, Skeleton, ErrorBox } from "../components/ui";
 import { GROUPS, groupFor, band, BAND, Stat, GroupHeader, Num, DishThumb, type GroupKey } from "../components/menuViz";
 import { ProductModal } from "./Products";
+import { DeliveryProfit } from "../components/DeliveryProfit";
 import { useProducts, useSettings, useCategories } from "../hooks/queries";
 import { productUnitCost, REVENUE_STATUSES } from "../lib/metrics";
 import { fmt, toCents, pct, ratio, fromCents } from "../lib/money";
@@ -22,6 +23,7 @@ export function MenuPage() {
   const sales = useQuery({ queryKey: ["product_sales", "all"], queryFn: async () => unwrap(await supabase.from("product_sales").select("*").limit(20000)) as ProductSale[] });
   const [showInactive, setShowInactive] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [tab, setTab] = useState<"menu" | "delivery">("menu");
   const includeLabor = settings.data?.include_owner_labor ?? false;
   const laborRate = settings.data?.default_labor_rate_per_hour ?? 0;
   const low = Number(settings.data?.low_margin_warning_pct ?? 0.3);
@@ -58,10 +60,18 @@ export function MenuPage() {
 
   return (
     <div>
-      <PageHeader title="Menu & Profit" crumbs={["Home", "Menu & Profit"]} actions={<>
+      <PageHeader title="Menu & Profit" crumbs={["Home", "Menu & Profit"]} actions={tab === "menu" ? <>
         <button className="btn-ghost btn-sm" onClick={() => setShowInactive((v) => !v)}>{showInactive ? <EyeOff size={14} /> : <Eye size={14} />} {showInactive ? "Hide inactive" : "Show inactive"}</button>
         <button className="btn-gold btn-sm" onClick={() => setAdding(true)}><Plus size={16} /> New product</button>
-      </>} />
+      </> : undefined} />
+      <div role="tablist" aria-label="Menu and delivery" className="mb-4 flex gap-1 rounded-xl bg-ivory-100 p-1 sm:inline-flex">
+        {([["menu", "🍽️ Menu"], ["delivery", "🛵 Delivery"]] as const).map(([k, label]) => (
+          <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
+            className={`flex-1 whitespace-nowrap rounded-lg px-4 py-1.5 text-sm font-medium sm:flex-none ${tab === k ? "bg-white text-teal-900 shadow-sm" : "text-charcoal/60 hover:text-teal-900"}`}>{label}</button>
+        ))}
+      </div>
+      {tab === "delivery" && <DeliveryProfit />}
+      {tab === "menu" && <>
       <p className="mb-2 text-sm text-charcoal/60">What each dish costs you, what it sells for, and what you keep. Margin = profit ÷ sale price. Tap a dish to edit its price or cost.</p>
       <p className="mb-4 flex items-start gap-2 rounded-lg bg-teal-50 px-3 py-2 text-xs text-teal-900/80">
         <span aria-hidden="true">ℹ️</span>
@@ -118,6 +128,7 @@ export function MenuPage() {
           )}
         </>
       )}
+      </>}
       <ProductModal open={adding} onClose={() => setAdding(false)} categories={cats.data ?? []} />
     </div>
   );

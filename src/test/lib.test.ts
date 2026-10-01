@@ -160,3 +160,47 @@ describe("tax pack helpers", () => {
     expect(taxCsvRows([r])[0]).toMatchObject({ schedule_c: "Line 25 Utilities (business share)", total: "100.00", deductible: "40.00", receipt_on_file: "no", ask_accountant: "Business use 40%." });
   });
 });
+
+
+/* ---- delivery profit ----------------------------------------------------------- */
+import { deliveryLine, summarizeDeliveries, buildDeliveryLines, type DeliveryOrder } from "../lib/deliveryProfit";
+const dOrder = (o: Partial<DeliveryOrder> = {}): DeliveryOrder => ({ id: "o", order_number: "PB-1", created_at: "2026-10-05T12:00:00Z", completed_at: null, status: "completed", customer_name: "Sara", address_city: "Plano", delivery_fee: 39.65, delivery_fee_customer_paid: true, delivery_miles: 19.8, delivery_records: null, ...o });
+describe("delivery profit", () => {
+  it("profit = what the customer paid for delivery minus gas for the round trip", () => {
+    const l = deliveryLine(dOrder(), 0.67, true);
+    expect(l.feeCents).toBe(3965); expect(l.tripMiles).toBe(39.6);
+    expect(l.costCents).toBe(2653); expect(l.profitCents).toBe(1312); expect(l.costKind).toBe("estimate");
+  });
+  it("counts one way when round trip is off", () => {
+    expect(deliveryLine(dOrder({ delivery_miles: 10 }), 0.5, false).costCents).toBe(500);
+  });
+  it("a real cost typed on the order wins over the estimate", () => {
+    const l = deliveryLine(dOrder({ delivery_records: { distance_miles: 19.8, actual_cost: 12 } }), 0.67, true);
+    expect(l.costCents).toBe(1200); expect(l.costKind).toBe("actual"); expect(l.profitCents).toBe(2765);
+  });
+  it("uses the delivery record miles when the order has none, and accepts a one-item list", () => {
+    const l = deliveryLine(dOrder({ delivery_miles: null, delivery_records: [{ distance_miles: 5, actual_cost: 0 }] }), 1, true);
+    expect(l.tripMiles).toBe(10); expect(l.costCents).toBe(1000);
+  });
+  it("never invents gas for an order with no miles: cost is unknown and flagged", () => {
+    const l = deliveryLine(dOrder({ delivery_miles: null }), 0.67, true);
+    expect(l.costKind).toBe("unknown"); expect(l.costCents).toBe(0); expect(l.tripMiles).toBeNull();
+  });
+  it("a delivery fee the customer did not pay counts as zero paid", () => {
+    expect(deliveryLine(dOrder({ delivery_fee_customer_paid: false }), 0.67, true).feeCents).toBe(0);
+  });
+  it("only real orders count: not cancelled, refunded or still pending", () => {
+    const lines = buildDeliveryLines([dOrder({ id: "a" }), dOrder({ id: "b", status: "cancelled" }), dOrder({ id: "c", status: "pending_whatsapp_confirmation" }), dOrder({ id: "d", status: "refunded" }), dOrder({ id: "e", status: "confirmed" })], 0.67, true);
+    expect(lines.map((l) => l.id)).toEqual(["a", "e"]);
+  });
+  it("totals paid, gas and profit and counts the losers", () => {
+    const lines = [deliveryLine(dOrder({ id: "1" }), 0.67, true), deliveryLine(dOrder({ id: "2", delivery_fee: 8, delivery_miles: 15 }), 0.67, true), deliveryLine(dOrder({ id: "3", delivery_miles: null }), 0.67, true)];
+    const s = summarizeDeliveries(lines);
+    expect(s.orders).toBe(3); expect(s.paidCents).toBe(3965 + 800 + 3965);
+    expect(s.costCents).toBe(2653 + 2010); expect(s.profitCents).toBe(s.paidCents - s.costCents);
+    expect(s.losing).toBe(1); expect(s.unknownCost).toBe(1); expect(s.estimated).toBe(2); expect(s.miles).toBe(69.6);
+  });
+  it("copes with no deliveries", () => {
+    expect(summarizeDeliveries([])).toMatchObject({ orders: 0, paidCents: 0, profitCents: 0, margin: null, avgProfitCents: 0 });
+  });
+});

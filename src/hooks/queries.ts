@@ -8,6 +8,7 @@ import type {
   BankAccount, BankTransaction, BankRule, ReceiptFile, ExpenseItem, NeedsReceiptRow, ExpenseTaxRow, TaxSummaryRow, TaxQuality, TaxExtras, ExpenseSettings, MileageLog, MileageSettings, IrsMileageRate, MileagePlace,
 } from "../lib/types";
 import type { DateRange } from "../lib/dates";
+import type { DeliveryOrder } from "../lib/deliveryProfit";
 
 const iso = (d: Date) => d.toISOString();
 
@@ -113,6 +114,13 @@ export interface ExpenseIntegrity { possible_duplicates: number; needs_review: n
 export function useExpenseIntegrity() {
   return useQuery({ queryKey: ["expense_integrity"], queryFn: async () => unwrap(await supabase.rpc("expense_integrity")) as unknown as ExpenseIntegrity });
 }
+/** Delivery orders of a period with their fee, saved miles and any real delivery cost: feeds Menu & Profit -> Delivery. */
+export function useDeliveryOrders(range: DateRange) {
+  return useQuery({ queryKey: ["delivery_orders", iso(range.from), iso(range.to)], queryFn: async () =>
+    unwrap(await supabase.from("orders").select("id, order_number, created_at, completed_at, status, customer_name, address_city, delivery_fee, delivery_fee_customer_paid, delivery_miles, delivery_records(distance_miles, actual_cost)")
+      .eq("delivery_method", "delivery").is("deleted_at", null).gte("created_at", iso(range.from)).lte("created_at", iso(range.to)).order("created_at", { ascending: false }).limit(1000)) as unknown as DeliveryOrder[] });
+}
+
 /* ---- receipts ---- */
 export function useReceipts() {
   return useQuery({ queryKey: ["receipt_files"], queryFn: async () =>
