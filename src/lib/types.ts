@@ -117,6 +117,8 @@ export interface Expense {
   /** ok | needs_review (no category yet) | possible_duplicate (see duplicate_of) */
   review_status: "ok" | "needs_review" | "possible_duplicate"; duplicate_of: string | null; merged_into: string | null;
   business_pct: Num; ask_accountant: boolean; ask_note: string;
+  /** only for category Marketing: social | flyers_print | online_ads | email_web | events | influencers | other */
+  marketing_channel?: string | null;
   created_at: string; updated_at: string; deleted_at: string | null; expense_categories?: { name: string } | null;
   expense_sources?: { source_type: string }[] | null;
 }

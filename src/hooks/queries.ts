@@ -9,6 +9,7 @@ import type {
 } from "../lib/types";
 import type { DateRange } from "../lib/dates";
 import type { DeliveryOrder } from "../lib/deliveryProfit";
+import type { MarketingExpense } from "../lib/marketing";
 
 const iso = (d: Date) => d.toISOString();
 
@@ -114,6 +115,14 @@ export interface ExpenseIntegrity { possible_duplicates: number; needs_review: n
 export function useExpenseIntegrity() {
   return useQuery({ queryKey: ["expense_integrity"], queryFn: async () => unwrap(await supabase.rpc("expense_integrity")) as unknown as ExpenseIntegrity });
 }
+/** Marketing-category expenses of a period (with their channel): feeds Expenses -> Marketing. */
+export function useMarketingExpenses(range: DateRange) {
+  return useQuery({ queryKey: ["marketing_expenses", iso(range.from), iso(range.to)], queryFn: async () =>
+    unwrap(await supabase.from("expenses").select("id, expense_date, vendor, description, total_amount, marketing_channel, receipt_path, expense_categories!inner(name)")
+      .eq("expense_categories.name", "Marketing").is("deleted_at", null)
+      .gte("expense_date", range.from.toISOString().slice(0, 10)).lte("expense_date", range.to.toISOString().slice(0, 10)).order("expense_date", { ascending: false })) as unknown as MarketingExpense[] });
+}
+
 /** Delivery orders of a period with their fee, saved miles and any real delivery cost: feeds Menu & Profit -> Delivery. */
 export function useDeliveryOrders(range: DateRange) {
   return useQuery({ queryKey: ["delivery_orders", iso(range.from), iso(range.to)], queryFn: async () =>

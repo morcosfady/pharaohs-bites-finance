@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { summarizeMarketing, channelOf, CHANNELS, type MarketingExpense } from "../lib/marketing";
 import { breakdown, quickTotals, donutSlices, colorFor, categoryEmoji, PALETTE, OTHER_COLOR } from "../lib/categoryBreakdown";
 import type { ExpenseTaxRow } from "../lib/types";
 import { fileProblem, receiptStatus, safeName, sha256Hex } from "../lib/receiptUpload";
@@ -124,4 +125,37 @@ describe("category breakdown", () => {
     expect(categoryEmoji("Gas / mileage")).toBe("⛽"); expect(categoryEmoji("Something new")).toBe("🧾");
   });
   it("copes with no spending", () => { const b = breakdown([]); expect(b.totalCents).toBe(0); expect(b.categories).toEqual([]); });
+});
+
+const mk = (marketing_channel: string | null, total_amount: number, vendor = "V", expense_date = "2026-10-05"): MarketingExpense => ({ id: vendor + total_amount, expense_date, vendor, description: "", total_amount, marketing_channel, receipt_path: "" });
+describe("marketing by channel", () => {
+  it("adds each channel in cents, biggest first, with its share", () => {
+    const m = summarizeMarketing([mk("social", 40.1), mk("social", 9.9), mk("flyers_print", 25), mk("online_ads", 25)], [], 0, 0);
+    expect(m.totalCents).toBe(10000);
+    expect(m.channels[0]).toMatchObject({ key: "social", cents: 5000, count: 2, share: 0.5 });
+    expect(m.channels.map((c) => c.key)).toEqual(["social", "flyers_print", "online_ads"]);
+  });
+  it("puts an unknown or empty channel under Other marketing", () => {
+    const m = summarizeMarketing([mk(null, 10), mk("nonsense", 5)], [], 0, 0);
+    expect(m.channels).toHaveLength(1); expect(m.channels[0]).toMatchObject({ key: "other", cents: 1500 });
+    expect(channelOf("social").label).toBe("Social media"); expect(channelOf(undefined).key).toBe("other");
+  });
+  it("shows share of sales and marketing cost per order, never dividing by zero", () => {
+    const m = summarizeMarketing([mk("social", 50)], [], 50000, 20);
+    expect(m.pctOfSales).toBeCloseTo(0.1); expect(m.costPerOrderCents).toBe(250);
+    const none = summarizeMarketing([mk("social", 50)], [], 0, 0);
+    expect(none.pctOfSales).toBeNull(); expect(none.costPerOrderCents).toBeNull();
+  });
+  it("compares with the previous period, overall and per channel", () => {
+    const m = summarizeMarketing([mk("social", 60), mk("events", 10)], [mk("social", 40), mk("events", 10)], 0, 0);
+    expect(m.change).toBeCloseTo(0.4); expect(m.channels.find((c) => c.key === "social")?.change).toBeCloseTo(0.5);
+    expect(summarizeMarketing([mk("social", 5)], [], 0, 0).change).toBeNull();
+  });
+  it("lists the channels you did not use, newest charges first", () => {
+    const m = summarizeMarketing([mk("social", 10, "A", "2026-10-01"), mk("social", 10, "B", "2026-10-09")], [], 0, 0);
+    expect(m.unused).not.toContain("Social media"); expect(m.unused).toContain("Flyers & print"); expect(m.unused).not.toContain("Other marketing");
+    expect(m.channels[0].entries.map((e) => e.vendor)).toEqual(["B", "A"]);
+    expect(CHANNELS.map((c) => c.key)).toContain("influencers");
+  });
+  it("copes with no spend", () => { const m = summarizeMarketing([], [], 0, 0); expect(m.totalCents).toBe(0); expect(m.channels).toEqual([]); });
 });
