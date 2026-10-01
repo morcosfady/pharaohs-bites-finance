@@ -3,6 +3,7 @@
 // + receipt go out only the first time.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { notifyAll } from "./notify.ts";
+import { markPromoUsed } from "./promo.ts";
 
 /** Stripe's processing fee for this payment as an expense (unique per payment, safe to repeat).
  *  Tries the exact fee from Stripe; falls back to the standard 2.9% + 30 cents estimate when the
@@ -51,6 +52,7 @@ export async function recordPaidSession(supabase: ReturnType<typeof createClient
   }
   await supabase.from("orders").update({ payment_method: "card" }).eq("id", orderId);
   await recordFee(supabase, s, orderId); // never blocks the order or the alert
+  await markPromoUsed(supabase, orderId); // a paid order uses up its promo code (once per customer)
   const { data: ord } = await supabase.from("orders").select("order_number, notify_payload").eq("id", orderId).maybeSingle();
   if (ord?.notify_payload) {
     await supabase.from("orders").update({ status: "confirmed", notify_payload: null }).eq("id", orderId);

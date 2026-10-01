@@ -18,6 +18,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { notifyAll, type OrderInfo } from "../_shared/notify.ts";
 import { quoteDelivery } from "../_shared/delivery.ts";
+import { checkPromo, markPromoUsed, normCode } from "../_shared/promo.ts";
 
 const ALLOWED_ORIGINS = [
   "https://morcosfady.github.io",
@@ -50,6 +51,7 @@ const MAX_QTY = 50;
 type Body = {
   checkout_token?: unknown;
   pay_online?: unknown;
+  promo?: unknown;
   fulfillment?: unknown;
   customer?: { name?: unknown; phone?: unknown; street?: unknown; apt?: unknown; city?: unknown; state?: unknown; zip?: unknown; instructions?: unknown; requested_at?: unknown; email?: unknown };
   items?: Array<{ slug?: unknown; quantity?: unknown; options?: unknown }>;
@@ -158,6 +160,15 @@ Deno.serve(async (req) => {
     miles = q.miles; deliveryFee = q.fee;
   }
 
+  // ---- promo code (FIRSTBITE = free delivery, once per customer) ---------------
+  let promoCode = "", promoEmail = "", feeWaived = 0;
+  if (normCode(body.promo)) {
+    if (isPickup) return json({ ok: false, error: "promo codes apply to delivery orders" }, 400, headers);
+    const pc = await checkPromo(supabase, body.promo, phoneDigits, email);
+    if (!pc.ok) return json({ ok: false, error: pc.error }, 400, headers);
+    promoCode = pc.code; promoEmail = pc.email_norm; feeWaived = deliveryFee; deliveryFee = 0;
+  }
+
   // ---- rate limit per IP -------------------------------------------------
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";
   const ipHash = await sha256(ip + "|pharaohs-bites");
@@ -169,7 +180,7 @@ Deno.serve(async (req) => {
   // ---- create atomically via SQL function ---------------------------------
   const { data, error } = await supabase.rpc("intake_website_order", {
     p_token: token,
-    p_customer: { name, phone, phone_digits: phoneDigits, street, apt, city, state, zip, instructions, requested_at: requestedAt },
+    p_customer: { name, phone, phone_digits: phoneDigits, street, apt, city, state, zip, instructions: promoCode ? `Promo ${promoCode} (free delivery)${instructions ? " | " + instructions : ""}`.slice(0, 500) : instructions, requested_at: requestedAt },
     p_items: items,
   });
 
@@ -187,8 +198,16 @@ Deno.serve(async (req) => {
   const info: OrderInfo = { pickup: isPickup, name, phone, email, address: `${street}${apt ? ", " + apt : ""}, ${city}, ${state} ${zip}`, instructions, requestedAt, items, deliveryFee, miles };
   // Pay-online orders stay "pending" and silent until Stripe confirms payment (stripe-webhook
   // then confirms the order and sends the alert + receipt). Other orders are confirmed now.
-  const { error: feeErr } = await supabase.from("orders").update({ delivery_fee: deliveryFee, delivery_miles: isPickup ? null : miles, customer_email: email, ...(isPickup ? { delivery_method: "pickup" } : {}), ...(payOnline ? { notify_payload: info } : { status: "confirmed" }) }).eq("order_number", data as string);
+  const { error: feeErr } = await supabase.from("orders").update({ delivery_fee: deliveryFee, delivery_miles: isPickup ? null : miles, customer_email: email, ...(promoCode ? { promo_code: promoCode } : {}), ...(isPickup ? { delivery_method: "pickup" } : {}), ...(payOnline ? { notify_payload: info } : { status: "confirmed" }) }).eq("order_number", data as string);
   if (feeErr) console.error("delivery fee update failed", feeErr.message);
+  if (promoCode) {
+    const { data: po } = await supabase.from("orders").select("id").eq("order_number", data as string).maybeSingle();
+    if (po?.id) {
+      const { error: rErr } = await supabase.from("promo_redemptions").insert({ code: promoCode, order_id: po.id, phone_digits: phoneDigits, email_norm: promoEmail, fee_waived: feeWaived });
+      if (rErr) console.error("promo redemption failed", rErr.message);
+      else if (!payOnline) await markPromoUsed(supabase, po.id);
+    }
+  }
   // keep the email on the customer record too (only when it was empty)
   const { data: ordRow } = await supabase.from("orders").select("customer_id").eq("order_number", data as string).maybeSingle();
   if (ordRow?.customer_id) await supabase.from("customers").update({ email }).eq("id", ordRow.customer_id).eq("email", "");
@@ -198,7 +217,7 @@ Deno.serve(async (req) => {
     // deno-lint-ignore no-explicit-any
     const rt = (globalThis as any).EdgeRuntime; if (rt?.waitUntil) rt.waitUntil(notify); else await notify;
   }
-  return json({ ok: true, order_number: data as string, delivery_fee: deliveryFee, miles }, 200, headers);
+  return json({ ok: true, order_number: data as string, delivery_fee: deliveryFee, miles, ...(promoCode ? { promo: promoCode } : {}) }, 200, headers);
 });
 
 function json(payload: unknown, status: number, headers: Record<string, string>) {
