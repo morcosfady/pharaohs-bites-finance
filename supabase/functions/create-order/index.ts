@@ -164,7 +164,7 @@ Deno.serve(async (req) => {
   let promoCode = "", promoEmail = "", feeWaived = 0;
   if (normCode(body.promo)) {
     if (isPickup) return json({ ok: false, error: "promo codes apply to delivery orders" }, 400, headers);
-    const pc = await checkPromo(supabase, body.promo, phoneDigits, email);
+    const pc = await checkPromo(supabase, body.promo, phoneDigits, email, miles);
     if (!pc.ok) return json({ ok: false, error: pc.error }, 400, headers);
     promoCode = pc.code; promoEmail = pc.email_norm; feeWaived = deliveryFee; deliveryFee = 0;
   }

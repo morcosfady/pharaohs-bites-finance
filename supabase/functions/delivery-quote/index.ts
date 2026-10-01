@@ -42,14 +42,14 @@ Deno.serve(async (req) => {
   const street = clean(body.street, 200), city = clean(body.city, 80), state = clean(body.state, 2).toUpperCase(), zip = clean(body.zip, 10);
   if (!street || !city || !/^[A-Z]{2}$/.test(state) || !/^\d{5}(-\d{4})?$/.test(zip)) return json({ ok: false, error: "incomplete address" }, 400, headers);
 
+  const q = await quoteDelivery(street, city, state, zip);
+  if (!q.ok) return json({ ok: false, error: q.error }, q.status, headers);
   // Promo check (read-only): is this code valid and unused for this phone / email?
   let promo: { valid: boolean; code?: string; message?: string } | undefined;
   if (normCode(body.promo)) {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
-    const r = await checkPromo(supabase, body.promo, clean(body.phone, 40).replace(/D/g, ""), clean(body.email, 120));
+    const r = await checkPromo(supabase, body.promo, clean(body.phone, 40).replace(/\D/g, ""), clean(body.email, 120), q.miles);
     promo = r.ok ? { valid: true, code: r.code } : { valid: false, message: r.error };
   }
-  const q = await quoteDelivery(street, city, state, zip);
-  if (!q.ok) return json({ ok: false, error: q.error }, q.status, headers);
   return json({ ok: true, delivery_fee: q.fee, miles: q.miles, ...(promo ? { promo } : {}) }, 200, headers);
 });

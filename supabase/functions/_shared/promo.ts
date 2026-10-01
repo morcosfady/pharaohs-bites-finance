@@ -13,14 +13,20 @@ export function normEmail(e: string): string {
   return local + "@" + domain;
 }
 
+/** Free-delivery promo codes only cover addresses this close to the kitchen. */
+export const PROMO_MAX_MILES = 5;
+
 export type PromoCheck = { ok: true; code: string; email_norm: string } | { ok: false; error: string };
 
 /** Is this code real, active, and not yet used by this phone number or email? */
-export async function checkPromo(supabase: any, rawCode: unknown, phoneDigits: string, email: string): Promise<PromoCheck> {
+export async function checkPromo(supabase: any, rawCode: unknown, phoneDigits: string, email: string, miles?: number): Promise<PromoCheck> {
   const code = normCode(rawCode);
   if (!code) return { ok: false, error: "enter a promo code" };
   const { data: promo } = await supabase.from("promo_codes").select("code, active").eq("code", code).maybeSingle();
   if (!promo || !promo.active) return { ok: false, error: "that promo code is not valid" };
+  if (typeof miles === "number" && miles > PROMO_MAX_MILES) {
+    return { ok: false, error: `${code} free delivery only works for addresses within ${PROMO_MAX_MILES} miles of our kitchen. Your address is about ${miles} miles away, so delivery is charged at the normal fee` };
+  }
   const emailNorm = normEmail(email);
   const filters = [];
   if (phoneDigits) filters.push(`phone_digits.eq.${phoneDigits}`);
