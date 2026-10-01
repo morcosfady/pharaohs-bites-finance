@@ -9,6 +9,7 @@ export type PresetKey = "today" | "yesterday" | "this_week" | "last_week" | "thi
 export interface DateRange { from: Date; to: Date; key: PresetKey }
 
 export const PRESETS: { key: PresetKey; label: string }[] = [
+  { key: "this_year", label: "This year" },
   { key: "today", label: "Today" },
   { key: "yesterday", label: "Yesterday" },
   { key: "this_week", label: "This week" },
@@ -16,7 +17,6 @@ export const PRESETS: { key: PresetKey; label: string }[] = [
   { key: "this_month", label: "This month" },
   { key: "last_month", label: "Last month" },
   { key: "this_quarter", label: "This quarter" },
-  { key: "this_year", label: "This year" },
   { key: "custom", label: "Custom" },
 ];
 
