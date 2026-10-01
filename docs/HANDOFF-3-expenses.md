@@ -84,6 +84,15 @@ Marketing spend by **channel**: Social media, Flyers & print, Online ads, Email 
 
 The owner asked to delete the top-level **Cost** page. It only listed the automatic recipe-cost entries (`auto_source = 'order_cost'`); those entries and the database trigger `sync_order_cost_expense` are untouched, so Menu & Profit, Home profit and the COGS numbers are unchanged. `/cost` now redirects to Home. To bring the page back: `git show 706e957:src/pages/Cost.tsx` (or any earlier commit) and re-add the route and nav item.
 
+## Expense insights (2026-10-01, migration 0056)
+
+- **Am I making money?** (top of All expenses): sales (net product sales + delivery revenue of confirmed/preparing/ready/out-for-delivery/completed orders in the period) minus expenses in the period. Cash view; Menu & Profit still shows per-dish profit.
+- **Bills coming up:** `upcoming_bills(days)` walks every recurring template forward from its last generated charge (one source for the dashboard card and Telegram). Shows "keep aside" for 30 days and 7 days.
+- **Monthly budgets:** `expense_budgets(category_id, monthly_limit)`, `budget_status(month)` (split-aware, from `expense_tax_view`). Green under 80%, amber from 80%, red from 100%. Set/edit/remove on the All expenses tab.
+- **Trends tab:** stacked 12-month chart (top 5 categories + Everything else), top vendors for the chosen period with an average-charge-up flag, and **Ingredient prices** (from receipt line items: per lb / gal / each, same-store price change, cheaper-store tip; informs only, never changes dish costs). The ingredient list is empty until receipts are read (needs `ANTHROPIC_API_KEY`).
+- **Weekly Telegram summary:** Edge Function `weekly-summary` (cron job `weekly-summary`, Mondays 13:00 UTC = 8am CDT / 7am CST, authenticated with `SYNC_CRON_SECRET`, created by copying the plaid-daily-sync command: it is not in a migration because it embeds the secret). Message = last Mon-Sun spent vs previous week, sales, left, top 3 categories, biggest charge, budgets >= 80%, ingredient price jumps >= 15% (same store, last 14 days, `ingredient_price_jumps()`), possible duplicates, charges without a receipt, receipts waiting, bills in the next 7 days. Manual run: `select command from cron.job where jobname='weekly-summary'` then execute it; add `"preview": true` to the body to return the text without sending.
+- Tests: `supabase/tests/insights.sql` (rolled back) and 18 vitest cases (formatter, bills, budgets, trends, vendors, ingredient parsing). All 8 SQL suites and 105 vitest tests pass.
+
 ## Next
 
 Phase 4 food cost intelligence is not built. It needs receipt line items (now stored in `expense_items`) to have data, so start it after some real receipts have been read.

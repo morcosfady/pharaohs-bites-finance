@@ -10,6 +10,7 @@ import type {
 import type { DateRange } from "../lib/dates";
 import type { DeliveryOrder } from "../lib/deliveryProfit";
 import type { MarketingExpense } from "../lib/marketing";
+import type { Bill, BudgetRow } from "../lib/bills";
 
 const iso = (d: Date) => d.toISOString();
 
@@ -115,6 +116,22 @@ export interface ExpenseIntegrity { possible_duplicates: number; needs_review: n
 export function useExpenseIntegrity() {
   return useQuery({ queryKey: ["expense_integrity"], queryFn: async () => unwrap(await supabase.rpc("expense_integrity")) as unknown as ExpenseIntegrity });
 }
+/** Subscriptions and fixed costs due in the next N days (database function, same numbers as the Telegram summary). */
+export function useUpcomingBills(days = 30) {
+  return useQuery({ queryKey: ["upcoming_bills", days], queryFn: async () => unwrap(await supabase.rpc("upcoming_bills", { p_days: days })) as unknown as Bill[] });
+}
+/** This month's spending against each category budget. */
+export function useBudgetStatus() {
+  return useQuery({ queryKey: ["budget_status"], queryFn: async () => unwrap(await supabase.rpc("budget_status", { p_month: new Date().toISOString().slice(0, 10) })) as unknown as BudgetRow[] });
+}
+export interface IngredientItemRow { id: string; description: string; quantity: number | string; unit_price: number | string; line_total: number | string; expenses: { vendor: string; expense_date: string } | null }
+/** Business ingredient line items from read receipts, with the store and date of each purchase. */
+export function useIngredientItems() {
+  return useQuery({ queryKey: ["ingredient_items"], queryFn: async () =>
+    unwrap(await supabase.from("expense_items").select("id, description, quantity, unit_price, line_total, expense_categories!inner(name), expenses!inner(vendor, expense_date, deleted_at)")
+      .eq("expense_categories.name", "Ingredients").eq("is_business", true).is("expenses.deleted_at", null).limit(5000)) as unknown as IngredientItemRow[] });
+}
+
 /** Marketing-category expenses of a period (with their channel): feeds Expenses -> Marketing. */
 export function useMarketingExpenses(range: DateRange) {
   return useQuery({ queryKey: ["marketing_expenses", iso(range.from), iso(range.to)], queryFn: async () =>

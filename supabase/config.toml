@@ -60,3 +60,7 @@ verify_jwt = false
 [functions.receipt-email]
 # Called by the Gmail Apps Script; authenticated by RECEIPT_INBOX_TOKEN.
 verify_jwt = false
+
+[functions.weekly-summary]
+# Called by pg_cron with a shared secret, or by a signed-in admin.
+verify_jwt = false
