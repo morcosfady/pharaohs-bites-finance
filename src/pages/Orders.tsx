@@ -82,7 +82,7 @@ export function OrdersPage() {
     { key: "payment_method", header: "Method", mobile: false, render: (o) => label(PAYMENT_METHODS, o.payment_method) },
     { key: "delivery_method", header: "Fulfilment", mobile: false, render: (o) => o.delivery_method === "delivery" ? "Delivery" : "Pickup" },
   ];
-  const SIMPLE = ["order_number", "created_at", "customer_name", "status", "payment_status", "total", "balance"];
+  const SIMPLE = ["order_number", "created_at", "requested_at", "customer_name", "status", "payment_status", "total", "balance"];
   const editCol: Column<Row> = { key: "edit", header: "", render: (o) => <EditButton small label={`Edit ${o.order_number}`} onClick={() => nav(`/orders/${o.id}`)} /> };
   const cols = [...(advanced ? allCols : allCols.filter((c) => SIMPLE.includes(c.key))), editCol];
 

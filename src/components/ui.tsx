@@ -87,7 +87,7 @@ export function KpiCard({ label, value, prev, formula, kind = "money", invert, s
   return (
     <div className="card flex flex-col gap-1 px-4 py-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="truncate text-xs font-medium uppercase tracking-wider text-teal-900/70">{label}</span>
+        <span className="text-xs font-medium uppercase leading-tight tracking-wider text-teal-900/70 [overflow-wrap:anywhere]">{label}</span>
         {formula && <Tip text={formula} />}
       </div>
       <div className="flex items-end justify-between gap-2">

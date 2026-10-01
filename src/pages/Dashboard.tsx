@@ -169,7 +169,7 @@ export function DashboardPage() {
             <Tile emoji="🎉" label="Orders completed" value={String(k.completedOrders)} prev={p?.completedOrders} cur={k.completedOrders} accent="#D4A72C" spark={series.map((s) => s.orders)} />
             <Tile emoji="💳" label="Money still owed" value={fmt(k.outstandingBalance)} prev={p?.outstandingBalance} cur={k.outstandingBalance} accent="#D85A30" invert formula={KPI_FORMULAS.outstandingBalance} />
           </div>
-          <div className="mt-3 grid grid-cols-3 gap-3">
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Tile emoji="🏛️" label="Sales tax to set aside" value={fmt(k.taxCollected)} accent="#534AB7" formula={KPI_FORMULAS.taxCollected} compact />
             <Tile emoji="🥘" label="Food & packaging" value={fmt(k.cogs)} accent="#D4A72C" formula={KPI_FORMULAS.cogs} compact />
             <Tile emoji="🧾" label="Other expenses" value={fmt(otherExpenses)} accent="#D85A30" formula="Operating expenses + payment fees + delivery costs in this period." compact />
