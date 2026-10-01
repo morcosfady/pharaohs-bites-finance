@@ -1,4 +1,6 @@
-# Combo pricing proposal (waiting for owner approval, nothing built yet)
+# Combo pricing (APPROVED and built 2026-10-01)
+
+Approved: Egyptian Breakfast $39.50, Family Feast $69, Meal for One $30.50 (Feteer Meshaltet only), Party Tray $89.50 (1 main + Sides Platter + 4 puddings). Pick Any 3 Puddings is now $15 (no discount). Sweet Feteer Box, Shake + Sweet and Comfort Meal stay blocked. Packaging stays a $0.50 per item placeholder.
 
 Date: 2026-10-01. Costs and prices come from the live `products` table.
 
@@ -44,3 +46,10 @@ Date: 2026-10-01. Costs and prices come from the live `products` table.
 
 ## Registration check (cottage food list)
 Add to the registration before promoting: **baba ganoush, hummus, white honey, rice pudding** (all are inside the Sides Platter or Pick 3 Puddings today). **Black honey, tahini and white cheese** are fine as add-ons to feteer (Egyptian Breakfast), but flag it. Nothing has been removed from the site.
+
+## Single pudding price for a 60% margin (suggestion only, prices not changed)
+Pudding cost is $2.79 (Rice Pudding $2.50). Lowest price, rounded up to $0.50:
+- Dashboard-style margin (price minus cost): **$7.00** (Rice Pudding $6.50)
+- Also counting $0.50 packaging: **$8.50** (Rice Pudding $7.50)
+- Also counting the card fee of a one-item order: **$10.00**
+Today's price is $5 (Rice Pudding $6), which is 44% (58%) on the dashboard-style margin.

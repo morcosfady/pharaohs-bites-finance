@@ -334,3 +334,14 @@ Dashboard:
 5. Review `tax_status` for drinks/desserts.
 6. Refresh the stale README/session logs, add Instagram/Facebook links when they exist.
 7. Consider making the About banner use an owner photo.
+
+## Combos (added 2026-10-01)
+
+Seven combos live in the **Combos** category (best profit first): Party Tray $89.50, Family Feast $69, Egyptian Breakfast $39.50, Feteer + Dip Trio $32, Meal for One $30.50, Sides Platter $19, Pick Any 3 Puddings $15. Pricing proof and the blocked ideas (Sweet Feteer Box, Shake + Sweet, Comfort Meal) are in `docs/COMBO-PRICING.md`.
+
+- **Pricing rules** (coded and tested in `src/lib/comboPricing.ts`): discount = the smaller of 10% of full price and 25% of profit before discount, rounded up to $0.50, at least $1 off. Full price uses the cheapest picks, cost uses the dearest picks. Margin after packaging and the Stripe fee (2.9% + $0.30) must be at least 50%, and combo profit must beat the best single item inside it. Delivery fee is never included.
+- **Cost on a combo product** = worst-case ingredient cost across the picks. **Packaging is a placeholder of $0.50 per item** (not real); edit it per product in Products > edit > "Packaging cost per unit".
+- **Choices**: table `combo_slots` (migration 0063) lists each choice slot (key, label, how many, all-different?, allowed product slugs). The website (`assets/js/data.js`, `slots` on a combo) opens a picker; the basket key carries the picks (`family-feast~main=kofta-tray&sides=tahini,hummus&...`); the order payload sends `choices` per item. `create-order` checks them with `_shared/combos.ts` (rejects wrong counts, outsiders, repeated "all different" items) and writes the readable line into `order_items.options` (for example `Main: Kofta Tray | Sides: Tahini, Hummus | Puddings: Banana Pudding x2`). That one line is what the Telegram alert, the email receipt, the dashboard order detail and the WhatsApp fallback show. The browser never sends a price; everything is priced from `products`.
+- **Adding a combo later**: (1) migration: insert into `products` (category Combos, price, worst-case ingredient cost, packaging) and insert its rows into `combo_slots` if it has picks; apply with `supabase db query --linked -f`, append to `ALL_MIGRATIONS.sql`; (2) add it to `data.js` with `includes` (fixed contents, shown as photos), `slots`, `worth` (price of the cheapest picks separately, for the "You save" badge); (3) add its Arabic name to `AR_NAMES` in `_shared/notify.ts`; (4) deploy `create-order`; (5) bump `?v=` in every HTML file.
+- Tests: `src/test/combos.test.ts` (choices + pricing rules) and `supabase/tests/combos.sql` (rolled back: price comes from the database, options kept, cost and packaging snapshotted).
+- Stripe Checkout shows "Pharaoh's Bites order PB-xxxx" with the correct total; it does not list item names (unchanged design). Item names with picks are on the receipt email and the dashboard order.
