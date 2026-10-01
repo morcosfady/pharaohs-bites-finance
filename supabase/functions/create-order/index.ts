@@ -20,6 +20,7 @@ import { notifyAll, type OrderInfo } from "../_shared/notify.ts";
 import { quoteDelivery } from "../_shared/delivery.ts";
 import { checkPromo, markPromoUsed, normCode } from "../_shared/promo.ts";
 import { normAddress } from "../_shared/address.ts";
+import { parseChoices, resolveChoices, type ComboSlot } from "../_shared/combos.ts";
 
 const ALLOWED_ORIGINS = [
   "https://morcosfady.github.io",
@@ -55,7 +56,7 @@ type Body = {
   promo?: unknown;
   fulfillment?: unknown;
   customer?: { name?: unknown; phone?: unknown; street?: unknown; apt?: unknown; city?: unknown; state?: unknown; zip?: unknown; instructions?: unknown; requested_at?: unknown; email?: unknown };
-  items?: Array<{ slug?: unknown; quantity?: unknown; options?: unknown }>;
+  items?: Array<{ slug?: unknown; quantity?: unknown; options?: unknown; choices?: unknown }>;
 };
 
 function corsHeaders(origin: string | null) {
@@ -134,6 +135,7 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: "invalid items" }, 400, headers);
   }
   const items: Array<{ slug: string; quantity: number; options: string }> = [];
+  const rawChoices: Array<unknown> = [];
   for (const it of body.items) {
     const slug = str(it?.slug, 80, true);
     const qty = typeof it?.quantity === "number" ? Math.floor(it.quantity) : NaN;
@@ -142,12 +144,33 @@ Deno.serve(async (req) => {
       return json({ ok: false, error: "invalid item" }, 400, headers);
     }
     items.push({ slug, quantity: qty, options });
+    rawChoices.push(it?.choices);
   }
 
   // ---- service client (server-side only) ---------------------------------
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
     auth: { persistSession: false },
   });
+
+  // ---- combo choices: checked against combo_slots, then written as the readable options line --------
+  const { data: slotRows, error: slotErr } = await supabase.from("combo_slots").select("*").in("combo_slug", [...new Set(items.map((i) => i.slug))]);
+  if (slotErr) { console.error("combo_slots read failed", slotErr.message); return json({ ok: false, error: "could not check combo choices" }, 500, headers); }
+  const slotsByCombo = new Map<string, ComboSlot[]>();
+  for (const r of (slotRows ?? []) as ComboSlot[]) slotsByCombo.set(r.combo_slug, [...(slotsByCombo.get(r.combo_slug) ?? []), r]);
+  if (slotsByCombo.size) {
+    const wanted = [...new Set([...slotsByCombo.values()].flat().flatMap((s) => s.allowed))];
+    const { data: prodNames } = await supabase.from("products").select("slug, name").in("slug", wanted);
+    const names = new Map<string, string>((prodNames ?? []).map((p: { slug: string; name: string }) => [p.slug, p.name]));
+    for (let i = 0; i < items.length; i++) {
+      const slots = slotsByCombo.get(items[i].slug);
+      if (!slots) continue;
+      const parsed = parseChoices(rawChoices[i]);
+      if (!parsed) return json({ ok: false, error: "invalid combo choices" }, 400, headers);
+      const res = resolveChoices(slots, parsed, names);
+      if (!res.ok) return json({ ok: false, error: res.error }, 400, headers);
+      items[i].options = res.options;
+    }
+  }
 
   // ---- idempotency: same token => same order ------------------------------
   const { data: existing } = await supabase.from("orders").select("order_number, delivery_fee").eq("checkout_token", token).maybeSingle();

@@ -63,6 +63,13 @@ const AR_NAMES: Record<string, string> = {
   "protein-shake": "مشروب البروتين بالشوكولاتة",
   "avocado-drink": "عصير أفوكادو",
   "diet-coke": "دايت كوكاكولا",
+  "feteer-dip-trio": "طبق الإضافات",
+  "feteer-and-dip-trio": "فطير مع ثلاثية الإضافات",
+  "pick-3-puddings": "اختر ٣ بودينج",
+  "egyptian-breakfast": "فطار مصري",
+  "family-feast": "عزومة العيلة",
+  "meal-for-one": "وجبة لفرد",
+  "party-tray": "صينية الحفلة",
 };
 
 export async function notifyAll(supabase: ReturnType<typeof createClient>, orderNumber: string, info: OrderInfo) {
