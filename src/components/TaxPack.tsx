@@ -66,9 +66,9 @@ export function TaxTab({ onOpenExpense }: { onOpenExpense: (id: string) => void 
       <p className="rounded-lg bg-ivory-50 px-4 py-2.5 text-xs text-charcoal/70"><b>Draft.</b> Bookkeeping support for your accountant, not tax advice. The Schedule C line for each category is a draft: confirm it with your accountant. Anything uncertain says <i>Ask accountant</i>.</p>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <KpiCard label="Deductible expenses" value={totalDeductible / 100} />
-        <KpiCard label="Startup costs" value={startup.total} />
-        <KpiCard label="Mileage deduction" value={msum.deduction} />
+        <KpiCard label="Deductible expenses" value={totalDeductible} />
+        <KpiCard label="Startup costs" value={cents(startup.total)} />
+        <KpiCard label="Mileage deduction" value={cents(msum.deduction)} />
         <KpiCard label="Ask accountant" value={asks.length} kind="int" />
       </div>
 

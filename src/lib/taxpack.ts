@@ -42,7 +42,8 @@ export function qualityIssues(q: TaxQuality | undefined): { key: string; text: s
   const out: { key: string; text: string; blocking: boolean }[] = [];
   const add = (key: string, n: number, text: (n: number) => string, blocking: boolean) => { if (n > 0) out.push({ key, text: text(n), blocking }); };
   add("dupes", q.possible_duplicates, (n) => `${n} possible duplicate${n === 1 ? "" : "s"} still to decide`, true);
-  add("review", q.needs_review, (n) => `${n} expense${n === 1 ? "" : "s"} waiting for a category`, true);
+  // the same expenses are usually both "waiting" and "uncategorized": say it once
+  add("review", q.uncategorized >= q.needs_review ? 0 : q.needs_review, (n) => `${n} expense${n === 1 ? "" : "s"} waiting for a category`, true);
   add("uncat", q.uncategorized, (n) => `${n} expense${n === 1 ? " has" : "s have"} no category`, true);
   add("in", q.money_in_unclassified, (n) => `${n} deposit${n === 1 ? "" : "s"} not classified yet`, true);
   add("rate", q.mileage_without_rate, (n) => `${n} mileage trip${n === 1 ? " has" : "s have"} no IRS rate`, true);

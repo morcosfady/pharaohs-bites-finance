@@ -147,9 +147,10 @@ describe("tax pack helpers", () => {
     expect(startupStatus(5200, 5000)).toMatchObject({ withinLimit: false, remaining: 0, over: 200 });
   });
   it("lists what blocks a clean pack and what is only a warning", () => {
-    const q: TaxQuality = { needs_review: 2, possible_duplicates: 0, uncategorized: 1, missing_receipts: 4, money_in_unclassified: 1, mileage_without_rate: 0, mileage_estimated: 3, ask_accountant: 5 };
+    const q: TaxQuality = { needs_review: 1, possible_duplicates: 0, uncategorized: 1, missing_receipts: 4, money_in_unclassified: 1, mileage_without_rate: 0, mileage_estimated: 3, ask_accountant: 5 };
     const issues = qualityIssues(q);
-    expect(issues.filter((i) => i.blocking).map((i) => i.key)).toEqual(["review", "uncat", "in"]);
+    expect(issues.filter((i) => i.blocking).map((i) => i.key)).toEqual(["uncat", "in"]);
+    expect(qualityIssues({ ...q, needs_review: 3, uncategorized: 1 }).some((i) => i.key === "review")).toBe(true);
     expect(issues.filter((i) => !i.blocking).map((i) => i.key)).toEqual(["receipts", "est"]);
     expect(qualityIssues({ needs_review: 0, possible_duplicates: 0, uncategorized: 0, missing_receipts: 0, money_in_unclassified: 0, mileage_without_rate: 0, mileage_estimated: 0, ask_accountant: 0 })).toEqual([]);
     expect(qualityIssues(undefined)).toEqual([]);

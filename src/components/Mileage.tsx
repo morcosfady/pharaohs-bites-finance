@@ -44,7 +44,7 @@ export function MileageTab({ range, gas }: { range: DateRange; gas: { count: num
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard label="Business miles" value={sum.miles} kind="int" />
-        <KpiCard label="Mileage deduction" value={sum.deduction} />
+        <KpiCard label="Mileage deduction" value={Math.round(sum.deduction * 100)} />
         <KpiCard label="Trips" value={sum.trips} kind="int" />
         <div className="card flex flex-col gap-1 px-4 py-3"><span className="text-xs font-medium uppercase leading-tight tracking-wider text-teal-900/70">IRS rate</span><span className="font-display text-2xl font-semibold text-teal-900">{formatCents((rates.data ?? []).find((r) => r.effective_from <= toInputDate(range.to) && r.effective_to >= toInputDate(range.to))?.cents_per_mile)}</span><span className="text-xs text-charcoal/50">per mile, on the period end date</span></div>
       </div>
