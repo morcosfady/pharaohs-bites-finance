@@ -1,14 +1,13 @@
 import { useMemo, useState } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { Plus, ChevronDown, ArrowUpRight, ArrowDownRight, Megaphone } from "lucide-react";
-import { Skeleton, EmptyState, KpiCard, useToast } from "./ui";
-import { useMarketingExpenses, useAllOrderFinancials, useWrite } from "../hooks/queries";
+import { Skeleton, EmptyState, useToast } from "./ui";
+import { useMarketingExpenses, useWrite } from "../hooks/queries";
 import { supabase, unwrap } from "../lib/supabase";
 import { summarizeMarketing, CHANNELS, type ChannelShare, type ChannelKey } from "../lib/marketing";
 import { colorFor } from "../lib/categoryBreakdown";
-import { REVENUE_STATUSES } from "../lib/metrics";
 import { fmt, toCents } from "../lib/money";
-import { fmtDate, previousRange, inRange, type DateRange } from "../lib/dates";
+import { fmtDate, previousRange, type DateRange } from "../lib/dates";
 
 /* Marketing: what you spend to get customers, by channel (social media, flyers and print, ads...), what share of
    sales it is, and what each order costs you in marketing. Charges from the bank (Meta, TikTok, Vistaprint...)
@@ -20,14 +19,9 @@ export function MarketingTab({ range, onAdd, onOpenExpense }: { range: DateRange
   const prev = useMemo(() => previousRange(range), [range]);
   const cur = useMarketingExpenses(range);
   const before = useMarketingExpenses(prev);
-  const fin = useAllOrderFinancials();
   const [open, setOpen] = useState<string | null>(null);
 
-  const sales = useMemo(() => {
-    const live = (fin.data ?? []).filter((o) => REVENUE_STATUSES.includes(o.status) && o.status !== "refunded" && inRange(o.created_at, range));
-    return { cents: live.reduce((s, o) => s + toCents(o.net_product_sales), 0), orders: live.length };
-  }, [fin.data, range]);
-  const m = useMemo(() => summarizeMarketing(cur.data ?? [], before.data ?? [], sales.cents, sales.orders), [cur.data, before.data, sales]);
+  const m = useMemo(() => summarizeMarketing(cur.data ?? [], before.data ?? [], 0, 0), [cur.data, before.data]);
   const order = useMemo(() => m.channels.map((c) => c.label), [m.channels]);
   const top = m.channels[0]?.cents ?? 0;
 
@@ -40,27 +34,13 @@ export function MarketingTab({ range, onAdd, onOpenExpense }: { range: DateRange
         <p className="text-sm text-charcoal/60">What you spend to bring customers in. Meta, TikTok, Vistaprint and similar bank charges appear here by themselves.</p>
         <button className="btn-gold btn-sm" onClick={() => onAdd()}><Plus size={16} /> Add marketing expense</button>
       </div>
-      <div className="flex flex-wrap gap-2">
-        {CHANNELS.filter((c) => c.key === "social" || c.key === "flyers_print").map((c) => <button key={c.key} type="button" className="btn-ghost btn-sm" onClick={() => onAdd(c.key)}><Plus size={14} /> {c.emoji} {c.label}</button>)}
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <div className="card flex flex-col gap-1 px-4 py-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="card col-span-2 flex flex-col gap-1 px-4 py-3 sm:col-span-1">
           <span className="text-xs font-medium uppercase leading-tight tracking-wider text-teal-900/70">Marketing spend</span>
           <span className="font-display text-3xl font-semibold leading-none text-teal-900">{fmt(m.totalCents)}</span>
           <span className="text-xs text-charcoal/55">{(up || down) ? <span className={`inline-flex items-center ${up ? "text-negative" : "text-positive"}`}>{up ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}{Math.abs(Math.round((m.change ?? 0) * 100))}% vs last period</span> : "all channels"}</span>
         </div>
-        <KpiCard label="Share of sales" value={m.pctOfSales == null ? null : Math.round(m.pctOfSales * 1000) / 10} kind="pct" formula="Marketing spend ÷ product sales in the period. Many small food businesses stay under 10%." />
-        <div className="card flex flex-col gap-1 px-4 py-3">
-          <span className="text-xs font-medium uppercase leading-tight tracking-wider text-teal-900/70">Marketing per order</span>
-          <span className="font-display text-3xl font-semibold leading-none text-teal-900">{m.costPerOrderCents == null ? "—" : fmt(m.costPerOrderCents)}</span>
-          <span className="text-xs text-charcoal/55">{sales.orders ? `${sales.orders} order${sales.orders === 1 ? "" : "s"} in the period` : "no orders yet"}</span>
-        </div>
-        <div className="card flex flex-col gap-1 px-4 py-3">
-          <span className="text-xs font-medium uppercase leading-tight tracking-wider text-teal-900/70">Biggest channel</span>
-          <span className="font-display text-xl font-semibold leading-tight text-teal-900 [overflow-wrap:anywhere]">{m.channels[0] ? `${m.channels[0].emoji} ${m.channels[0].label}` : "—"}</span>
-          <span className="text-xs text-charcoal/55">{m.channels[0] ? `${fmt(m.channels[0].cents)} · ${pct(m.channels[0].share)}` : "nothing spent yet"}</span>
-        </div>
+        {(["social", "flyers_print"] as const).map((k) => <ChannelCard key={k} k={k} m={m} onAdd={() => onAdd(k)} />)}
       </div>
 
       <section className="card">
@@ -88,6 +68,25 @@ export function MarketingTab({ range, onAdd, onOpenExpense }: { range: DateRange
         )}
         {m.unused.length > 0 && m.channels.length > 0 && <p className="border-t border-ivory-200 px-5 py-2.5 text-xs text-charcoal/60">Not used in this period: {m.unused.join(", ")}.</p>}
       </section>
+    </div>
+  );
+}
+
+/** One headline channel: what it cost, its share of all marketing, and the change since last period. */
+function ChannelCard({ k, m, onAdd }: { k: ChannelKey; m: ReturnType<typeof summarizeMarketing>; onAdd: () => void }) {
+  const ch = CHANNELS.find((c) => c.key === k)!;
+  const c = m.channels.find((x) => x.key === k);
+  const up = !!c && c.change != null && c.change > 0.005, down = !!c && c.change != null && c.change < -0.005;
+  return (
+    <div className="card flex flex-col gap-1 px-4 py-3">
+      <div className="flex items-start justify-between gap-2">
+        <span className="flex items-center gap-1.5 text-xs font-medium uppercase leading-tight tracking-wider text-teal-900/70"><span aria-hidden>{ch.emoji}</span>{ch.label}</span>
+        <button type="button" onClick={onAdd} className="-mr-1 -mt-1 inline-flex shrink-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs text-teal-700 hover:bg-teal-50" aria-label={`Add ${ch.label} expense`}><Plus size={12} /> Add</button>
+      </div>
+      <span className="font-display text-3xl font-semibold leading-none text-teal-900">{fmt(c?.cents ?? 0)}</span>
+      <span className="text-xs text-charcoal/55">
+        {!c ? "nothing spent yet" : <>{pct(c.share)} of marketing{(up || down) && <span className={`ml-2 inline-flex items-center ${up ? "text-negative" : "text-positive"}`}>{up ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}{Math.abs(Math.round((c.change ?? 0) * 100))}%</span>}</>}
+      </span>
     </div>
   );
 }
