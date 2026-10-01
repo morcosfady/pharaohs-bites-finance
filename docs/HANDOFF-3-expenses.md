@@ -117,6 +117,14 @@ Until `ANTHROPIC_API_KEY` is set, receipts the owner sends are read by the assis
 
 **Originals uploaded 2026-10-01** (10 files, 8 MB, `originals/` in the bucket): Walgreens order, 5 Amazon order pages, Walmart order PDF, Costco photo, Ace Mart photos (2 pages). All 12 receipt rows now have their picture and every matching expense shows the paperclip. The Amazon list pages without prices were not stored. The upload used a throw-away Edge Function with a one-time token, deleted afterwards (the CLI cannot upload files and the browser pane blocks local files); to repeat: recreate a similar temporary function, or just use Receipts -> Upload file.
 
+## Open items for a new session (2026-10-01, end of day)
+
+1. Owner: add `ANTHROPIC_API_KEY` (Supabase secrets) so receipts are read automatically and ingredient prices fill in; then test with a real receipt.
+2. Owner: Walmart subscription real billing day (template start date assumed 2026-10-01); screenshots of the hidden lists of Walmart order #2000152-76591017 (placeholder line of 36.48 to replace: re-run `apply_parsed_receipt` for that file, it is idempotent).
+3. Accountant questions are listed in the Tax tab ("Ask accountant") and above in this file.
+4. Possible next features: connect the other cards (Plaid) so Amazon/Ace Mart-type purchases are automatic; log supply-run mileage; Gmail script for order emails; exact Stripe fees.
+5. How receipts are entered by hand, and the temporary upload-function method, are in the memory note `expenses-rebuild` (repeat the same way).
+
 ## Next
 
 Phase 4 food cost intelligence is not built. It needs receipt line items (now stored in `expense_items`) to have data, so start it after some real receipts have been read.
