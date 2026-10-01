@@ -36,6 +36,13 @@ h1, h2, h3 { @apply font-display; }
 * { scrollbar-width: thin; scrollbar-color: #c9bfa5 transparent; }
 
 /* papyrus-ish card texture, kept very subtle */
+/* A grid with no explicit column count would size its single column to its widest child
+   (a wide table or chart), pushing the whole page sideways on phones. Give every grid a
+   shrinkable single column by default; the sm:/md:/lg: grid-cols-* utilities still win. */
+@layer base {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+}
+
 .card {
   @apply rounded-xl border border-ivory-200 bg-white/90 shadow-[0_1px_2px_rgba(36,36,36,.05),0_8px_24px_-12px_rgba(15,76,76,.18)];
 }

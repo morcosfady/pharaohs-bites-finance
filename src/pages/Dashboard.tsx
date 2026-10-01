@@ -6,6 +6,7 @@ import { DateRangeBar, useDateRange } from "../components/DateRangeBar";
 import { KpiCard, Section, Skeleton, ErrorBox, Badge, EditButton, Tip } from "../components/ui";
 import { groupFor, GROUPS } from "../components/menuViz";
 import { StatHero, ProfitSplit } from "../components/ProfitViz";
+import { UpcomingDeliveries } from "../components/UpcomingDeliveries";
 import { useOrderFinancials, useExpenses, usePayments, useRefunds, useSettings, useProductSales, useTaxAdjustments, useTaxSettings, useCategories } from "../hooks/queries";
 import { useAuth } from "../hooks/useAuth";
 import { previousRange, bucketKey, bucketLabel, PRESETS } from "../lib/dates";
@@ -199,6 +200,7 @@ export function DashboardPage() {
           </details>}
 
           {/* ---- money flow + order pipeline ---- */}
+          <div className="mt-4"><UpcomingDeliveries /></div>
           <div className="mt-4 grid gap-4 lg:grid-cols-5">
             <Section title="💸 Where the money went" className="lg:col-span-3" right={<span className="text-xs text-charcoal/50">Money in: <b className="text-charcoal">{fmt(totalIn)}</b></span>}>
               {flowTotal === 0 ? <Empty emoji="🌱" title="Nothing moved yet" hint="Once orders and expenses land, this bar shows how every dollar was split between food, other costs and profit." /> : (

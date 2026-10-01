@@ -6,6 +6,7 @@ import { PageHeader, Badge, Section, Skeleton, ErrorBox, Modal, Field, ConfirmDi
 import { ORDER_STATUSES, PAYMENT_STATUSES, PAYMENT_METHODS, DELIVERY_PROVIDERS, DELIVERY_STATUSES, CUSTOMER_STATUSES, cls, label } from "../lib/status";
 import { fmt, toCents, fromCents, pct } from "../lib/money";
 import { fmtDateTime } from "../lib/dates";
+import { deliverySlot, plainNote } from "../lib/slot";
 import { waLink, mapsLink, fillTemplate } from "../lib/whatsapp";
 import { supabase, unwrap } from "../lib/supabase";
 import type { Order, OrderItem, OrderStatus, PaymentMethod, DeliveryProvider, DeliveryStatus, DeliveryRecord } from "../lib/types";
@@ -69,7 +70,8 @@ export function OrderDetailPage() {
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Badge className={cls(ORDER_STATUSES, o.status)}>{label(ORDER_STATUSES, o.status)}</Badge>
         <Badge className={cls(PAYMENT_STATUSES, o.payment_status)}>{label(PAYMENT_STATUSES, o.payment_status)}</Badge>
-        <span className="text-xs text-charcoal/60">Placed {fmtDateTime(o.created_at)} · via {o.source}{o.requested_at ? ` · requested for ${fmtDateTime(o.requested_at)}` : ""}</span>
+        <span className="text-xs text-charcoal/60">Placed {fmtDateTime(o.created_at)} · via {o.source}</span>
+        {(() => { const sl = deliverySlot(o); return sl ? <span className="rounded-full bg-gold/20 px-3 py-1 text-xs font-semibold text-teal-900 ring-1 ring-gold/40">🗓️ {o.delivery_method === "pickup" ? "Pickup" : "Deliver"} {sl.date} · {sl.window}</span> : null; })()}
       </div>
 
       {/* status workflow */}
@@ -172,10 +174,11 @@ export function OrderDetailPage() {
           <Section title="Customer" right={<EditButton small label="Edit customer & address" onClick={() => setEditCust(true)} />}>
             <p className="font-medium">{o.customer_name} {cust.data && cust.data.status !== "active" && <Badge className={cls(CUSTOMER_STATUSES, cust.data.status)}>{label(CUSTOMER_STATUSES, cust.data.status)}</Badge>}</p>
             <p className="text-sm">{o.customer_phone}</p>
+            {o.customer_email && <p className="text-sm"><a className="text-teal-700 hover:underline" href={`mailto:${o.customer_email}`}>{o.customer_email}</a></p>}
             {o.delivery_method === "delivery" ? (
               <p className="mt-2 text-sm text-charcoal/80">{o.address_street}{o.address_apt ? `, ${o.address_apt}` : ""}<br />{o.address_city}, {o.address_state} {o.address_zip}</p>
             ) : <p className="mt-2 text-sm">Customer pickup</p>}
-            {o.delivery_instructions && <p className="mt-2 rounded-lg bg-ivory-50 px-3 py-2 text-xs">📝 {o.delivery_instructions}</p>}
+            {plainNote(o.delivery_instructions) && <p className="mt-2 rounded-lg bg-ivory-50 px-3 py-2 text-xs">📝 {plainNote(o.delivery_instructions)}</p>}
             {o.customer_id && <Link to={`/customers/${o.customer_id}`} className="no-print mt-2 inline-block text-xs text-teal-700 hover:underline">Customer history →</Link>}
           </Section>
           <Section title="History">

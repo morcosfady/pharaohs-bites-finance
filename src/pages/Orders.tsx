@@ -1,3 +1,4 @@
+import { deliverySlot } from "../lib/slot";
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
@@ -40,7 +41,7 @@ export function OrdersPage() {
     const deliveryRevenue = o.delivery_fee_customer_paid ? toCents(o.delivery_fee) : 0;
     const profit = toCents(o.subtotal) - toCents(o.discount) + deliveryRevenue - cost - toCents(d?.actual_cost ?? 0);
     return { ...o, cost, profit, balance: toCents(o.total) - toCents(o.amount_paid) + toCents(o.amount_refunded),
-      search: [o.order_number, o.customer_name, o.customer_phone, o.address_street, o.address_city, o.address_zip].join(" ").toLowerCase() };
+      search: [o.order_number, o.customer_name, o.customer_phone, o.customer_email, o.address_street, o.address_city, o.address_zip].join(" ").toLowerCase() };
   }), [orders.data]);
 
   const filtered = useMemo(() => rows.filter((o) => {
@@ -65,6 +66,7 @@ export function OrdersPage() {
   const allCols: Column<Row>[] = [
     { key: "order_number", header: "Order #", primary: true, render: (o) => <span className="font-mono text-xs font-medium text-teal-800">{o.order_number}</span> },
     { key: "created_at", header: "Date", render: (o) => fmtDateTime(o.created_at), sortValue: (o) => o.created_at },
+    { key: "requested_at", header: "Deliver", render: (o) => { const sl = deliverySlot(o); return sl ? <span className="font-medium">{sl.date}<span className="block text-xs font-normal text-charcoal/60">{sl.window}</span></span> : <span className="text-charcoal/40">—</span>; }, sortValue: (o) => o.requested_at ?? "" },
     { key: "customer_name", header: "Customer", render: (o) => <span>{o.customer_name}<span className="block text-xs text-charcoal/50">{o.customer_phone}</span></span> },
     { key: "status", header: "Status", render: (o) => <Badge className={cls(ORDER_STATUSES, o.status)}>{label(ORDER_STATUSES, o.status)}</Badge> },
     { key: "payment_status", header: "Payment", render: (o) => <Badge className={cls(PAYMENT_STATUSES, o.payment_status)}>{label(PAYMENT_STATUSES, o.payment_status)}</Badge> },

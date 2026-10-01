@@ -60,7 +60,7 @@ export function TaxPage() {
       </div>
       {days != null && days <= s.reminder_days_before && <p className="mb-4 rounded-lg bg-red-50 px-4 py-2 text-sm text-negative">{days < 0 ? "Your sales-tax due date has passed." : `Your ${s.filing_frequency} sales-tax return is due in ${days} day${days === 1 ? "" : "s"} (${s.next_due_date}).`} After filing, update the next due date below.</p>}
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <Section title="Tax settings">
           <Field label="Default tax rate" hint="Dallas, TX combined rate is 8.25% (0.0825). Applied to new orders; each order keeps the rate used."><input className="input" type="number" step="0.0001" min="0" defaultValue={Number(s.default_tax_rate)} onBlur={(e) => Number(e.target.value) !== Number(s.default_tax_rate) && save(async () => unwrap(await supabase.from("tax_settings").update({ default_tax_rate: Number(e.target.value) }).eq("id", 1).select("id")))} /></Field>
           <Field label="Prices include tax?"><select className="input" value={s.prices_include_tax ? "1" : "0"} onChange={(e) => save(async () => unwrap(await supabase.from("tax_settings").update({ prices_include_tax: e.target.value === "1" }).eq("id", 1).select("id")))}><option value="0">No — tax is added on top</option><option value="1">Yes — menu prices already include tax</option></select></Field>
@@ -70,7 +70,7 @@ export function TaxPage() {
           <Field label="Jurisdiction note"><textarea className="input" defaultValue={s.jurisdiction_note} onBlur={(e) => e.target.value !== s.jurisdiction_note && save(async () => unwrap(await supabase.from("tax_settings").update({ jurisdiction_note: e.target.value }).eq("id", 1).select("id")))} /></Field>
         </Section>
 
-        <Section title="Reporting periods" className="lg:col-span-2" right={<button className="btn-ghost btn-sm" onClick={() => setAdjOpen(true)}>Add manual adjustment</button>}>
+        <Section title="Reporting periods" right={<button className="btn-ghost btn-sm" onClick={() => setAdjOpen(true)}>Add manual adjustment</button>}>
           <div className="table-wrap"><table className="table !min-w-[720px]"><thead><tr><th>Period</th><th className="num">Total sales</th><th className="num">Taxable</th><th className="num">Nontaxable</th><th className="num">Tax collected</th><th className="num">Adjustments</th><th className="num">Est. due</th><th>Filed</th></tr></thead>
             <tbody>{rows.map((r) => (
               <tr key={r.label}><td>{r.label}</td><td className="num">{fmt(r.total)}</td><td className="num">{fmt(r.taxable)}</td><td className="num">{fmt(r.nontaxable)}</td><td className="num">{fmt(r.collected)}</td><td className="num">{fmt(r.adjustments)}</td><td className="num font-semibold">{fmt(r.due)}</td>

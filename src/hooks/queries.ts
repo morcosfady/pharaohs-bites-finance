@@ -78,14 +78,15 @@ export function useCustomer(id: string | undefined) {
 
 export function usePayments(range?: DateRange) {
   return useQuery({ queryKey: ["payments", range ? iso(range.from) : "all", range ? iso(range.to) : ""], queryFn: async () => {
-    let q = supabase.from("payments").select("*, orders(order_number, customer_name)").order("paid_at", { ascending: false });
+    // !inner + deleted_at filter: payments of deleted (e.g. test) orders must never show up.
+    let q = supabase.from("payments").select("*, orders!inner(order_number, customer_name, deleted_at)").is("orders.deleted_at", null).order("paid_at", { ascending: false });
     if (range) q = q.gte("paid_at", iso(range.from)).lte("paid_at", iso(range.to));
     return unwrap(await q) as Payment[];
   }});
 }
 export function useRefunds(range?: DateRange) {
   return useQuery({ queryKey: ["refunds", range ? iso(range.from) : "all", range ? iso(range.to) : ""], queryFn: async () => {
-    let q = supabase.from("refunds").select("*").order("refunded_at", { ascending: false });
+    let q = supabase.from("refunds").select("*, orders!inner(deleted_at)").is("orders.deleted_at", null).order("refunded_at", { ascending: false });
     if (range) q = q.gte("refunded_at", iso(range.from)).lte("refunded_at", iso(range.to));
     return unwrap(await q) as Refund[];
   }});

@@ -187,8 +187,11 @@ Deno.serve(async (req) => {
   const info: OrderInfo = { pickup: isPickup, name, phone, email, address: `${street}${apt ? ", " + apt : ""}, ${city}, ${state} ${zip}`, instructions, requestedAt, items, deliveryFee, miles };
   // Pay-online orders stay "pending" and silent until Stripe confirms payment (stripe-webhook
   // then confirms the order and sends the alert + receipt). Other orders are confirmed now.
-  const { error: feeErr } = await supabase.from("orders").update({ delivery_fee: deliveryFee, ...(isPickup ? { delivery_method: "pickup" } : {}), ...(payOnline ? { notify_payload: info } : { status: "confirmed" }) }).eq("order_number", data as string);
+  const { error: feeErr } = await supabase.from("orders").update({ delivery_fee: deliveryFee, customer_email: email, ...(isPickup ? { delivery_method: "pickup" } : {}), ...(payOnline ? { notify_payload: info } : { status: "confirmed" }) }).eq("order_number", data as string);
   if (feeErr) console.error("delivery fee update failed", feeErr.message);
+  // keep the email on the customer record too (only when it was empty)
+  const { data: ordRow } = await supabase.from("orders").select("customer_id").eq("order_number", data as string).maybeSingle();
+  if (ordRow?.customer_id) await supabase.from("customers").update({ email }).eq("id", ordRow.customer_id).eq("email", "");
   if (!payOnline) {
     const notify = notifyAll(supabase, data as string, info);
     // keep the function alive until the alert is sent, without making the customer wait

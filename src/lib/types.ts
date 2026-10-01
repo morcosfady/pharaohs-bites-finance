@@ -59,7 +59,7 @@ export interface CustomerAddress {
 
 export interface Order {
   id: string; order_number: string; checkout_token: string | null; source: "website" | "manual" | "import";
-  customer_id: string | null; customer_name: string; customer_phone: string; delivery_method: DeliveryMethod;
+  customer_id: string | null; customer_name: string; customer_phone: string; customer_email?: string; delivery_method: DeliveryMethod;
   address_street: string; address_apt: string; address_city: string; address_state: string; address_zip: string;
   delivery_instructions: string; requested_at: string | null; status: OrderStatus; payment_status: PaymentStatus;
   payment_method: PaymentMethod | null; subtotal: Num; discount: Num; discount_reason: string; delivery_fee: Num;

@@ -120,7 +120,7 @@ const EMBEDS: Record<string, Record<string, { table: string; fk: string; many: b
   recipes: { ingredients: { table: "ingredients", fk: "ingredient_id", many: false, on: "id" } },
 };
 function embed(table: string, rows: Row[], select: string): Row[] {
-  const rels = [...select.matchAll(/(\w+)\(([^)]*)\)/g)].map((m) => m[1]);
+  const rels = [...select.matchAll(/(\w+)(?:!inner)?\(([^)]*)\)/g)].map((m) => m[1]);
   if (!rels.length) return rows.map((r) => ({ ...r }));
   return rows.map((r) => {
     const out: Row = { ...r };
@@ -148,7 +148,14 @@ class Builder implements PromiseLike<{ data: unknown; error: null | { message: s
   delete() { this.mode = "delete"; return this; }
   eq(c: string, v: unknown) { this.filters.push((r) => r[c] === v); return this; }
   neq(c: string, v: unknown) { this.filters.push((r) => r[c] !== v); return this; }
-  is(c: string, v: unknown) { this.filters.push((r) => r[c] == v); return this; }
+  is(c: string, v: unknown) {
+    if (c.includes(".")) {   // filter on an embedded relation, e.g. .is("orders.deleted_at", null) after orders!inner(...)
+      const [rel, col] = c.split(".");
+      this.filters.push((r) => { const e = EMBEDS[this.table]?.[rel]; if (!e) return true; const hit = (store[e.table] ?? []).find((x) => x[e.on ?? "id"] === r[e.fk]); return hit ? hit[col] == v : false; });
+      return this;
+    }
+    this.filters.push((r) => r[c] == v); return this;
+  }
   gte(c: string, v: string) { this.filters.push((r) => String(r[c] ?? "") >= v); return this; }
   lte(c: string, v: string) { this.filters.push((r) => String(r[c] ?? "") <= v); return this; }
   in(c: string, v: unknown[]) { this.filters.push((r) => v.includes(r[c])); return this; }

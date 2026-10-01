@@ -1982,3 +1982,6 @@ on conflict (slug) do update set name = excluded.name, selling_price = excluded.
   is_active = true, deleted_at = null;
 -- 0043_remove_test_item.sql : removes the temporary 1-cent test item (0041), 2026-09-30.
 update products set is_active = false, deleted_at = now() where slug = 'test-item';
+
+-- 0044_order_customer_email.sql
+alter table orders add column if not exists customer_email text not null default '';
