@@ -11,7 +11,7 @@ import { MileageTab } from "../components/Mileage";
 import { TaxTab } from "../components/TaxPack";
 import { CategoryBreakdown } from "../components/CategoryBreakdown";
 import { MarketingTab } from "../components/MarketingTab";
-import { ProfitBox, UpcomingBills, BudgetsCard } from "../components/ExpenseInsights";
+import { ProfitBox, UpcomingBills } from "../components/ExpenseInsights";
 import { TrendsTab } from "../components/TrendsTab";
 import { CHANNELS } from "../lib/marketing";
 import { ReceiptsTab } from "../components/Receipts";
@@ -91,7 +91,7 @@ export function ExpensesPage() {
         <DateRangeBar range={range} onChange={setRange} />
         <ProfitBox range={range} spentCents={total} />
         <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4"><KpiCard label="Total expenses" value={total} />{advanced && <><KpiCard label="Direct product costs" value={direct} /><KpiCard label="Operating expenses" value={total - direct} /></>}<KpiCard label="Entries" value={rows.length} kind="int" />{toReview > 0 && <button type="button" className="text-left" onClick={() => setTab("review")}><KpiCard label="Items to review" value={toReview} kind="int" /></button>}</div>
-        <div className="mb-5 grid gap-4 lg:grid-cols-2"><UpcomingBills onOpen={openById} /><BudgetsCard /></div>
+        <div className="mb-5"><UpcomingBills onOpen={openById} /></div>
         <CategoryBreakdown range={range} />
         {expenses.error && <ErrorBox error={expenses.error} />}
         {expenses.isLoading ? <Skeleton rows={8} className="card p-5" /> : <DataTable rows={rows} columns={cols} rowKey={(r) => r.id} onRowClick={(r) => setEdit(r)} initialSort={{ key: "expense_date", dir: "desc" }} />}
