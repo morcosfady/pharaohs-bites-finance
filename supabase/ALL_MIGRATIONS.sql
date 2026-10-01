@@ -2508,3 +2508,8 @@ begin
 end $$;
 drop trigger if exists expenses_review_autoclear on expenses;
 create trigger expenses_review_autoclear before update on expenses for each row execute function expense_review_autoclear();
+
+
+-- 0048: bank imports made before the review flag existed that still have no category go to the Review inbox.
+update expenses set review_status = 'needs_review'
+ where deleted_at is null and auto_source = 'bank' and category_id is null and review_status = 'ok';

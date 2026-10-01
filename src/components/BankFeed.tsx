@@ -143,7 +143,7 @@ function RecentList({ rows }: { rows: BankTransaction[] }) {
             <span className="w-16 shrink-0 text-xs text-charcoal/50">{fmtDate(t.posted_on)}</span>
             <span className="min-w-0 flex-1 truncate">{t.merchant_name || t.name}</span>
             {t.pending && <span className="badge bg-ivory-200 text-charcoal/60">pending</span>}
-            {!t.pending && t.kind === "money_in" && <span className="badge bg-gold-100 text-charcoal/70">money in: review</span>}
+            {!t.pending && t.kind === "money_in" && <span className="badge bg-gold-100 text-charcoal/70">review</span>}
             {!t.pending && t.kind === "owner_contribution" && <span className="badge bg-teal-50 text-teal-800">owner money</span>}
             {!t.pending && t.kind === "payout" && <span className="badge bg-teal-50 text-teal-800">Stripe payout</span>}
             {!t.pending && t.kind === "transfer" && <span className="badge bg-ivory-200 text-charcoal/60">transfer</span>}

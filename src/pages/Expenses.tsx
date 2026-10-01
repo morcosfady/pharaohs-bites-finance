@@ -77,15 +77,15 @@ export function ExpensesPage() {
 
 /* ---------- tabs ---------- */
 type Tab = "all" | "review" | "subs" | "bank";
-const TABS: { key: Tab; label: string }[] = [{ key: "all", label: "All expenses" }, { key: "review", label: "Review" }, { key: "subs", label: "Subscriptions" }, { key: "bank", label: "Bank feed" }];
+const TABS: { key: Tab; label: string; short: string }[] = [{ key: "all", label: "All expenses", short: "All" }, { key: "review", label: "Review", short: "Review" }, { key: "subs", label: "Subscriptions", short: "Subs" }, { key: "bank", label: "Bank feed", short: "Bank" }];
 
 function TabBar({ tab, onChange, reviewCount }: { tab: Tab; onChange: (t: Tab) => void; reviewCount: number }) {
   return (
-    <div role="tablist" aria-label="Expenses sections" className="mb-4 flex gap-1 overflow-x-auto rounded-xl bg-ivory-100 p-1">
+    <div role="tablist" aria-label="Expenses sections" className="mb-4 flex gap-0.5 overflow-x-auto rounded-xl bg-ivory-100 p-1 sm:gap-1">
       {TABS.map((t) => (
         <button key={t.key} role="tab" aria-selected={tab === t.key} onClick={() => onChange(t.key)}
-          className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium ${tab === t.key ? "bg-white text-teal-900 shadow-sm" : "text-charcoal/60 hover:text-teal-900"}`}>
-          {t.label}{t.key === "review" && reviewCount > 0 && <span className="ml-1.5 rounded-full bg-gold px-1.5 py-0.5 text-[10px] font-bold text-charcoal">{reviewCount}</span>}
+          className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm font-medium sm:px-3 ${tab === t.key ? "bg-white text-teal-900 shadow-sm" : "text-charcoal/60 hover:text-teal-900"}`}>
+          <span className="sm:hidden">{t.short}</span><span className="hidden sm:inline">{t.label}</span>{t.key === "review" && reviewCount > 0 && <span className="ml-1.5 rounded-full bg-gold px-1.5 py-0.5 text-[10px] font-bold text-charcoal">{reviewCount}</span>}
         </button>
       ))}
     </div>
