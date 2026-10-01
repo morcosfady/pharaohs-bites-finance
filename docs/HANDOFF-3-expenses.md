@@ -125,6 +125,13 @@ Until `ANTHROPIC_API_KEY` is set, receipts the owner sends are read by the assis
 4. Possible next features: connect the other cards (Plaid) so Amazon/Ace Mart-type purchases are automatic; log supply-run mileage; Gmail script for order emails; exact Stripe fees.
 5. How receipts are entered by hand, and the temporary upload-function method, are in the memory note `expenses-rebuild` (repeat the same way).
 
+## Update (2026-10-01, later)
+
+- Walmart #2000152 is now fully itemized (27 lines, the 36.48 placeholder was the ice cube tray 11.49 + paper bowls 24.99; lines 255.56 + tax 4.13 = 259.69). The 3 new screenshots are stored as pages p14-p16 (p13 in the bucket is an unlinked leftover).
+- Walmart+ is a 30-day trial ($1 + tax, approx. Sep 27), renews Oct 27, 2026 at $98/year + tax unless cancelled. The $98 is NOT entered yet (owner may cancel).
+- DBA filing done Sep 24: Collin County Clerk $18.50, Licenses and permits, with the picture in the Gallery. Oct 2 deadline is closed.
+- The assistant uploads pictures itself (owner never uploads): temporary Edge Function, then delete it and unset its secret.
+
 ## Next
 
 Phase 4 food cost intelligence is not built. It needs receipt line items (now stored in `expense_items`) to have data, so start it after some real receipts have been read.
