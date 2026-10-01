@@ -80,6 +80,10 @@ Per delivery order: **paid** (delivery fee the customer paid) minus **gas** = pr
 
 Marketing spend by **channel**: Social media, Flyers & print, Online ads, Email & website, Events & samples, Influencers & collabs, Other. `expenses.marketing_channel` (only for category "Marketing") is guessed from vendor + description by `marketing_keywords` (editable table; lowest sort wins; trigger `expenses_marketing_channel`), cleared if the expense leaves Marketing, and **never overwritten once the owner picks one** (per-charge dropdown on the tab, and a "Marketing channel" field in the expense form). More bank rules route Meta/TikTok/Vistaprint/FedEx Office (print, not shipping)/Mailchimp/Eventbrite etc. to Marketing. The tab shows spend with change vs the previous period, share of sales, marketing per order, biggest channel, a donut and a ranked channel list that expands into the charges, plus "Add marketing expense". Logic `src/lib/marketing.ts`, UI `src/components/MarketingTab.tsx`. Tests: `supabase/tests/marketing.sql` (rolled back) and 6 vitest cases. Live check: tab and form render, the data query returns 200; no real marketing spend exists yet so the live tab shows its empty state.
 
+## Cost page removed (2026-10-01)
+
+The owner asked to delete the top-level **Cost** page. It only listed the automatic recipe-cost entries (`auto_source = 'order_cost'`); those entries and the database trigger `sync_order_cost_expense` are untouched, so Menu & Profit, Home profit and the COGS numbers are unchanged. `/cost` now redirects to Home. To bring the page back: `git show 706e957:src/pages/Cost.tsx` (or any earlier commit) and re-add the route and nav item.
+
 ## Next
 
 Phase 4 food cost intelligence is not built. It needs receipt line items (now stored in `expense_items`) to have data, so start it after some real receipts have been read.

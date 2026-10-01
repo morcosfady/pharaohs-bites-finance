@@ -43,7 +43,7 @@ export function ExpensesPage() {
   const [tab, setTab] = useState<Tab>("all");
   const integrity = useExpenseIntegrity();
   const toReview = (integrity.data?.needs_review ?? 0) + (integrity.data?.possible_duplicates ?? 0) + (integrity.data?.money_in_unclassified ?? 0);
-  /* Recipe-based order cost lives on its own Cost tab, not here -- Expenses is
+  /* Recipe-based order cost (the automatic Kitchen entries) is not shown here -- Expenses is
      real money movement (manual entries + the bank feed). */
   const rows = useMemo<Row[]>(() => (expenses.data ?? [])
     .filter((e) => e.auto_source !== "order_cost")
