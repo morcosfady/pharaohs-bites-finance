@@ -42,6 +42,17 @@ Read with `docs/HANDOFF.md` and `docs/HANDOFF-2026-09-30-payments-alerts.md`. Pl
 - Tests: `supabase db query --linked -f supabase/tests/mileage.sql` (rolled back): rates by date, auto trip, idempotency, cancel/restore, owner-delete stays deleted, test/pickup/no-miles make no trip, one-way setting, route combine/split. Plus 5 vitest cases (48 total).
 - Not verified against a real order yet: the first real completed delivery will prove `create-order` saves `delivery_miles` (the column and update are in place; the function still answers normally).
 
+## Phase 5 tax-ready (done 2026-10-01)
+
+Bookkeeping support for the accountant (Schedule C, sole proprietor). **Not tax advice:** the line mapping is a DRAFT and the UI says so; uncertain items say "Ask accountant".
+
+- Migration `0051_tax_ready.sql`: `expense_categories.schedule_c_line / treatment (cogs, deductible, excluded) / always_ask / ask_note` (all 23 categories mapped; new categories Professional services, Phone & internet, Home office), `expenses.business_pct / ask_accountant / ask_note`, settings `business_start_date` (2026-10-01), `asset_threshold` ($500), `startup_limit` ($5,000 draft), view `expense_tax_view`, functions `tax_summary`, `tax_data_quality`, `tax_extras`.
+- **Rules in the view:** deductible = total x business %; refunds and gas (when standard mileage is selected) deduct $0 with a flag; anything dated before the business start date goes to the **startup** bucket (not into the Schedule C lines); a single purchase >= the asset threshold is flagged "possible asset"; no category = "uncategorized". Recipe-based order cost (`auto_source = 'order_cost'`) is **excluded** so ingredients are not counted twice (real purchases are the cost of goods).
+- **Tax tab** (Expenses): year picker (2026 = short first year), "Is it clean?" list (blocking vs warning), totals by Schedule C line, startup vs limit, mileage deduction, possible assets, Ask-accountant list (tap to open and fix), personal / owner money / Stripe payouts / transfers left out, editable category-to-line mapping and settings. Downloads: **Tax Pack PDF** (jsPDF, lazy-loaded; sections: data quality, lines, startup, mileage, assets, Ask accountant, left out), **Expenses CSV**, **Mileage CSV**. The PDF lists unresolved issues instead of hiding them.
+- Expense form: **Business use %** and **Ask my accountant** (+ note). Bank/Stripe imported rows are now editable for category, business %, notes (date, vendor, amount are locked and refresh on sync).
+- Tests: `supabase db query --linked -f supabase/tests/tax_pack.sql` (rolled back): lines, business %, standard-mileage gas exclusion (and actual method), refunds, startup bucket, asset threshold setting, order_cost excluded, archived rows excluded, data quality, extras. Plus 5 vitest cases (53 total).
+- Owner decisions still open (all "Ask accountant"): startup election and limit, whether September expenses (Anthropic subscription etc.) are startup, standard vs actual mileage, estimated delivery miles, packaging as COGS vs supplies, equipment depreciation.
+
 ## Next
 
-Phase 2 receipts (skipped for now by the owner; upload + SHA-256 dedupe, Gmail label inbox, Claude vision parsing with a key the owner pastes into Supabase, item splits, matching), then mileage, food cost intelligence, tax pack. Not started: nothing from phases 2-5 is built.
+Not built: Phase 2 receipts (upload + SHA-256 dedupe, Gmail label inbox, Claude vision parsing with a key the owner pastes into Supabase, item splits, receipt matching) and Phase 4 food cost intelligence (needs the receipt line items from phase 2 as its data). Brief cases still open with phase 2: 2, 3, 4, 6, 7, 9.
