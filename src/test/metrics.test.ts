@@ -35,9 +35,10 @@ describe("computeKpis", () => {
   it("computes COGS, gross profit and contribution profit", () => {
     const cogs = toCents(8.2) + 1100 + 1100 + toCents(10.05);
     expect(k.cogs).toBe(cogs);
-    expect(k.grossProfit).toBe(10800 - cogs);
+    expect(k.purchases).toBe(4000); // Costco flour: real purchase, not tied to an order
+    expect(k.grossProfit).toBe(10800 - 4000);
     const delivery = toCents(4.35) + 300 + toCents(4.35);
-    expect(k.contributionProfit).toBe(10800 + 2100 - cogs - delivery - 300 /* bank fees */);
+    expect(k.contributionProfit).toBe(10800 + 2100 - 4000 - delivery - 300 /* bank fees */);
     expect(k.operatingExpenses).toBe(2500); // marketing only; bank fees are processing fees, ingredients are direct
     expect(k.netProfit).toBe(k.contributionProfit - 2500);
   });
@@ -85,5 +86,13 @@ describe("productUnitCost", () => {
   it("adds ingredient + packaging + other and optional labor", () => {
     expect(productUnitCost(PRODUCTS[0], 15, false)).toBe(210 + 125);
     expect(productUnitCost(PRODUCTS[0], 15, true)).toBe(210 + 125 + 500);
+  });
+});
+
+describe("profit matches what was really spent", () => {
+  it("counts purchases of ingredients/packaging even before any order exists", () => {
+    const k0 = computeKpis({ orders: [], expenses: EXPENSES, payments: [], refunds: [], includeLabor: false });
+    const spent = EXPENSES.filter((e) => !e.deleted_at).reduce((a, e) => a + toCents(e.total_amount), 0);
+    expect(k0.netProfit).toBe(-spent);
   });
 });

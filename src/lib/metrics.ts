@@ -5,9 +5,12 @@
  * Gross product revenue  = Σ line totals (before discount, tax, delivery)
  * Net product sales      = gross − discounts − product refunds
  * Total revenue          = net product sales + delivery fees retained
- * COGS                   = ingredient + packaging + other direct (+ labor when enabled)
- * Gross profit           = net product sales − COGS
- * Contribution profit    = total revenue − COGS − delivery cost − processing fees − other variable
+ * Purchases              = real ingredient/packaging purchases (expenses not tied to an order). These ARE
+ *                           the cost of goods, so profit uses them instead of the recipe-based COGS estimate
+ *                           (which would count the same food twice). Same number the Expenses page shows.
+ * COGS                   = recipe cost snapshot of orders sold (menu analysis only, not used in profit)
+ * Gross profit           = net product sales − purchases (− labor when enabled)
+ * Contribution profit    = total revenue − purchases − labor − delivery cost − processing fees − other variable
  * Est. net profit        = contribution − operating expenses
  * Cash collected         = payments received (includes tax + delivery)
  * Sales-tax liability    = tax collected − adjustments/refunded tax
@@ -23,7 +26,7 @@ export interface Kpis {
   completedOrders: number; pendingOrders: number; cancelledOrders: number; revenueOrders: number;
   grossSales: Cents; discounts: Cents; refunds: Cents; netSales: Cents; deliveryFees: Cents; taxCollected: Cents;
   cashCollected: Cents; cogs: Cents; packaging: Cents; deliveryCost: Cents; processingFees: Cents; otherVariable: Cents;
-  laborCost: Cents; operatingExpenses: Cents; grossProfit: Cents; contributionProfit: Cents; netProfit: Cents;
+  laborCost: Cents; purchases: Cents; operatingExpenses: Cents; grossProfit: Cents; contributionProfit: Cents; netProfit: Cents;
   grossMargin: number | null; netMargin: number | null; avgOrderValue: Cents | null; avgProfitPerOrder: Cents | null;
   outstandingBalance: Cents; taxLiability: Cents; taxableSales: Cents; nontaxableSales: Cents;
 }
@@ -72,9 +75,12 @@ export function computeKpis(i: MetricInputs): Kpis {
   // Operating expenses exclude direct product purchases (those are in COGS via recipes) and refunds (already netted).
   const operatingExpenses = sum(liveExp.filter((e) => e.cost_type === "operating" && !catName(e).includes("refund") && !catName(e).includes("payment fee") && !catName(e).includes("bank")).map((e) => toCents(e.total_amount)));
 
-  const grossProfit = netSales - cogs - laborCost;
+  // Real purchases of ingredients / packaging (direct product costs not tied to one order, never the
+  // auto recipe-cost rows). They are the cost of goods for profit, so the Home profit matches Expenses.
+  const purchases = sum(liveExp.filter((e) => e.cost_type === "direct_product" && !e.order_id && e.auto_source !== "order_cost" && !catName(e).includes("refund") && !catName(e).includes("payment fee") && !catName(e).includes("bank")).map((e) => toCents(e.total_amount)));
+  const grossProfit = netSales - purchases - laborCost;
   const totalRevenue = netSales + deliveryFees;
-  const contributionProfit = totalRevenue - cogs - laborCost - deliveryCost - processingFees - otherVariable;
+  const contributionProfit = totalRevenue - purchases - laborCost - deliveryCost - processingFees - otherVariable;
   const netProfit = contributionProfit - operatingExpenses;
   const outstandingBalance = sum(live.filter((o) => !["cancelled"].includes(o.status)).map((o) => Math.max(0, toCents(o.balance_due))));
 
@@ -84,7 +90,7 @@ export function computeKpis(i: MetricInputs): Kpis {
   return {
     completedOrders: completed.length, pendingOrders: pending.length, cancelledOrders: cancelled.length, revenueOrders: rev.length,
     grossSales, discounts, refunds, netSales, deliveryFees, taxCollected, cashCollected, cogs, packaging, deliveryCost,
-    processingFees, otherVariable, laborCost, operatingExpenses, grossProfit, contributionProfit, netProfit,
+    processingFees, otherVariable, laborCost, purchases, operatingExpenses, grossProfit, contributionProfit, netProfit,
     grossMargin: ratio(grossProfit, netSales), netMargin: ratio(netProfit, totalRevenue),
     avgOrderValue: rev.length ? Math.round(netSales / rev.length) : null,
     avgProfitPerOrder: rev.length ? Math.round(contributionProfit / rev.length) : null,
@@ -101,14 +107,15 @@ export const KPI_FORMULAS: Record<string, string> = {
   deliveryFees: "Delivery fees charged to customers (only when the customer pays them).",
   taxCollected: "Estimated sales tax charged on orders. Held for the Comptroller — not income.",
   cashCollected: "Customer payments actually received (includes tax and delivery).",
-  cogs: "Ingredient + packaging + other direct costs, using the cost snapshot stored on each order line.",
+  cogs: "Recipe cost of the orders sold (menu analysis). Profit uses your real purchases instead.",
+  purchases: "Ingredients and packaging you actually bought in the period (from receipts and the bank).",
   packaging: "Packaging portion of COGS.",
   deliveryCost: "Actual delivery cost recorded on delivery records (fuel, courier).",
   processingFees: "Expenses in the Bank / payment fees category.",
   otherVariable: "Direct-cost expenses linked to a specific order.",
   operatingExpenses: "Operating expenses in the period (rent, marketing, supplies, licences…).",
-  grossProfit: "Net sales − COGS (− owner labor when enabled in Settings).",
-  contributionProfit: "Net sales + delivery fees − COGS − delivery cost − processing fees − order-linked costs.",
+  grossProfit: "Net sales − purchases of ingredients and packaging (− owner labor when enabled in Settings).",
+  contributionProfit: "Net sales + delivery fees − purchases − delivery cost − processing fees − order-linked costs.",
   netProfit: "Contribution profit − operating expenses. An estimate, not a tax figure.",
   grossMargin: "Gross profit ÷ net sales.",
   netMargin: "Estimated net profit ÷ (net sales + delivery fees).",

@@ -112,7 +112,7 @@ export function DashboardPage() {
 
   // "where the money went" — one stacked bar from money in to money kept
   const flow = k ? [
-    { key: "cogs", label: "Food & packaging", emoji: "🥘", value: k.cogs + k.laborCost, color: "#D4A72C" },
+    { key: "cogs", label: "Food & packaging", emoji: "🥘", value: k.purchases + k.laborCost, color: "#D4A72C" },
     { key: "other", label: "Other expenses", emoji: "🧾", value: otherExpenses, color: "#D85A30" },
     { key: "profit", label: "Profit kept", emoji: "💰", value: Math.max(0, k.netProfit), color: "#16855B" },
   ] : [];
@@ -171,7 +171,7 @@ export function DashboardPage() {
           </div>
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Tile emoji="🏛️" label="Sales tax to set aside" value={fmt(k.taxCollected)} accent="#534AB7" formula={KPI_FORMULAS.taxCollected} compact />
-            <Tile emoji="🥘" label="Food & packaging" value={fmt(k.cogs)} accent="#D4A72C" formula={KPI_FORMULAS.cogs} compact />
+            <Tile emoji="🥘" label="Food & packaging" value={fmt(k.purchases)} accent="#D4A72C" formula={KPI_FORMULAS.purchases} compact />
             <Tile emoji="🧾" label="Other expenses" value={fmt(otherExpenses)} accent="#D85A30" formula="Operating expenses + payment fees + delivery costs in this period." compact />
           </div>
 
