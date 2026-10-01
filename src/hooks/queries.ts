@@ -5,7 +5,7 @@ import { supabase, unwrap } from "../lib/supabase";
 import type {
   BusinessSettings, TaxSettings, Product, ProductCategory, Ingredient, Recipe, Customer, Order, OrderFinancial,
   ProductSale, Payment, Refund, Expense, ExpenseCategory, DeliveryRecord, TaxAdjustment, TaxPeriodSummary, AuditLog,
-  BankAccount, BankTransaction, BankRule, MileageLog, MileageSettings, IrsMileageRate, MileagePlace,
+  BankAccount, BankTransaction, BankRule, ExpenseTaxRow, TaxSummaryRow, TaxQuality, TaxExtras, ExpenseSettings, MileageLog, MileageSettings, IrsMileageRate, MileagePlace,
 } from "../lib/types";
 import type { DateRange } from "../lib/dates";
 
@@ -113,6 +113,25 @@ export interface ExpenseIntegrity { possible_duplicates: number; needs_review: n
 export function useExpenseIntegrity() {
   return useQuery({ queryKey: ["expense_integrity"], queryFn: async () => unwrap(await supabase.rpc("expense_integrity")) as unknown as ExpenseIntegrity });
 }
+/* ---- tax pack (income-tax side of expenses) ---- */
+const yr = (y: number) => ({ from: `${y}-01-01`, to: `${y}-12-31` });
+export function useTaxSummaryYear(y: number) {
+  return useQuery({ queryKey: ["tax_pack", "summary", y], queryFn: async () => unwrap(await supabase.rpc("tax_summary", { p_from: yr(y).from, p_to: yr(y).to })) as unknown as TaxSummaryRow[] });
+}
+export function useTaxQuality(y: number) {
+  return useQuery({ queryKey: ["tax_pack", "quality", y], queryFn: async () => unwrap(await supabase.rpc("tax_data_quality", { p_from: yr(y).from, p_to: yr(y).to })) as unknown as TaxQuality });
+}
+export function useTaxExtras(y: number) {
+  return useQuery({ queryKey: ["tax_pack", "extras", y], queryFn: async () => unwrap(await supabase.rpc("tax_extras", { p_from: yr(y).from, p_to: yr(y).to })) as unknown as TaxExtras });
+}
+export function useTaxRows(y: number) {
+  return useQuery({ queryKey: ["tax_pack", "rows", y], queryFn: async () =>
+    unwrap(await supabase.from("expense_tax_view").select("*").gte("expense_date", yr(y).from).lte("expense_date", yr(y).to).order("expense_date")) as ExpenseTaxRow[] });
+}
+export function useExpenseSettings() {
+  return useQuery({ queryKey: ["expense_settings"], queryFn: async () => unwrap(await supabase.from("expense_settings").select("*").limit(1).single()) as ExpenseSettings });
+}
+
 /* ---- mileage ---- */
 export function useMileageLogs(range?: DateRange) {
   return useQuery({ queryKey: ["mileage_logs", range ? iso(range.from) : "all", range ? iso(range.to) : ""], queryFn: async () => {

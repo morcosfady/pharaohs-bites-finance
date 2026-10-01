@@ -88,7 +88,21 @@ export interface DeliveryRecord {
   orders?: { order_number: string; customer_name: string; address_street: string; address_city: string; created_at: string; delivery_fee: Num; delivery_fee_customer_paid: boolean; status: OrderStatus };
 }
 
-export interface ExpenseCategory { id: string; name: string; cost_type: CostType; sort_order: number }
+export interface ExpenseCategory {
+  id: string; name: string; cost_type: CostType; sort_order: number;
+  /** draft Schedule C line key (see lib/taxpack.ts) and how the category is treated for tax */
+  schedule_c_line?: string | null; treatment?: "cogs" | "deductible" | "excluded"; always_ask?: boolean; ask_note?: string;
+}
+/** Row of the expense_tax_view */
+export interface ExpenseTaxRow {
+  expense_id: string; expense_date: string; vendor: string; description: string; category_id: string | null; category_name: string;
+  total_amount: Num; business_pct: Num; receipt_path: string; review_status: string; auto_source: string | null;
+  is_startup: boolean; line_key: string; treatment: string; gas_excluded: boolean | null; asset_candidate: boolean; deductible_amount: Num; ask_reason: string | null;
+}
+export interface TaxSummaryRow { line_key: string; entries: Num; total: Num; deductible: Num }
+export interface TaxQuality { needs_review: number; possible_duplicates: number; uncategorized: number; missing_receipts: number; money_in_unclassified: number; mileage_without_rate: number; mileage_estimated: number; ask_accountant: number }
+export interface TaxExtras { personal_total: number; personal_count: number; owner_contributions: number; stripe_payouts: number; transfers: number }
+export interface ExpenseSettings { id: boolean; match_window_days: number; amount_tolerance: Num; business_start_date: string; asset_threshold: Num; startup_limit: Num }
 
 export interface Expense {
   id: string; expense_date: string; vendor: string; category_id: string | null; description: string;
@@ -100,6 +114,7 @@ export interface Expense {
   bank_transaction_id: string | null;
   /** ok | needs_review (no category yet) | possible_duplicate (see duplicate_of) */
   review_status: "ok" | "needs_review" | "possible_duplicate"; duplicate_of: string | null; merged_into: string | null;
+  business_pct: Num; ask_accountant: boolean; ask_note: string;
   created_at: string; updated_at: string; deleted_at: string | null; expense_categories?: { name: string } | null;
   expense_sources?: { source_type: string }[] | null;
 }

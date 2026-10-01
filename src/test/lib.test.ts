@@ -128,3 +128,34 @@ describe("mileage summary", () => {
   });
   it("formats rates", () => { expect(formatCents(76)).toBe("76¢"); expect(formatCents(72.5)).toBe("72.5¢"); expect(formatCents(null)).toBe("no rate"); });
 });
+
+/* ---- tax pack helpers --------------------------------------------------------- */
+import { SCHEDULE_C_LINES, lineLabel, sortLines, startupStatus, qualityIssues, taxCsvRows } from "../lib/taxpack";
+import type { ExpenseTaxRow, TaxQuality } from "../lib/types";
+describe("tax pack helpers", () => {
+  it("has unique line keys and labels every known line", () => {
+    const keys = SCHEDULE_C_LINES.map((l) => l.key);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(lineLabel("l8_advertising")).toBe("Advertising");
+    expect(lineLabel("unknown_line")).toBe("unknown_line");
+  });
+  it("sorts lines in Schedule C order, unknown last", () => {
+    expect(sortLines([{ line_key: "l27a_other" }, { line_key: "zzz" }, { line_key: "cogs_purchases" }]).map((r) => r.line_key)).toEqual(["cogs_purchases", "l27a_other", "zzz"]);
+  });
+  it("compares startup costs with the limit", () => {
+    expect(startupStatus(188.05, 5000)).toMatchObject({ withinLimit: true, remaining: 4811.95, over: 0 });
+    expect(startupStatus(5200, 5000)).toMatchObject({ withinLimit: false, remaining: 0, over: 200 });
+  });
+  it("lists what blocks a clean pack and what is only a warning", () => {
+    const q: TaxQuality = { needs_review: 2, possible_duplicates: 0, uncategorized: 1, missing_receipts: 4, money_in_unclassified: 1, mileage_without_rate: 0, mileage_estimated: 3, ask_accountant: 5 };
+    const issues = qualityIssues(q);
+    expect(issues.filter((i) => i.blocking).map((i) => i.key)).toEqual(["review", "uncat", "in"]);
+    expect(issues.filter((i) => !i.blocking).map((i) => i.key)).toEqual(["receipts", "est"]);
+    expect(qualityIssues({ needs_review: 0, possible_duplicates: 0, uncategorized: 0, missing_receipts: 0, money_in_unclassified: 0, mileage_without_rate: 0, mileage_estimated: 0, ask_accountant: 0 })).toEqual([]);
+    expect(qualityIssues(undefined)).toEqual([]);
+  });
+  it("builds accountant CSV rows with the line, deduction and flags", () => {
+    const r = { expense_id: "e", expense_date: "2027-03-01", vendor: "Verizon", description: "", category_id: "c", category_name: "Phone & internet", total_amount: 100, business_pct: 40, receipt_path: "", review_status: "ok", auto_source: null, is_startup: false, line_key: "l25_utilities", treatment: "deductible", gas_excluded: false, asset_candidate: false, deductible_amount: 40, ask_reason: "Business use 40%." } as ExpenseTaxRow;
+    expect(taxCsvRows([r])[0]).toMatchObject({ schedule_c: "Line 25 Utilities (business share)", total: "100.00", deductible: "40.00", receipt_on_file: "no", ask_accountant: "Business use 40%." });
+  });
+});

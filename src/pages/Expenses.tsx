@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { BankFeed } from "../components/BankFeed";
 import { ReviewInbox } from "../components/ExpenseReview";
 import { MileageTab } from "../components/Mileage";
+import { TaxTab } from "../components/TaxPack";
 import { sourceBadges } from "../lib/expenseReview";
 import { PAYMENT_METHODS, label } from "../lib/status";
 import { fmt, toCents, sum } from "../lib/money";
@@ -29,6 +30,11 @@ export function ExpensesPage() {
   const [del, setDel] = useState<Expense | null>(null);
   const advanced = useAdvanced();
   const write = useWrite(); const toast = useToast();
+  const openById = async (id: string) => {
+    const { data, error } = await supabase.from("expenses").select("*, expense_categories(name)").eq("id", id).maybeSingle();
+    if (error || !data) { toast.push(error?.message ?? "Expense not found", "err"); return; }
+    setEdit(data as Expense);
+  };
   const [tab, setTab] = useState<Tab>("all");
   const integrity = useExpenseIntegrity();
   const toReview = (integrity.data?.needs_review ?? 0) + (integrity.data?.possible_duplicates ?? 0) + (integrity.data?.money_in_unclassified ?? 0);
@@ -54,7 +60,7 @@ export function ExpensesPage() {
     { key: "receipt_path", header: "Receipt", render: (r) => r.receipt_path ? <button className="text-teal-700 hover:underline" onClick={async (ev) => { ev.stopPropagation(); const { data } = await supabase.storage.from("receipts").createSignedUrl(r.receipt_path, 300); if (data?.signedUrl) window.open(data.signedUrl, "_blank"); }}><Paperclip size={14} /></button> : "" },
     { key: "recurrence", header: "Recurring", mobile: false, render: (r) => r.recurrence === "none" ? "" : r.recurrence },
   ];
-  const editCol: Column<Row> = { key: "edit", header: "", render: (r) => r.auto_source ? <span /> : <EditButton small label="Edit expense" onClick={() => setEdit(r)} /> };
+  const editCol: Column<Row> = { key: "edit", header: "", render: (r) => <EditButton small label="Edit expense" onClick={() => setEdit(r)} /> };
   const cols = [...(advanced ? allCols : allCols.filter((c) => ["expense_date", "vendor", "category", "total_amount", "receipt_path"].includes(c.key))), editCol];
   return (
     <div>
@@ -66,13 +72,14 @@ export function ExpensesPage() {
       <TabBar tab={tab} onChange={setTab} reviewCount={toReview} />
       {tab === "review" && <ReviewInbox />}
       {tab === "bank" && <BankFeed />}
+      {tab === "tax" && <TaxTab onOpenExpense={openById} />}
       {tab === "mileage" && <><DateRangeBar range={range} onChange={setRange} /><MileageTab range={range} gas={gas} /></>}
       {tab === "subs" && <FixedCosts rows={fixed.data ?? []} loading={fixed.isLoading} onOpen={(e) => setEdit(e)} />}
       {tab === "all" && <>
         <DateRangeBar range={range} onChange={setRange} />
         <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4"><KpiCard label="Total expenses" value={total} />{advanced && <><KpiCard label="Direct product costs" value={direct} /><KpiCard label="Operating expenses" value={total - direct} /></>}<KpiCard label="Entries" value={rows.length} kind="int" />{toReview > 0 && <button type="button" className="text-left" onClick={() => setTab("review")}><KpiCard label="Items to review" value={toReview} kind="int" /></button>}</div>
         {expenses.error && <ErrorBox error={expenses.error} />}
-        {expenses.isLoading ? <Skeleton rows={8} className="card p-5" /> : <DataTable rows={rows} columns={cols} rowKey={(r) => r.id} onRowClick={(r) => r.auto_source === "bank" ? undefined : setEdit(r)} initialSort={{ key: "expense_date", dir: "desc" }} />}
+        {expenses.isLoading ? <Skeleton rows={8} className="card p-5" /> : <DataTable rows={rows} columns={cols} rowKey={(r) => r.id} onRowClick={(r) => setEdit(r)} initialSort={{ key: "expense_date", dir: "desc" }} />}
       </>}
       {edit && <ExpenseModal expense={edit === "new" || edit === "subscription" ? undefined : edit} subscription={edit === "subscription"} categories={cats.data ?? []} onClose={() => setEdit(null)} onDelete={(e) => { setEdit(null); setDel(e); }} />}
       <ConfirmDialog open={!!del} title="Delete this expense?" body="It is archived (soft-deleted) and kept in the audit log." danger confirmLabel="Delete" onCancel={() => setDel(null)} onConfirm={async () => { const e = del!; setDel(null); try { await write.mutateAsync(async () => unwrap(await supabase.from("expenses").update({ deleted_at: new Date().toISOString() }).eq("id", e.id).select("id"))); toast.push("Expense deleted"); } catch (err) { toast.push((err as Error).message, "err"); } }} />
@@ -81,8 +88,8 @@ export function ExpensesPage() {
 }
 
 /* ---------- tabs ---------- */
-type Tab = "all" | "review" | "mileage" | "subs" | "bank";
-const TABS: { key: Tab; label: string; short: string }[] = [{ key: "all", label: "All expenses", short: "All" }, { key: "review", label: "Review", short: "Review" }, { key: "mileage", label: "Mileage", short: "Miles" }, { key: "subs", label: "Subscriptions", short: "Subs" }, { key: "bank", label: "Bank feed", short: "Bank" }];
+type Tab = "all" | "review" | "mileage" | "tax" | "subs" | "bank";
+const TABS: { key: Tab; label: string; short: string }[] = [{ key: "all", label: "All expenses", short: "All" }, { key: "review", label: "Review", short: "Review" }, { key: "mileage", label: "Mileage", short: "Miles" }, { key: "tax", label: "Tax", short: "Tax" }, { key: "subs", label: "Subscriptions", short: "Subs" }, { key: "bank", label: "Bank feed", short: "Bank" }];
 
 function TabBar({ tab, onChange, reviewCount }: { tab: Tab; onChange: (t: Tab) => void; reviewCount: number }) {
   return (
@@ -134,11 +141,13 @@ function FixedCosts({ rows, loading, onOpen }: { rows: Expense[]; loading: boole
 export function ExpenseModal({ expense, subscription, categories, onClose, onDelete }: { expense?: Expense; subscription?: boolean; categories: { id: string; name: string; cost_type: string }[]; onClose: () => void; onDelete?: (e: Expense) => void }) {
   const products = useProducts();
   const write = useWrite(); const toast = useToast(); const advanced = useAdvanced();
-  const [f, setF] = useState({ expense_date: expense?.expense_date ?? toInputDate(new Date()), vendor: expense?.vendor ?? "", category_id: expense?.category_id ?? "", description: expense?.description ?? "", amount_before_tax: Number(expense?.amount_before_tax ?? 0), sales_tax_paid: Number(expense?.sales_tax_paid ?? 0), payment_method: expense?.payment_method ?? "card", cost_type: expense?.cost_type ?? "operating", product_id: expense?.product_id ?? "", order_id: expense?.order_id ?? "", notes: expense?.notes ?? "", recurrence: expense?.recurrence ?? (subscription ? "annual" : "none") });
+  const [f, setF] = useState({ expense_date: expense?.expense_date ?? toInputDate(new Date()), vendor: expense?.vendor ?? "", category_id: expense?.category_id ?? "", description: expense?.description ?? "", amount_before_tax: Number(expense?.amount_before_tax ?? 0), sales_tax_paid: Number(expense?.sales_tax_paid ?? 0), payment_method: expense?.payment_method ?? "card", cost_type: expense?.cost_type ?? "operating", product_id: expense?.product_id ?? "", order_id: expense?.order_id ?? "", notes: expense?.notes ?? "", recurrence: expense?.recurrence ?? (subscription ? "annual" : "none"), business_pct: Number(expense?.business_pct ?? 100), ask_accountant: expense?.ask_accountant ?? false, ask_note: expense?.ask_note ?? "" });
+  /* bank and Stripe rows take their date, vendor and amount from the source and refresh on sync */
+  const locked = expense?.auto_source === "bank" || expense?.auto_source === "stripe";
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const u = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const v = e.target.type === "number" ? Number(e.target.value) : e.target.value;
+    const v = e.target.type === "number" ? Number(e.target.value) : e.target.type === "checkbox" ? (e.target as HTMLInputElement).checked : e.target.value;
     const next = { ...f, [k]: v };
     if (k === "category_id") { const c = categories.find((x) => x.id === v); if (c) next.cost_type = c.cost_type as "operating" | "direct_product"; }
     setF(next);
@@ -159,16 +168,17 @@ export function ExpenseModal({ expense, subscription, categories, onClose, onDel
   };
   return (
     <Modal open onClose={onClose} title={expense ? "Edit expense" : subscription ? "Add subscription" : "Add expense"} wide>
+      {locked && <p className="mb-3 rounded-lg bg-ivory-50 px-3 py-2 text-xs text-charcoal/70">Imported automatically: date, vendor and amount come from the {expense?.auto_source === "stripe" ? "payment" : "bank"} and refresh on sync. You can change the category, business use % and notes.</p>}
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Date"><input className="input" type="date" value={f.expense_date} onChange={u("expense_date")} /></Field>
-        <Field label="Vendor"><input className="input" value={f.vendor} onChange={u("vendor")} /></Field>
+        <Field label="Date"><input className="input" type="date" disabled={locked} value={f.expense_date} onChange={u("expense_date")} /></Field>
+        <Field label="Vendor"><input className="input" disabled={locked} value={f.vendor} onChange={u("vendor")} /></Field>
         <Field label="Category"><select className="input" value={f.category_id} onChange={u("category_id")}><option value="">—</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
         {advanced ? <>
           <Field label="Cost type" hint="Direct product costs feed COGS; operating expenses reduce net profit."><select className="input" value={f.cost_type} onChange={u("cost_type")}><option value="direct_product">Direct product cost</option><option value="operating">Operating expense</option></select></Field>
-          <Field label="Amount before tax"><input className="input" type="number" step="0.01" min="0" value={f.amount_before_tax} onChange={u("amount_before_tax")} /></Field>
+          <Field label="Amount before tax"><input className="input" disabled={locked} type="number" step="0.01" min="0" value={f.amount_before_tax} onChange={u("amount_before_tax")} /></Field>
           <Field label="Sales tax paid" hint={`Total: ${fmt(toCents(f.amount_before_tax) + toCents(f.sales_tax_paid))}`}><input className="input" type="number" step="0.01" min="0" value={f.sales_tax_paid} onChange={u("sales_tax_paid")} /></Field>
         </> : (
-          <Field label="Amount paid (total)"><input className="input" type="number" step="0.01" min="0" value={f.amount_before_tax} onChange={u("amount_before_tax")} /></Field>
+          <Field label="Amount paid (total)"><input className="input" disabled={locked} type="number" step="0.01" min="0" value={f.amount_before_tax} onChange={u("amount_before_tax")} /></Field>
         )}
         <Field label="Payment method"><select className="input" value={f.payment_method ?? ""} onChange={u("payment_method")}>{PAYMENT_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</select></Field>
         <Field label="Recurring" hint="Anything other than one-off shows under Subscriptions & fixed costs."><select className="input" value={f.recurrence} onChange={u("recurrence")}><option value="none">One-off</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="annual">Annual</option></select></Field>
@@ -176,6 +186,9 @@ export function ExpenseModal({ expense, subscription, categories, onClose, onDel
         <Field label="Linked product (optional)"><select className="input" value={f.product_id} onChange={u("product_id")}><option value="">—</option>{(products.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
         <Field label="Linked order id (optional)"><input className="input" value={f.order_id} onChange={u("order_id")} placeholder="paste order UUID" /></Field>
         </>}
+        <Field label="Business use %" hint="100 for business-only. Phone, internet, utilities: only the business share counts."><input className="input" type="number" min="0" max="100" step="1" value={f.business_pct} onChange={u("business_pct")} /></Field>
+        <label className="flex items-center gap-2 self-center text-sm"><input type="checkbox" checked={f.ask_accountant} onChange={u("ask_accountant")} /> Ask my accountant about this</label>
+        {f.ask_accountant && <Field label="What to ask" className="sm:col-span-2"><input className="input" value={f.ask_note} onChange={u("ask_note")} placeholder="Is the mixer an asset?" /></Field>}
         <Field label="Description" className="sm:col-span-2"><input className="input" value={f.description} onChange={u("description")} /></Field>
         <Field label="Receipt photo / PDF" hint={expense?.receipt_path ? "A receipt is attached; choosing a file replaces it." : "Stored privately; only admins can open it."}><input className="input" type="file" accept="image/*,application/pdf" capture="environment" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></Field>
         {advanced && <Field label="Notes"><input className="input" value={f.notes} onChange={u("notes")} /></Field>}
