@@ -96,7 +96,7 @@ export function ExpensesPage() {
 
 /* ---------- tabs ---------- */
 type Tab = "all" | "marketing" | "receipts" | "review" | "mileage" | "tax" | "subs" | "bank";
-const TABS: { key: Tab; label: string; short: string }[] = [{ key: "all", label: "All expenses", short: "All" }, { key: "marketing", label: "Marketing", short: "Mktg" }, { key: "receipts", label: "Receipts", short: "Receipts" }, { key: "review", label: "Review", short: "Review" }, { key: "mileage", label: "Mileage", short: "Miles" }, { key: "tax", label: "Tax", short: "Tax" }, { key: "subs", label: "Subscriptions", short: "Subs" }, { key: "bank", label: "Bank feed", short: "Bank" }];
+const TABS: { key: Tab; label: string; short: string }[] = [{ key: "all", label: "All expenses", short: "All" }, { key: "marketing", label: "Marketing", short: "Marketing" }, { key: "receipts", label: "Receipts", short: "Receipts" }, { key: "review", label: "Review", short: "Review" }, { key: "mileage", label: "Mileage", short: "Miles" }, { key: "tax", label: "Tax", short: "Tax" }, { key: "subs", label: "Subscriptions", short: "Subs" }, { key: "bank", label: "Bank feed", short: "Bank" }];
 
 function TabBar({ tab, onChange, reviewCount }: { tab: Tab; onChange: (t: Tab) => void; reviewCount: number }) {
   return (
