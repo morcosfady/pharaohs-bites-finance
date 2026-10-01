@@ -13,7 +13,7 @@ import { downloadText, toCsv } from "../lib/csv";
 import type { Payment, OrderFinancial } from "../lib/types";
 
 export function PaymentsPage() {
-  const [range, setRange] = useDateRange("this_month");
+  const [range, setRange] = useDateRange("this_year");
   const payments = usePayments(range);
   const refunds = useRefunds(range);
   const fin = useAllOrderFinancials();

@@ -3,7 +3,7 @@ import { PRESETS, rangeFor, toInputDate, type DateRange, type PresetKey } from "
 
 /** Shared period selector. State lives in the URL hash-free localStorage so
  *  every page opens on the same period. */
-export function useDateRange(defaultKey: PresetKey = "this_month"): [DateRange, (r: DateRange) => void] {
+export function useDateRange(defaultKey: PresetKey = "this_year"): [DateRange, (r: DateRange) => void] {
   const [range, setRangeState] = useState<DateRange>(() => {
     try {
       const raw = localStorage.getItem("pbf:range");

@@ -16,7 +16,7 @@ import { fmtDate, previousRange, inRange, type DateRange } from "../lib/dates";
 
 const pct = (n: number) => `${(n * 100).toFixed(n > 0 && n < 0.1 ? 1 : 0)}%`;
 
-export function MarketingTab({ range, onAdd, onOpenExpense }: { range: DateRange; onAdd: () => void; onOpenExpense: (id: string) => void }) {
+export function MarketingTab({ range, onAdd, onOpenExpense }: { range: DateRange; onAdd: (channel?: string) => void; onOpenExpense: (id: string) => void }) {
   const prev = useMemo(() => previousRange(range), [range]);
   const cur = useMarketingExpenses(range);
   const before = useMarketingExpenses(prev);
@@ -38,7 +38,10 @@ export function MarketingTab({ range, onAdd, onOpenExpense }: { range: DateRange
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-charcoal/60">What you spend to bring customers in. Meta, TikTok, Vistaprint and similar bank charges appear here by themselves.</p>
-        <button className="btn-gold btn-sm" onClick={onAdd}><Plus size={16} /> Add marketing expense</button>
+        <button className="btn-gold btn-sm" onClick={() => onAdd()}><Plus size={16} /> Add marketing expense</button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {CHANNELS.filter((c) => c.key === "social" || c.key === "flyers_print").map((c) => <button key={c.key} type="button" className="btn-ghost btn-sm" onClick={() => onAdd(c.key)}><Plus size={14} /> {c.emoji} {c.label}</button>)}
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -62,7 +65,7 @@ export function MarketingTab({ range, onAdd, onOpenExpense }: { range: DateRange
 
       <section className="card">
         <div className="card-head"><div><h2 className="card-title inline-flex items-center gap-2"><Megaphone size={16} className="text-gold" /> By channel</h2><p className="text-xs text-charcoal/50">Tap a channel to see each charge. The channel is a guess from the vendor name: change it on any charge.</p></div></div>
-        {m.channels.length === 0 ? <div className="px-5 pb-5"><EmptyState title="No marketing spend in this period" hint="Add a flyer print job or an ad, or pick a longer period above." action={<button className="btn-gold btn-sm" onClick={onAdd}><Plus size={14} /> Add marketing expense</button>} /></div> : (
+        {m.channels.length === 0 ? <div className="px-5 pb-5"><EmptyState title="No marketing spend in this period" hint="Add a flyer print job or an ad, or pick a longer period above." action={<button className="btn-gold btn-sm" onClick={() => onAdd()}><Plus size={14} /> Add marketing expense</button>} /></div> : (
           <div className="grid gap-4 px-5 pb-5 md:grid-cols-[minmax(0,240px)_minmax(0,1fr)] md:items-start">
             <div className="relative mx-auto h-52 w-52 md:h-60 md:w-60" role="img" aria-label={`Marketing by channel, total ${fmt(m.totalCents)}`}>
               <ResponsiveContainer width="100%" height="100%">

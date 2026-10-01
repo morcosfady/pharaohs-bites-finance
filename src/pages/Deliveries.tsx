@@ -12,7 +12,7 @@ import type { DeliveryRecord } from "../lib/types";
 type Row = DeliveryRecord & { revenue: number; profit: number; [k: string]: unknown };
 
 export function DeliveriesPage() {
-  const [range, setRange] = useDateRange("this_month");
+  const [range, setRange] = useDateRange("this_year");
   const q = useDeliveries();
   const rows = useMemo<Row[]>(() => (q.data ?? []).filter((d) => d.orders && inRange(d.orders.created_at, range) && d.orders.status !== "cancelled").map((d) => {
     const revenue = d.orders!.delivery_fee_customer_paid ? toCents(d.orders!.delivery_fee) : 0;

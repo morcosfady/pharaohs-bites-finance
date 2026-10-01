@@ -8,7 +8,7 @@ import { buildInsights } from "../lib/insights";
 import { toCents, sum, change } from "../lib/money";
 
 export function InsightsPage() {
-  const [range, setRange] = useDateRange("this_month");
+  const [range, setRange] = useDateRange("this_year");
   const prev = useMemo(() => previousRange(range), [range]);
   const settings = useSettings(); const tax = useTaxSettings();
   const includeLabor = settings.data?.include_owner_labor ?? false;

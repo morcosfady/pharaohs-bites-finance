@@ -25,13 +25,14 @@ import { useAdvanced } from "../hooks/useMode";
 type Row = Expense & { category: string; [k: string]: unknown };
 
 export function ExpensesPage() {
-  const [range, setRange] = useDateRange("this_month");
+  const [range, setRange] = useDateRange("this_year");
   const expenses = useExpenses(range);
   /* Subscriptions and fixed costs are shown for all time, not just the selected period. */
   const fixed = useQuery({ queryKey: ["expenses", "fixed"], queryFn: async () => unwrap(await supabase.from("expenses").select("*, expense_categories(name)").is("deleted_at", null).neq("recurrence", "none").order("expense_date", { ascending: false })) as Expense[] });
   const cats = useExpenseCategories();
   const [edit, setEdit] = useState<Expense | null | "new" | "subscription" | "marketing">(null);
   const [del, setDel] = useState<Expense | null>(null);
+  const [mkChannel, setMkChannel] = useState("");
   const advanced = useAdvanced();
   const write = useWrite(); const toast = useToast();
   const openById = async (id: string) => {
@@ -78,7 +79,7 @@ export function ExpensesPage() {
       {tab === "bank" && <BankFeed />}
       {tab === "tax" && <TaxTab onOpenExpense={openById} />}
       {tab === "receipts" && <ReceiptsTab onOpenExpense={openById} />}
-      {tab === "marketing" && <><DateRangeBar range={range} onChange={setRange} /><MarketingTab range={range} onAdd={() => setEdit("marketing")} onOpenExpense={openById} /></>}
+      {tab === "marketing" && <><DateRangeBar range={range} onChange={setRange} /><MarketingTab range={range} onAdd={(ch) => { setMkChannel(ch ?? ""); setEdit("marketing"); }} onOpenExpense={openById} /></>}
       {tab === "mileage" && <><DateRangeBar range={range} onChange={setRange} /><MileageTab range={range} gas={gas} /></>}
       {tab === "subs" && <FixedCosts rows={fixed.data ?? []} loading={fixed.isLoading} onOpen={(e) => setEdit(e)} />}
       {tab === "all" && <>
@@ -88,7 +89,7 @@ export function ExpensesPage() {
         {expenses.error && <ErrorBox error={expenses.error} />}
         {expenses.isLoading ? <Skeleton rows={8} className="card p-5" /> : <DataTable rows={rows} columns={cols} rowKey={(r) => r.id} onRowClick={(r) => setEdit(r)} initialSort={{ key: "expense_date", dir: "desc" }} />}
       </>}
-      {edit && <ExpenseModal expense={edit === "new" || edit === "subscription" || edit === "marketing" ? undefined : edit} subscription={edit === "subscription"} marketing={edit === "marketing"} categories={cats.data ?? []} onClose={() => setEdit(null)} onDelete={(e) => { setEdit(null); setDel(e); }} />}
+      {edit && <ExpenseModal expense={edit === "new" || edit === "subscription" || edit === "marketing" ? undefined : edit} subscription={edit === "subscription"} marketing={edit === "marketing"} channel={mkChannel} categories={cats.data ?? []} onClose={() => setEdit(null)} onDelete={(e) => { setEdit(null); setDel(e); }} />}
       <ConfirmDialog open={!!del} title="Delete this expense?" body="It is archived (soft-deleted) and kept in the audit log." danger confirmLabel="Delete" onCancel={() => setDel(null)} onConfirm={async () => { const e = del!; setDel(null); try { await write.mutateAsync(async () => unwrap(await supabase.from("expenses").update({ deleted_at: new Date().toISOString() }).eq("id", e.id).select("id"))); toast.push("Expense deleted"); } catch (err) { toast.push((err as Error).message, "err"); } }} />
     </div>
   );
@@ -145,10 +146,10 @@ function FixedCosts({ rows, loading, onOpen }: { rows: Expense[]; loading: boole
   );
 }
 
-export function ExpenseModal({ expense, subscription, marketing, categories, onClose, onDelete }: { expense?: Expense; subscription?: boolean; marketing?: boolean; categories: { id: string; name: string; cost_type: string }[]; onClose: () => void; onDelete?: (e: Expense) => void }) {
+export function ExpenseModal({ expense, subscription, marketing, channel, categories, onClose, onDelete }: { expense?: Expense; subscription?: boolean; marketing?: boolean; channel?: string; categories: { id: string; name: string; cost_type: string }[]; onClose: () => void; onDelete?: (e: Expense) => void }) {
   const products = useProducts();
   const write = useWrite(); const toast = useToast(); const advanced = useAdvanced();
-  const [f, setF] = useState({ expense_date: expense?.expense_date ?? toInputDate(new Date()), vendor: expense?.vendor ?? "", category_id: expense?.category_id ?? (marketing ? (categories.find((c) => c.name === "Marketing")?.id ?? "") : ""), marketing_channel: expense?.marketing_channel ?? "", description: expense?.description ?? "", amount_before_tax: Number(expense?.amount_before_tax ?? 0), sales_tax_paid: Number(expense?.sales_tax_paid ?? 0), payment_method: expense?.payment_method ?? "card", cost_type: expense?.cost_type ?? "operating", product_id: expense?.product_id ?? "", order_id: expense?.order_id ?? "", notes: expense?.notes ?? "", recurrence: expense?.recurrence ?? (subscription ? "annual" : "none"), business_pct: Number(expense?.business_pct ?? 100), ask_accountant: expense?.ask_accountant ?? false, ask_note: expense?.ask_note ?? "" });
+  const [f, setF] = useState({ expense_date: expense?.expense_date ?? toInputDate(new Date()), vendor: expense?.vendor ?? "", category_id: expense?.category_id ?? (marketing ? (categories.find((c) => c.name === "Marketing")?.id ?? "") : ""), marketing_channel: expense?.marketing_channel ?? channel ?? "", description: expense?.description ?? "", amount_before_tax: Number(expense?.amount_before_tax ?? 0), sales_tax_paid: Number(expense?.sales_tax_paid ?? 0), payment_method: expense?.payment_method ?? "card", cost_type: expense?.cost_type ?? "operating", product_id: expense?.product_id ?? "", order_id: expense?.order_id ?? "", notes: expense?.notes ?? "", recurrence: expense?.recurrence ?? (subscription ? "annual" : "none"), business_pct: Number(expense?.business_pct ?? 100), ask_accountant: expense?.ask_accountant ?? false, ask_note: expense?.ask_note ?? "" });
   /* bank and Stripe rows take their date, vendor and amount from the source and refresh on sync */
   const locked = expense?.auto_source === "bank" || expense?.auto_source === "stripe";
   const [file, setFile] = useState<File | null>(null);

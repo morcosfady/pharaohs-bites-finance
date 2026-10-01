@@ -60,6 +60,7 @@ export const QUICK_GROUPS: { key: string; label: string; emoji: string; names: s
   { key: "packaging", label: "Packaging", emoji: "📦", names: ["Packaging", "Pizza boxes", "Cake boxes", "Dessert cups", "Logo stickers"] },
   { key: "gas", label: "Gas", emoji: "⛽", names: ["Gas / mileage"] },
   { key: "software", label: "Software", emoji: "💻", names: ["Website / technology"] },
+  { key: "marketing", label: "Marketing", emoji: "📣", names: ["Marketing"] },
   { key: "fees", label: "Card & bank fees", emoji: "💳", names: ["Payment processing fees", "Bank / payment fees"] },
 ];
 

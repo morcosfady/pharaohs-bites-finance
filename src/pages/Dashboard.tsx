@@ -33,7 +33,7 @@ function greeting() {
 }
 
 export function DashboardPage() {
-  const [range, setRange] = useDateRange("this_month");
+  const [range, setRange] = useDateRange("this_year");
   const prev = useMemo(() => previousRange(range), [range]);
   const settings = useSettings();
   const taxS = useTaxSettings();

@@ -13,7 +13,7 @@ type Row = ProductRank & { rank: number; category: string; share: number | null;
 
 export function PerformancePage() {
   const nav = useNavigate();
-  const [range, setRange] = useDateRange("this_month");
+  const [range, setRange] = useDateRange("this_year");
   const prev = useMemo(() => previousRange(range), [range]);
   const cur = useProductSales(range);
   const pre = useProductSales(prev);

@@ -18,7 +18,7 @@ const REPORTS = [
 type Key = typeof REPORTS[number][0];
 
 export function ReportsPage() {
-  const [range, setRange] = useDateRange("this_month");
+  const [range, setRange] = useDateRange("this_year");
   const prev = useMemo(() => previousRange(range), [range]);
   const [key, setKey] = useState<Key>("sales");
   const settings = useSettings();

@@ -22,7 +22,7 @@ const ORDER_LINE = /order (\S+) \(([^)]*)\)/;
 
 export function CostPage() {
   const nav = useNavigate();
-  const [range, setRange] = useDateRange("this_month");
+  const [range, setRange] = useDateRange("this_year");
   const expenses = useExpenses(range);
 
   const rows = useMemo<Row[]>(() => (expenses.data ?? [])

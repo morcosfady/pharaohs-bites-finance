@@ -21,7 +21,7 @@ function lineCost(i: OrderItem) { return i.quantity * (toCents(i.unit_ingredient
 export function OrdersPage() {
   const nav = useNavigate();
   const [sp, setSp] = useSearchParams();
-  const [range, setRange] = useDateRange("this_month");
+  const [range, setRange] = useDateRange("this_year");
   const orders = useOrders();
   const products = useProducts();
   const cats = useCategories();

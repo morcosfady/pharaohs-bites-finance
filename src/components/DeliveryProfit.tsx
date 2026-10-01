@@ -13,7 +13,7 @@ import { fmtDate } from "../lib/dates";
    per delivery order. Gas = round-trip miles x the cost per mile in Settings. */
 
 export function DeliveryProfit() {
-  const [range, setRange] = useDateRange("this_month");
+  const [range, setRange] = useDateRange("this_year");
   const orders = useDeliveryOrders(range);
   const settings = useSettings();
   const mileage = useMileageSettings();

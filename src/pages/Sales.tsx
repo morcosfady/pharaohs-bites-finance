@@ -21,7 +21,7 @@ type Row = Product & { group: GroupKey; units: number; refunded: number; orders:
 
 export function SalesPage() {
   const nav = useNavigate();
-  const [range, setRange] = useDateRange("this_month");
+  const [range, setRange] = useDateRange("this_year");
   const products = useProducts(false);
   const sales = useProductSales(range);
   const settings = useSettings();
