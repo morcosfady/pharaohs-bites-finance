@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { ChevronDown, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Skeleton } from "./ui";
-import { useCategoryRows, useExpenseCategories } from "../hooks/queries";
+import { useCategoryRows } from "../hooks/queries";
 import { breakdown, quickTotals, donutSlices, colorFor, categoryEmoji, type CategoryShare } from "../lib/categoryBreakdown";
 import { fmt } from "../lib/money";
 import { previousRange, type DateRange } from "../lib/dates";
@@ -16,11 +16,11 @@ export function CategoryBreakdown({ range }: { range: DateRange }) {
   const prev = useMemo(() => previousRange(range), [range]);
   const cur = useCategoryRows(range);
   const before = useCategoryRows(prev);
-  const cats = useExpenseCategories();
   const [open, setOpen] = useState<string | null>(null);
 
   const b = useMemo(() => breakdown(cur.data ?? [], before.data ?? []), [cur.data, before.data]);
-  const order = useMemo(() => (cats.data ?? []).map((c) => c.name), [cats.data]);
+  // colours follow the ranking on screen, so the biggest categories are always different colours
+  const order = useMemo(() => b.categories.map((c) => c.name), [b.categories]);
   const slices = useMemo(() => donutSlices(b.categories), [b.categories]);
   const quick = useMemo(() => quickTotals(b), [b]);
   const top = b.categories[0]?.cents ?? 0;
