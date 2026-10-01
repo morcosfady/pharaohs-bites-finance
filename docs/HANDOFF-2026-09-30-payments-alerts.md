@@ -198,3 +198,29 @@ Current asset versions (bump `?v=` in **every** HTML when editing): `main.js?v=1
 **Rotate/replace a secret safely:** copy it **straight from the provider** (Stripe/BotFather/ntfy) in the owner's normal Chrome, then Supabase website → Edge Functions → Secrets → edit → paste → Save. Then verify with a harmless test (see the diagnostics trick in gotcha 2).
 
 **Remove all test data again:** soft-delete orders, void payments, soft-delete test customers (SQL used on 2026-09-30 is in this file's section 3 description; see `supabase/migrations/0043_remove_test_item.sql` for the product part).
+
+---
+
+## 14. Dashboard QA tour (2026-10-01, done after this file was first written)
+
+Method: signed-in owner session in the in-app browser, every route opened at desktop, 768 px and 375 px, text scanned for `NaN/undefined/errors`, forms opened (and cancelled), a temporary silent QA order created and then deleted.
+
+**Bugs found and fixed (all deployed):**
+1. **Sideways scrolling on phones/tablets** on Home, Reports and Tax (grids without a single shrinkable column let wide tables stretch the page). Global fix in `src/index.css` (`@layer base { .grid { grid-template-columns: minmax(0,1fr) } }`) plus Tax grid. Verified: **0 overflow on all 15 pages at 375 px and 768 px**.
+2. **Payments page listed payments of deleted (test) orders** (and refunds). Queries now use `orders!inner(...)` + `.is("orders.deleted_at", null)` (`src/hooks/queries.ts`); the mock in `src/test/mockSupabase.ts` understands it.
+3. **Missing: when must it be delivered?** Added `src/lib/slot.ts` (reads "Delivery window: … on …" from the instructions), a **Deliver** column on Orders (also in simple mode), a **"Deliver Sun, Oct 4 · 12:00 PM–3:00 PM" chip** on the order page, and an **"Upcoming deliveries" card on Home** (`src/components/UpcomingDeliveries.tsx`, confirmed/preparing/ready orders, soonest first).
+4. **Missing: customer email.** New `orders.customer_email` (migration `0044`), saved by `create-order` (and onto the customer when empty), shown on the order page and in search. The raw "Delivery window:" tag is hidden from notes (`plainNote`).
+5. Truncated KPI labels on Home ("SA…", "ORDERS COMPL…") now wrap; the small cards stack on phones.
+6. Dish names on Menu and Sales wrap to two lines instead of being cut.
+7. Order items table now fits a phone (Taxable column hidden under 640 px, narrower inputs, placeholder "note").
+8. Tax page "Products needing review: 27" counted inactive products; now active only (23).
+9. Default WhatsApp message (Settings) no longer says "Please confirm" (migration `0045`).
+
+**Checked and fine:** Home numbers after the cleanup (Sales $0, Profit −$110.00 = the two real expenses), Orders list and detail math, Record-payment modal, Payments "Payment collector" (Remind link + Collect), Customers list/detail, Expenses (bank feed section, subscriptions), Reports, Settings values, bell ("All caught up").
+
+**Still for the owner (not bugs):**
+- Menu & Profit says **9 of 23 dishes have no cost entered**, so profit is overstated for those until costs are filled in.
+- Expense "Court Solutions LLC $10.00" has no category (probably "Licenses and permits").
+- Settings → Owner name, Address and Email are empty.
+- Simple mode hides Payments/Deliveries/Tax pages (Settings → Advanced mode shows them).
+- Dashboard login cannot be automated; the owner must sign in on the pane for any future live QA.
