@@ -3,6 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import { ArrowUpRight, ArrowDownRight, Store, Wheat } from "lucide-react";
 import { Skeleton, EmptyState } from "./ui";
 import { DateRangeBar } from "./DateRangeBar";
+import { PriceBook, AddToPriceBook } from "./PriceBook";
 import { useCategoryRows, useIngredientItems } from "../hooks/queries";
 import { trendData, topVendors } from "../lib/trends";
 import { buildIngredientPrices } from "../lib/ingredients";
@@ -73,6 +74,7 @@ export function TrendsTab({ range, onRange }: { range: DateRange; onRange: (r: D
       </section>
 
       <IngredientPrices />
+      <PriceBook />
     </div>
   );
 }
@@ -98,6 +100,7 @@ function IngredientPrices() {
                     {(up || down) && <div className={`inline-flex items-center text-xs ${up ? "text-negative" : "text-positive"}`}>{up ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}{Math.abs(Math.round((p.change ?? 0) * 100))}% vs last time</div>}</div>
                 </div>
                 {p.savingVsLatest != null && p.savingVsLatest >= 0.05 && p.cheapest && <div className="mt-1 rounded-lg bg-teal-50 px-3 py-1.5 text-xs text-teal-900">💡 Cheaper at <b>{p.cheapest.store}</b>: {fmt(Math.round(p.cheapest.price * 100))}{p.unit === "each" ? " each" : p.unit}, {Math.round(p.savingVsLatest * 100)}% less.</div>}
+                <div className="mt-1"><AddToPriceBook p={p} /></div>
               </li>
             );
           })}</ul>}

@@ -32,7 +32,7 @@ export function parseSize(name: string): Size | null {
 
 export const UNIT_LABEL: Record<UnitKind | "item", string> = { lb: "/lb", gal: "/gal", each: "/each", item: "each" };
 
-export interface Purchase { store: string; date: string; price: number; label: string }
+export interface Purchase { store: string; date: string; price: number; label: string; /** one package as bought, when the size could be read */ packageSize?: number; packageKind?: UnitKind; packagePrice?: number }
 export interface IngredientPrice {
   key: string; name: string; unit: string; normalized: boolean; latest: Purchase; previous: Purchase | null;
   change: number | null; cheapest: Purchase | null; savingVsLatest: number | null; stores: number; purchases: number;
@@ -41,10 +41,10 @@ export interface IngredientPrice {
 const n = (v: number | string) => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
 
 /** Price per normalized unit, or per item when the size is unknown. */
-export function unitPrice(it: ItemInput): { price: number; unit: string; normalized: boolean } | null {
+export function unitPrice(it: ItemInput): { price: number; unit: string; normalized: boolean; size?: number; kind?: UnitKind; packagePrice?: number } | null {
   const qty = n(it.quantity) || 1, total = n(it.line_total), unit = n(it.unit_price);
   const size = parseSize(it.description);
-  if (size && total > 0) return { price: total / (qty * size.amount), unit: UNIT_LABEL[size.kind], normalized: true };
+  if (size && total > 0) return { price: total / (qty * size.amount), unit: UNIT_LABEL[size.kind], normalized: true, size: size.amount, kind: size.kind, packagePrice: total / qty };
   if (unit > 0) return { price: unit, unit: UNIT_LABEL.item, normalized: false };
   if (total > 0) return { price: total / qty, unit: UNIT_LABEL.item, normalized: false };
   return null;
@@ -57,7 +57,7 @@ export function buildIngredientPrices(items: ItemInput[], now: Date, recentDays 
     if (!k || !up) continue;
     const gk = `${k}|${up.unit}`;                      // never compare $/lb with $/each
     const g = groups.get(gk) ?? { name: it.description.trim(), unit: up.unit, normalized: up.normalized, rows: [] };
-    g.rows.push({ store: it.store || "Unknown", date: it.date, price: up.price, label: it.description });
+    g.rows.push({ store: it.store || "Unknown", date: it.date, price: up.price, label: it.description, packageSize: up.size, packageKind: up.kind, packagePrice: up.packagePrice });
     groups.set(gk, g);
   }
   const cutoff = new Date(now.getTime() - recentDays * 86400000).toISOString().slice(0, 10);

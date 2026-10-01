@@ -116,6 +116,17 @@ export interface ExpenseIntegrity { possible_duplicates: number; needs_review: n
 export function useExpenseIntegrity() {
   return useQuery({ queryKey: ["expense_integrity"], queryFn: async () => unwrap(await supabase.rpc("expense_integrity")) as unknown as ExpenseIntegrity });
 }
+export interface IngredientLink { item_key: string; ingredient_id: string }
+/** Which receipt items are linked to which price-book ingredient. */
+export function useIngredientLinks() {
+  return useQuery({ queryKey: ["ingredient_links"], queryFn: async () => unwrap(await supabase.from("ingredient_receipt_links").select("item_key, ingredient_id")) as IngredientLink[] });
+}
+export interface RecipeLineRow { ingredient_id: string; product_id: string; quantity: number | string; unit: string; waste_pct: number | string; products: { name: string; ingredient_cost: number | string; selling_price: number | string } | null }
+/** Every recipe line with its dish: used to preview which dishes a price change would move. */
+export function useRecipeLines() {
+  return useQuery({ queryKey: ["recipe_lines"], queryFn: async () => unwrap(await supabase.from("recipes").select("ingredient_id, product_id, quantity, unit, waste_pct, products(name, ingredient_cost, selling_price)").limit(5000)) as unknown as RecipeLineRow[] });
+}
+
 /** Subscriptions and fixed costs due in the next N days (database function, same numbers as the Telegram summary). */
 export function useUpcomingBills(days = 30) {
   return useQuery({ queryKey: ["upcoming_bills", days], queryFn: async () => unwrap(await supabase.rpc("upcoming_bills", { p_days: days })) as unknown as Bill[] });

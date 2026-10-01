@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { dueLabel, totalDue, budgetTone, budgetView } from "../lib/bills";
 import { trendData, topVendors } from "../lib/trends";
 import { parseSize, itemKey, unitPrice, buildIngredientPrices } from "../lib/ingredients";
+import { suggestedPackagePrice, lineCost, dishImpact, priceChange, familyOf } from "../lib/priceBook";
 import { formatWeeklySummary, type WeeklySummary } from "../../supabase/functions/_shared/weeklySummary";
 
 const base: WeeklySummary = { from: "2026-09-21", to: "2026-09-27", spent: 250.5, prev_spent: 200, sales: 400, profit: 149.5, top_categories: [{ name: "Ingredients", amount: 120 }, { name: "Marketing", amount: 60 }], biggest: { vendor: "Costco", amount: 98.2, date: "2026-09-23" }, budgets: [], bills: [], price_jumps: [], possible_duplicates: 0, needs_receipt: 0, waiting_receipts: 0 };
@@ -109,4 +110,43 @@ describe("ingredient prices", () => {
     const list = buildIngredientPrices([{ description: "Rice 10 lb", quantity: 1, unit_price: 8, line_total: 8, store: "A", date: "2026-10-01" }, { description: "Rice", quantity: 1, unit_price: 3, line_total: 3, store: "B", date: "2026-10-02" }], new Date("2026-10-10"));
     expect(list.length).toBe(2);
   });
+});
+
+
+describe("price book: receipts to dish costs", () => {
+  it("costs a recipe line exactly like the database (a $10, 10 lb package, 1 lb used = $1.00)", () => {
+    expect(lineCost(1, "lb", 10, "lb", 10, 0)).toBeCloseTo(1, 4);
+    expect(lineCost(8, "oz", 1, "lb", 4, 0)).toBeCloseTo(2, 2);            // half a pound of a $4/lb ingredient
+    expect(lineCost(1, "lb", 10, "lb", 10, 0.1)).toBeCloseTo(1.1, 4);       // 10% waste
+    expect(lineCost(1, "lb", 0, "lb", 10, 0)).toBe(0);                      // no package size: no division by zero
+  });
+  it("turns a receipt price per pound into a price for your package", () => {
+    expect(suggestedPackagePrice(0.8, "/lb", { package_size: 25, package_unit: "lb" })).toEqual({ price: 20 });
+    expect(suggestedPackagePrice(4, "/lb", { package_size: 8, package_unit: "oz" })).toEqual({ price: 2 });
+    expect(suggestedPackagePrice(3.5, "/gal", { package_size: 1, package_unit: "gallon" })).toEqual({ price: 3.5 });
+    expect(suggestedPackagePrice(0.25, "/each", { package_size: 12, package_unit: "piece" })).toEqual({ price: 3 });
+  });
+  it("refuses to compare things it cannot compare, and says why", () => {
+    expect("reason" in suggestedPackagePrice(0.8, "/lb", { package_size: 2, package_unit: "cup" })).toBe(true);     // pounds vs cups needs a density
+    expect("reason" in suggestedPackagePrice(3, "each", { package_size: 1, package_unit: "lb" })).toBe(true);        // receipt had no size
+    expect(familyOf("Gallon")).toBe("volume"); expect(familyOf("sack")).toBe("unknown");
+  });
+  const flour = { package_size: 25, package_unit: "lb", package_price: 20, waste_pct: 0 };
+  it("previews which dishes move and what happens to their margin", () => {
+    const lines = [{ product_id: "a", product: "Feteer", quantity: 2, unit: "lb", waste_pct: 0, product_ingredient_cost: 5, selling_price: 12 }, { product_id: "b", product: "Pita", quantity: 0.5, unit: "lb", waste_pct: 0, product_ingredient_cost: 1, selling_price: 4 }];
+    const d = dishImpact(flour, lines, 25);
+    expect(d.map((x) => x.product)).toEqual(["Feteer", "Pita"]);
+    expect(d[0]).toMatchObject({ deltaCents: 40, oldCostCents: 500, newCostCents: 540 });
+    expect(d[0].marginBefore).toBeCloseTo(7 / 12, 3); expect(d[0].marginAfter).toBeCloseTo(6.6 / 12, 3);
+    expect(d[1].deltaCents).toBe(10);
+  });
+  it("adds two lines of the same ingredient in one dish, and a lower price shrinks the cost", () => {
+    const two = [{ product_id: "a", product: "Mix", quantity: 1, unit: "lb", waste_pct: 0, product_ingredient_cost: 3, selling_price: 10 }, { product_id: "a", product: "Mix", quantity: 1, unit: "lb", waste_pct: 0, product_ingredient_cost: 3, selling_price: 10 }];
+    expect(dishImpact(flour, two, 15)[0]).toMatchObject({ deltaCents: -40, newCostCents: 260 });
+  });
+  it("uses the higher of the recipe waste and the ingredient waste, like the database", () => {
+    const d = dishImpact({ ...flour, waste_pct: 0.1 }, [{ product_id: "a", product: "X", quantity: 2, unit: "lb", waste_pct: 0, product_ingredient_cost: 2, selling_price: 10 }], 25);
+    expect(d[0].deltaCents).toBe(44);   // (2.0 - 1.6) * 1.1
+  });
+  it("measures the price change", () => { expect(priceChange(20, 25)).toBeCloseTo(0.25); expect(priceChange(0, 5)).toBeNull(); });
 });

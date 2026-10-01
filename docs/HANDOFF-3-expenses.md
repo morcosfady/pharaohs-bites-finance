@@ -97,6 +97,12 @@ The owner asked to delete the top-level **Cost** page. It only listed the automa
 
 The Tax tab warning "N expenses have no receipt on file" now counts only purchases at or above `expense_settings.receipt_min_amount` (default **$75**, the IRS line for documentary evidence; editable in Expenses -> Tax -> Tax settings, marked Ask accountant). Smaller charges still have the bank record as proof of payment. A split expense counts once. To satisfy the warning for a bigger purchase: open the expense and attach a photo/PDF (sets `receipt_path`), or upload it on the Receipts tab once the Claude key is set.
 
+## Receipt prices -> dish costs (price book, 2026-10-01, migration 0058)
+
+**Finding:** the live system has **0 ingredients and 0 recipes**; every dish cost is a flat number the owner typed (`products.ingredient_cost`). A dish switches to recipe-driven cost the moment it gets a recipe line (`recalc_product_cost`), so the owner must add ALL of a dish's ingredients first.
+
+**What was built (Expenses -> Trends):** each Ingredient prices row has **+ Add to price book** (creates the `ingredients` row from the receipt, prefilled and editable, and a link in `ingredient_receipt_links(item_key, ingredient_id)`). The **Price book and dish costs** card compares each linked ingredient's package price with the latest receipt price (converted per lb / gallon / each into the package unit; refuses to compare cups vs pounds), shows **which dishes change and their margin before/after**, and **Apply new price** updates only `ingredients.package_price`. Nothing is ever applied automatically (owner rule: confirm price/cost changes). After Apply the existing triggers recalculate every dish using it and keep `ingredient_cost_history` and `product_cost_history`; dishes without a recipe keep their typed cost. Logic `src/lib/priceBook.ts` (mirrors `unit_to_base` / `recipe_line_cost`, 7 vitest cases), UI `src/components/PriceBook.tsx`. Test: `supabase/tests/price_book.sql` (rolled back). Empty until receipts are read (needs `ANTHROPIC_API_KEY`) and until recipes exist.
+
 ## Next
 
 Phase 4 food cost intelligence is not built. It needs receipt line items (now stored in `expense_items`) to have data, so start it after some real receipts have been read.
