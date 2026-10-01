@@ -35,7 +35,7 @@ export function TrendsTab({ range, onRange }: { range: DateRange; onRange: (r: D
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={data} margin={{ top: 8, right: 4, left: -8, bottom: 0 }} barCategoryGap="22%">
                     <CartesianGrid vertical={false} stroke="#eadfc6" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#242424" }} axisLine={false} tickLine={false} interval={0} />
+                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#242424" }} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={8} />
                     <YAxis tick={{ fontSize: 11, fill: "#7a7466" }} axisLine={false} tickLine={false} width={44} tickFormatter={(v) => `$${v >= 1000 ? `${Math.round(v / 100) / 10}k` : v}`} />
                     <Tooltip cursor={{ fill: "rgba(15,76,76,.06)" }} formatter={(v, n) => [fmt(Math.round(Number(v) * 100)), String(n)]} contentStyle={{ borderRadius: 10, border: "1px solid #eadfc6", fontSize: 12 }} />
                     {trend.categories.map((c, i) => <Bar key={c} dataKey={c} stackId="m" fill={colorFor(c, trend.categories)} radius={i === trend.categories.length - 1 ? [4, 4, 0, 0] : 0} isAnimationActive={false} />)}
