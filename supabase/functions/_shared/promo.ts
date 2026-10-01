@@ -25,7 +25,7 @@ export async function checkPromo(supabase: any, rawCode: unknown, phoneDigits: s
   const { data: promo } = await supabase.from("promo_codes").select("code, active").eq("code", code).maybeSingle();
   if (!promo || !promo.active) return { ok: false, error: "that promo code is not valid" };
   if (typeof miles === "number" && miles > PROMO_MAX_MILES) {
-    return { ok: false, error: `${code} free delivery only works for addresses within ${PROMO_MAX_MILES} miles of our kitchen. Your address is about ${miles} miles away, so delivery is charged at the normal fee` };
+    return { ok: false, error: `Sorry, ${code} free delivery is for addresses within ${PROMO_MAX_MILES} miles of our kitchen, and yours is about ${miles} miles away. You can still order, and delivery is just charged at the normal fee.` };
   }
   const emailNorm = normEmail(email);
   const filters = [];
