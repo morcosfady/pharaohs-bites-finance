@@ -71,6 +71,7 @@ h1, h2, h3 { @apply font-display; }
 .table th.num, .table td.num { text-align: right; }
 .table th.num > button { justify-content: flex-end; width: 100%; }
 .table td { @apply border-t border-ivory-200 px-3 py-2.5 align-middle; }
+@media (max-width: 640px) { .table th, .table td { padding-left: .5rem; padding-right: .5rem; } }
 .table tr:hover td { @apply bg-ivory-50; }
 .num { @apply text-right tabular-nums; }
 

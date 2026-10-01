@@ -91,7 +91,7 @@ export function OrderDetailPage() {
           <Section title="Items" right={!locked && <div className="flex items-center gap-2"><EditButton small label="Edit items" onClick={() => focusFirst("sec-items")} /><button className="btn-ghost btn-sm no-print" onClick={() => setAddOpen(true)}><Plus size={14} /> Add product</button></div>}>
             <div id="sec-items">
             <div className="table-wrap"><table className="table !min-w-0">
-              <thead><tr><th>Product</th><th className="num">Qty</th><th className="num">Unit</th><th className="num">Line</th><th>Taxable</th><th className="no-print"></th></tr></thead>
+              <thead><tr><th>Product</th><th className="num">Qty</th><th className="num">Unit</th><th className="num">Line</th><th className="hidden sm:table-cell">Taxable</th><th className="no-print"></th></tr></thead>
               <tbody>
                 {items.map((i) => <ItemRow key={i.id} item={i} locked={locked} onSave={save} />)}
                 {items.length === 0 && <tr><td colSpan={6} className="text-center text-charcoal/50">No items yet.</td></tr>}
@@ -213,10 +213,10 @@ function ItemRow({ item, locked, onSave }: { item: OrderItem; locked: boolean; o
   return (
     <tr>
       <td><div>{item.product_name}</div>{!locked ? <input className="input !min-h-8 !py-0.5 mt-1 text-xs" placeholder="options" defaultValue={item.options} onBlur={(e) => e.target.value !== item.options && upd({ options: e.target.value })} /> : item.options && <div className="text-xs text-charcoal/60">{item.options}</div>}</td>
-      <td className="num">{locked ? item.quantity : <input type="number" min={1} className="input !min-h-8 !w-16 !py-0.5 text-right" defaultValue={item.quantity} onBlur={(e) => { const v = Math.max(1, parseInt(e.target.value || "1", 10)); if (v !== item.quantity) upd({ quantity: v }); }} />}</td>
-      <td className="num">{locked ? fmt(toCents(item.unit_price)) : <input type="number" step="0.01" min={0} className="input !min-h-8 !w-20 !py-0.5 text-right" defaultValue={fromCents(toCents(item.unit_price))} onBlur={(e) => { const v = Number(e.target.value); if (toCents(v) !== toCents(item.unit_price)) upd({ unit_price: v }); }} />}</td>
+      <td className="num">{locked ? item.quantity : <input type="number" min={1} className="input !min-h-8 !w-12 sm:!w-16 !py-0.5 text-right" defaultValue={item.quantity} onBlur={(e) => { const v = Math.max(1, parseInt(e.target.value || "1", 10)); if (v !== item.quantity) upd({ quantity: v }); }} />}</td>
+      <td className="num">{locked ? fmt(toCents(item.unit_price)) : <input type="number" step="0.01" min={0} className="input !min-h-8 !w-16 sm:!w-20 !py-0.5 text-right" defaultValue={fromCents(toCents(item.unit_price))} onBlur={(e) => { const v = Number(e.target.value); if (toCents(v) !== toCents(item.unit_price)) upd({ unit_price: v }); }} />}</td>
       <td className="num font-medium">{fmt(toCents(item.line_total))}</td>
-      <td><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={item.is_taxable} disabled={locked} onChange={(e) => upd({ is_taxable: e.target.checked })} />{item.is_taxable ? "taxable" : "nontaxable"}</label></td>
+      <td className="hidden sm:table-cell"><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={item.is_taxable} disabled={locked} onChange={(e) => upd({ is_taxable: e.target.checked })} />{item.is_taxable ? "taxable" : "nontaxable"}</label></td>
       <td className="no-print">{!locked && <button className="text-negative hover:underline" aria-label="Remove line" onClick={() => onSave(async () => unwrap(await supabase.from("order_items").delete().eq("id", item.id).select("id")), "Line removed")}><Trash2 size={14} /></button>}</td>
     </tr>
   );

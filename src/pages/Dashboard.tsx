@@ -358,7 +358,7 @@ function Tile({ emoji, label, value, cur, prev, accent, invert, formula, spark, 
   return (
     <div className="card relative overflow-hidden px-4 py-3" style={{ borderTop: `3px solid ${accent}` }}>
       <div className="flex items-center justify-between gap-2">
-        <span className="truncate text-xs font-medium uppercase tracking-wider text-teal-900/70">{emoji} {label}</span>
+        <span className="text-xs font-medium uppercase leading-tight tracking-wider text-teal-900/70 [overflow-wrap:anywhere]">{emoji} {label}</span>
         {formula && <Tip text={formula} />}
       </div>
       <div className="mt-1 flex items-end justify-between gap-2">

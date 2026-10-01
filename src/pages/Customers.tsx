@@ -1,3 +1,4 @@
+import { plainNote } from "../lib/slot";
 import { useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { MessageCircle, MapPin } from "lucide-react";
@@ -94,7 +95,7 @@ export function CustomerDetailPage() {
           <div className="mb-2 flex items-center gap-2"><Badge className={cls(CUSTOMER_STATUSES, cust.status)}>{label(CUSTOMER_STATUSES, cust.status)}</Badge>
             <select className={`input !min-h-9 !w-auto !py-1 font-medium ${cust.status === "vip" ? "!border-emerald-500 !text-emerald-800" : cust.status === "trouble_maker" ? "!border-red-500 !text-red-700" : cust.status === "blocked" ? "!border-neutral-800 !text-neutral-900" : ""}`} value={cust.status} onChange={(e) => save(async () => unwrap(await supabase.from("customers").update({ status: e.target.value as CustomerStatus }).eq("id", cust.id).select("id")), "Status updated")} aria-label="Customer status">{CUSTOMER_STATUSES.map((s) => <option key={s.value} value={s.value} style={{ color: s.value === "vip" ? "#16855B" : s.value === "trouble_maker" ? "#C64040" : undefined, fontWeight: s.value === "active" ? 400 : 600 }}>{s.label}</option>)}</select></div>
           <p className="text-sm">{cust.phone}{cust.email ? ` · ${cust.email}` : ""}</p>
-          {a && <p className="mt-2 text-sm">{a.street}{a.apt ? `, ${a.apt}` : ""}<br />{a.city}, {a.state} {a.zip}{a.instructions && <span className="block text-xs text-charcoal/60">📝 {a.instructions}</span>}</p>}
+          {a && <p className="mt-2 text-sm">{a.street}{a.apt ? `, ${a.apt}` : ""}<br />{a.city}, {a.state} {a.zip}{plainNote(a.instructions) && <span className="block text-xs text-charcoal/60">📝 {plainNote(a.instructions)}</span>}</p>}
           <dl className="mt-3 grid grid-cols-2 gap-y-1 text-sm">
             <dt className="text-charcoal/60">Completed orders</dt><dd className="text-right">{mine.filter((o) => o.status === "completed").length}</dd>
             <dt className="text-charcoal/60">Cancelled</dt><dd className="text-right">{mine.filter((o) => o.status === "cancelled").length}</dd>

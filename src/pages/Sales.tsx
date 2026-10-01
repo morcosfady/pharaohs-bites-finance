@@ -142,7 +142,7 @@ function SaleCard({ r, low, max, onClick }: { r: Row; low: number; max: number; 
       <DishThumb image_url={r.image_url} badge={r.units > 0 ? `${r.units} sold` : "0 sold"} badgeTone={r.units > 0 ? "good" : "none"} />
       <div className="flex min-w-0 flex-1 flex-col gap-2 p-3">
         <div className="min-w-0">
-          <div className="truncate font-medium leading-tight text-charcoal">{r.name}</div>
+          <div className="line-clamp-2 font-medium leading-tight text-charcoal">{r.name}</div>
           {r.name_ar && <div className="truncate text-xs text-charcoal/50" dir="rtl">{r.name_ar}</div>}
         </div>
         <div className="grid grid-cols-3 gap-1 text-center">

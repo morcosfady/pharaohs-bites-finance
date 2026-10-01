@@ -131,7 +131,7 @@ function DishCard({ r, low, onClick }: { r: Row; low: number; onClick: () => voi
       <DishThumb image_url={r.image_url} badge={r.hasCost ? pct(r.margin, 0) : "no cost"} badgeTone={b} inactive={!r.is_active} />
       <div className="flex min-w-0 flex-1 flex-col gap-2 p-3">
         <div className="min-w-0">
-          <div className="truncate font-medium leading-tight text-charcoal">{r.name}</div>
+          <div className="line-clamp-2 font-medium leading-tight text-charcoal">{r.name}</div>
           {r.name_ar && <div className="truncate text-xs text-charcoal/50" dir="rtl">{r.name_ar}</div>}
         </div>
         <div className="grid grid-cols-3 gap-1 text-center">
