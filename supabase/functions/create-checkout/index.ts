@@ -9,6 +9,7 @@
 // ---------------------------------------------------------------------------
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { recordPaidSession } from "../_shared/payments.ts";
+import { reconcilePromo } from "../_shared/promo.ts";
 
 const ALLOWED_ORIGINS = [
   "https://morcosfady.github.io",
@@ -49,6 +50,9 @@ Deno.serve(async (req) => {
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
   const { data: order } = await supabase.from("orders").select("id, order_number, status, delivery_method, stripe_session_id").eq("order_number", order_number).eq("checkout_token", checkout_token).maybeSingle();
   if (!order) return json({ ok: false, error: "order not found" }, 404, headers);
+  // Free delivery is withdrawn if the same customer already used the code on another (paid) order.
+  let promoWithdrawn = false;
+  if (action === "create") promoWithdrawn = await reconcilePromo(supabase, order.id);
   const { data: fin } = await supabase.from("order_financials").select("balance_due, amount_paid").eq("id", order.id).maybeSingle();
   const balanceCents = Math.round(Number(fin?.balance_due ?? 0) * 100);
   let paid = balanceCents <= 0 && Number(fin?.amount_paid ?? 0) > 0;
@@ -113,5 +117,5 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: "could not start payment" }, 502, headers);
   }
   await supabase.from("orders").update({ stripe_session_id: session.id }).eq("id", order.id);
-  return json({ ok: true, url: session.url, amount: balanceCents / 100 }, 200, headers);
+  return json({ ok: true, url: session.url, amount: balanceCents / 100, ...(promoWithdrawn ? { promo_withdrawn: true } : {}) }, 200, headers);
 });

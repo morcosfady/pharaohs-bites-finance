@@ -45,3 +45,19 @@ export async function markPromoUsed(supabase: any, orderId: string) {
     if (error && !error.message.includes("promo_used_")) console.error("promo mark used failed", error.message);
   } catch (e) { console.error("promo mark used failed", String(e)); }
 }
+
+/** Called right before payment. If this order's code was meanwhile used (paid) by the same phone / email
+ *  on another order, the free delivery is withdrawn: the fee goes back on the order. Returns true if so. */
+export async function reconcilePromo(supabase: any, orderId: string): Promise<boolean> {
+  const { data: mine } = await supabase.from("promo_redemptions").select("id, code, phone_digits, email_norm, fee_waived, used_at").eq("order_id", orderId).maybeSingle();
+  if (!mine || mine.used_at) return false;
+  const filters = [];
+  if (mine.phone_digits) filters.push(`phone_digits.eq.${mine.phone_digits}`);
+  if (mine.email_norm) filters.push(`email_norm.eq.${String(mine.email_norm).replace(/[,()]/g, "")}`);
+  if (!filters.length) return false;
+  const { data: used } = await supabase.from("promo_redemptions").select("id").eq("code", mine.code).neq("order_id", orderId).not("used_at", "is", null).or(filters.join(",")).limit(1);
+  if (!used || !used.length) return false;
+  await supabase.from("promo_redemptions").delete().eq("id", mine.id);
+  await supabase.from("orders").update({ delivery_fee: mine.fee_waived, promo_code: null }).eq("id", orderId);
+  return true;
+}
