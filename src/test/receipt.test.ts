@@ -109,7 +109,7 @@ describe("category breakdown", () => {
   });
   it("answers the headline questions: ingredients, packaging, gas, software, fees", () => {
     const q = Object.fromEntries(quickTotals(breakdown([row("Ingredients", 50), row("Packaging", 20), row("Pizza boxes", 10), row("Gas / mileage", 15), row("Website / technology", 100), row("Payment processing fees", 3), row("Bank / payment fees", 2), row("Kitchen supplies", 7)])).map((g) => [g.key, g.cents]));
-    expect(q).toEqual({ ingredients: 5000, packaging: 3000, gas: 1500, software: 10000, marketing: 0, fees: 500, other: 700 });
+    expect(q).toEqual({ ingredients: 5000, packaging: 3000, gas: 1500, software: 10000, marketing: 0, fees: 500, "cat:Kitchen supplies": 700 });
     expect(Object.values(q).reduce((a, b) => a + b, 0)).toBe(20700); // tiles add up to the total
   });
   it("folds the small categories into one donut slice and keeps the total", () => {
