@@ -13,7 +13,7 @@ import { cors, json, plaid, requireAdmin, serviceClient } from "../_shared/plaid
 interface Txn {
   transaction_id: string; account_id: string; date: string; name?: string;
   merchant_name?: string | null; amount: number; iso_currency_code?: string | null;
-  pending?: boolean; payment_channel?: string | null;
+  pending?: boolean; pending_transaction_id?: string | null; payment_channel?: string | null;
   personal_finance_category?: { primary?: string; detailed?: string } | null;
 }
 interface SyncRes {
@@ -61,6 +61,15 @@ Deno.serve(async (req) => {
           count: 500,
         });
 
+        // A pending charge that posts arrives as a NEW id pointing at the old one.
+        // Re-key the stored row so it stays ONE transaction (and one expense).
+        for (const t of res.added) {
+          if (t.pending_transaction_id) {
+            await db.from("bank_transactions").update({ plaid_transaction_id: t.transaction_id })
+              .eq("plaid_transaction_id", t.pending_transaction_id);
+          }
+        }
+
         const upserts = [...res.added, ...res.modified]
           .filter((t) => byPlaidId.has(t.account_id))
           .map((t) => ({
@@ -72,6 +81,7 @@ Deno.serve(async (req) => {
             amount: t.amount,
             iso_currency_code: t.iso_currency_code ?? "USD",
             pending: !!t.pending,
+            pending_transaction_id: t.pending_transaction_id ?? null,
             plaid_category: t.personal_finance_category?.primary ?? "",
             payment_channel: t.payment_channel ?? "",
           }));
@@ -85,12 +95,10 @@ Deno.serve(async (req) => {
         }
 
         if (res.removed.length) {
+          // Archives bank-owned expenses, un-links adopted manual ones, drops the evidence.
           const ids = res.removed.map((r) => r.transaction_id);
-          // Archive the expense first, then drop the transaction.
-          const { data: gone } = await db.from("bank_transactions").select("id, expense_id").in("plaid_transaction_id", ids);
-          const expenseIds = (gone ?? []).map((g) => g.expense_id).filter(Boolean) as string[];
-          if (expenseIds.length) await db.from("expenses").update({ deleted_at: new Date().toISOString() }).in("id", expenseIds);
-          await db.from("bank_transactions").delete().in("plaid_transaction_id", ids);
+          const { error: rmErr } = await db.rpc("remove_bank_transactions", { p_plaid_ids: ids });
+          if (rmErr) throw new Error(rmErr.message);
           totalRemoved += ids.length;
         }
 
@@ -101,7 +109,7 @@ Deno.serve(async (req) => {
       // Turn each touched transaction into (or out of) an expense.
       for (const id of touched) {
         const { data: expenseId, error: applyErr } = await db.rpc("apply_bank_transaction", { p_txn_id: id });
-        if (applyErr) throw new Error(applyErr.message);
+        if (applyErr) { problems.push(`apply ${id}: ${applyErr.message}`); continue; } // one bad row never blocks the rest
         if (expenseId) totalExpenses += 1;
       }
 

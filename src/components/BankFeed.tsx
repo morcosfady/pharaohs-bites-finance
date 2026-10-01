@@ -6,6 +6,8 @@ import { useBankAccounts, useBankTransactions, useBankRules, useExpenseCategorie
 import { supabase, unwrap } from "../lib/supabase";
 import { fmt, toCents, sum } from "../lib/money";
 import { fmtDate } from "../lib/dates";
+import { formatDistanceToNow } from "date-fns";
+import { RULE_ACTIONS, ruleActionLabel } from "../lib/expenseReview";
 import type { BankRule, BankTransaction } from "../lib/types";
 
 /* The bank feed: connect a bank through Plaid, pull activity, and let the
@@ -26,7 +28,8 @@ export function BankFeed() {
 
   const recent = txns.data ?? [];
   const imported = recent.filter((t) => t.expense_id);
-  const skipped = recent.filter((t) => !t.expense_id && !t.pending && Number(t.amount) > 0);
+  const skipped = recent.filter((t) => !t.expense_id && !t.pending && ["transfer", "owner_contribution", "personal", "payout"].includes(t.kind));
+  const unclassified = recent.filter((t) => t.kind === "money_in");
   const moneyOut = sum(imported.map((t) => toCents(t.amount)));
 
   async function connect(itemId?: string) {
@@ -114,11 +117,13 @@ export function BankFeed() {
           </div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-charcoal/60">
             <span><b className="text-charcoal">{imported.length}</b> imported as expenses · <b className="text-charcoal">{fmt(moneyOut)}</b></span>
-            {skipped.length > 0 && <span><b className="text-charcoal">{skipped.length}</b> skipped by a rule</span>}
-            <span>Last sync: {item?.last_synced_at ? fmtDate(item.last_synced_at) : "never"}</span>
+            {skipped.length > 0 && <span><b className="text-charcoal">{skipped.length}</b> not costs (transfers, owner money, personal)</span>}
+            {unclassified.length > 0 && <span className="text-warning"><b>{unclassified.length}</b> deposit{unclassified.length === 1 ? "" : "s"} to classify in Review</span>}
+            <span title={item?.last_synced_at ? new Date(item.last_synced_at).toLocaleString() : undefined}>Last sync: {item?.last_synced_at ? `${formatDistanceToNow(new Date(item.last_synced_at))} ago` : "never"}</span>
+            <span className="text-charcoal/40">Auto-sync every morning</span>
             <button className="text-teal-700 hover:underline" onClick={() => connect()}><Plus size={11} className="inline" /> add another bank</button>
           </div>
-          {item?.last_error && <p className="mt-2 text-xs text-negative">{item.last_error}</p>}
+          {item?.last_error && <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-negative/10 px-3 py-2 text-xs text-negative"><AlertTriangle size={14} className="mt-px shrink-0" /><span><b>Last sync failed.</b> {item.last_error}</span></p>}
           <RecentList rows={recent.slice(0, 8)} />
         </>
       )}
@@ -134,12 +139,15 @@ function RecentList({ rows }: { rows: BankTransaction[] }) {
       {rows.map((t) => {
         const out = Number(t.amount) > 0;
         return (
-          <li key={t.id} className="flex items-center gap-3 py-1.5 text-sm">
+          <li key={t.id} className="flex items-center gap-2 py-1.5 text-sm sm:gap-3">
             <span className="w-16 shrink-0 text-xs text-charcoal/50">{fmtDate(t.posted_on)}</span>
             <span className="min-w-0 flex-1 truncate">{t.merchant_name || t.name}</span>
             {t.pending && <span className="badge bg-ivory-200 text-charcoal/60">pending</span>}
-            {!t.pending && !out && <span className="badge bg-teal-50 text-teal-800">money in</span>}
-            {!t.pending && out && !t.expense_id && <span className="badge bg-ivory-200 text-charcoal/60">skipped</span>}
+            {!t.pending && t.kind === "money_in" && <span className="badge bg-gold-100 text-charcoal/70">money in: review</span>}
+            {!t.pending && t.kind === "owner_contribution" && <span className="badge bg-teal-50 text-teal-800">owner money</span>}
+            {!t.pending && t.kind === "payout" && <span className="badge bg-teal-50 text-teal-800">Stripe payout</span>}
+            {!t.pending && t.kind === "transfer" && <span className="badge bg-ivory-200 text-charcoal/60">transfer</span>}
+            {!t.pending && t.kind === "personal" && <span className="badge bg-ivory-200 text-charcoal/60">personal</span>}
             {t.expense_id && <span className="badge bg-gold-100 text-charcoal/70">expense</span>}
             <span className={`w-20 shrink-0 text-right tabular-nums ${out ? "" : "text-positive"}`}>{out ? fmt(toCents(t.amount)) : "+" + fmt(toCents(-Number(t.amount)))}</span>
           </li>
@@ -156,7 +164,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
   const toast = useToast();
   const qc = useQueryClient();
   const [del, setDel] = useState<BankRule | null>(null);
-  const [draft, setDraft] = useState({ match_text: "", vendor: "", category_id: "", cost_type: "operating" as BankRule["cost_type"], skip: false });
+  const [draft, setDraft] = useState({ match_text: "", vendor: "", category_id: "", cost_type: "operating" as BankRule["cost_type"], action: "expense" as BankRule["action"], direction: "any" as BankRule["direction"] });
 
   const save = async (fn: () => Promise<unknown>, msg: string) => {
     try { await write.mutateAsync(fn); toast.push(msg); } catch (e) { toast.push((e as Error).message, "err"); }
@@ -165,21 +173,22 @@ function RulesModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal open onClose={onClose} title="Bank import rules" wide>
       <p className="mb-3 text-sm text-charcoal/70">
-        The first rule whose text appears in the bank description wins. <b>Skip</b> means never create an
-        expense — use it for transfers between your own accounts and credit-card payments, which are not costs.
+        The first rule whose text appears in the bank description wins. Only <b>Business expense</b> creates an expense.
+        Transfers, owner money, personal spending and Stripe payouts are classified but never counted as costs.
       </p>
       <div className="mb-4 rounded-lg border border-ivory-200 bg-white p-3">
-        <div className="grid gap-2 sm:grid-cols-5">
+        <div className="grid gap-2 sm:grid-cols-6">
           <Field label="If description contains" className="sm:col-span-2 !mb-0"><input className="input" value={draft.match_text} onChange={(e) => setDraft({ ...draft, match_text: e.target.value })} placeholder="COSTCO" /></Field>
           <Field label="Show vendor as" className="!mb-0"><input className="input" value={draft.vendor} onChange={(e) => setDraft({ ...draft, vendor: e.target.value })} placeholder="Costco" /></Field>
           <Field label="Category" className="!mb-0"><select className="input" value={draft.category_id} onChange={(e) => { const c = cats.data?.find((x) => x.id === e.target.value); setDraft({ ...draft, category_id: e.target.value, cost_type: (c?.cost_type ?? "operating") as BankRule["cost_type"] }); }}><option value="">—</option>{(cats.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
-          <Field label="Action" className="!mb-0"><select className="input" value={draft.skip ? "skip" : "import"} onChange={(e) => setDraft({ ...draft, skip: e.target.value === "skip" })}><option value="import">Import as expense</option><option value="skip">Skip</option></select></Field>
+          <Field label="Money" className="!mb-0"><select className="input" value={draft.direction} onChange={(e) => setDraft({ ...draft, direction: e.target.value as BankRule["direction"] })}><option value="any">In or out</option><option value="out">Going out</option><option value="in">Coming in</option></select></Field>
+          <Field label="Treat as" className="!mb-0"><select className="input" value={draft.action} onChange={(e) => setDraft({ ...draft, action: e.target.value as BankRule["action"] })}>{RULE_ACTIONS.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}</select></Field>
         </div>
         <div className="mt-2 flex justify-end">
           <button className="btn-gold btn-sm" disabled={!draft.match_text.trim() || write.isPending}
             onClick={async () => {
               await save(async () => unwrap(await supabase.from("bank_rules").insert({ ...draft, category_id: draft.category_id || null, sort_order: 60 }).select("id")), "Rule added");
-              setDraft({ match_text: "", vendor: "", category_id: "", cost_type: "operating", skip: false });
+              setDraft({ match_text: "", vendor: "", category_id: "", cost_type: "operating", action: "expense", direction: "any" });
             }}><Plus size={14} /> Add rule</button>
         </div>
       </div>
@@ -187,14 +196,15 @@ function RulesModal({ onClose }: { onClose: () => void }) {
       {rules.isLoading ? <Skeleton rows={4} /> : (
         <div className="max-h-[38vh] overflow-y-auto rounded-lg border border-ivory-200">
           <table className="table !min-w-0">
-            <thead><tr><th>Contains</th><th>Vendor</th><th>Category</th><th>Action</th><th /></tr></thead>
+            <thead><tr><th>Contains</th><th>Vendor</th><th>Category</th><th>Money</th><th>Treat as</th><th /></tr></thead>
             <tbody>
               {(rules.data ?? []).map((r) => (
                 <tr key={r.id}>
                   <td className="font-mono text-xs">{r.match_text}</td>
                   <td>{r.vendor || <span className="text-charcoal/40">from bank</span>}</td>
                   <td>{cats.data?.find((c) => c.id === r.category_id)?.name ?? <span className="text-charcoal/40">—</span>}</td>
-                  <td>{r.skip ? <span className="badge bg-ivory-200 text-charcoal/60">skip</span> : <span className="badge bg-teal-50 text-teal-800">expense</span>}</td>
+                  <td className="text-xs">{r.direction === "any" ? "in or out" : r.direction === "out" ? "out" : "in"}</td>
+                  <td>{r.action === "expense" ? <span className="badge bg-teal-50 text-teal-800">expense</span> : <span className="badge bg-ivory-200 text-charcoal/60">{ruleActionLabel(r.action)}</span>}</td>
                   <td className="text-right"><button className="text-charcoal/40 hover:text-negative" aria-label={`Delete rule ${r.match_text}`} onClick={() => setDel(r)}><Trash2 size={14} /></button></td>
                 </tr>
               ))}

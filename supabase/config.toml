@@ -40,3 +40,12 @@ verify_jwt = false
 [functions.delivery-quote]
 # Public read-only price quote for the order page; applies its own origin allow-list.
 verify_jwt = false
+
+# The Plaid functions authenticate themselves (admin JWT, or the cron secret for the
+# daily sync), so the gateway must not demand a JWT: the scheduled run has none.
+[functions.plaid-sync]
+verify_jwt = false
+[functions.plaid-link-token]
+verify_jwt = false
+[functions.plaid-exchange]
+verify_jwt = false

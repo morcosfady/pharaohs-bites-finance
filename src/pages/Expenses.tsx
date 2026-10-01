@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
-import { Plus, Paperclip, Repeat, Landmark } from "lucide-react";
+import { Plus, Paperclip, Repeat } from "lucide-react";
 import { DateRangeBar, useDateRange } from "../components/DateRangeBar";
 import { DataTable, type Column } from "../components/DataTable";
 import { PageHeader, Modal, Field, Skeleton, ErrorBox, KpiCard, ConfirmDialog, useToast, EditButton } from "../components/ui";
-import { useExpenses, useExpenseCategories, useProducts, useWrite } from "../hooks/queries";
+import { useExpenses, useExpenseCategories, useProducts, useWrite, useExpenseIntegrity } from "../hooks/queries";
 import { useQuery } from "@tanstack/react-query";
 import { BankFeed } from "../components/BankFeed";
+import { ReviewInbox } from "../components/ExpenseReview";
+import { sourceBadges } from "../lib/expenseReview";
 import { PAYMENT_METHODS, label } from "../lib/status";
 import { fmt, toCents, sum } from "../lib/money";
 import { fmtDate, toInputDate } from "../lib/dates";
@@ -26,6 +28,9 @@ export function ExpensesPage() {
   const [del, setDel] = useState<Expense | null>(null);
   const advanced = useAdvanced();
   const write = useWrite(); const toast = useToast();
+  const [tab, setTab] = useState<Tab>("all");
+  const integrity = useExpenseIntegrity();
+  const toReview = (integrity.data?.needs_review ?? 0) + (integrity.data?.possible_duplicates ?? 0) + (integrity.data?.money_in_unclassified ?? 0);
   /* Recipe-based order cost lives on its own Cost tab, not here -- Expenses is
      real money movement (manual entries + the bank feed). */
   const rows = useMemo<Row[]>(() => (expenses.data ?? [])
@@ -35,7 +40,7 @@ export function ExpensesPage() {
   const direct = sum(rows.filter((r) => r.cost_type === "direct_product").map((r) => toCents(r.total_amount)));
   const allCols: Column<Row>[] = [
     { key: "expense_date", header: "Date", render: (r) => fmtDate(r.expense_date) },
-    { key: "vendor", header: "Vendor", primary: true, render: (r) => <span><span className="font-medium">{r.vendor || "—"}</span>{r.auto_source === "bank" && <span className="badge ml-2 bg-gold-100 text-charcoal/70" title="Imported from the bank feed; change the rule to change this"><Landmark size={10} /> Bank</span>}<span className="block text-xs text-charcoal/50">{r.description}</span></span> },
+    { key: "vendor", header: "Vendor", primary: true, render: (r) => <span><span className="font-medium">{r.vendor || "—"}</span><span className="ml-2 inline-flex gap-0.5 text-xs">{sourceBadges(r.expense_sources).map((b) => <span key={b.key} title={b.label}>{b.icon}</span>)}</span>{r.review_status !== "ok" && <span className="badge ml-2 bg-gold-100 text-charcoal/70">{r.review_status === "possible_duplicate" ? "check" : "needs category"}</span>}<span className="block text-xs text-charcoal/50">{r.description}</span></span> },
     { key: "category", header: "Category" },
     { key: "cost_type", header: "Type", mobile: false, render: (r) => r.cost_type === "direct_product" ? "Direct product cost" : "Operating" },
     { key: "amount_before_tax", header: "Before tax", numeric: true, mobile: false, render: (r) => fmt(toCents(r.amount_before_tax)) },
@@ -54,14 +59,35 @@ export function ExpensesPage() {
         <button className="btn-ghost btn-sm" onClick={() => setEdit("subscription")}><Repeat size={14} /> Add subscription</button>
         <button className="btn-gold btn-sm" onClick={() => setEdit("new")}><Plus size={16} /> Add expense</button>
       </>} />
-      <DateRangeBar range={range} onChange={setRange} />
-      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4"><KpiCard label="Total expenses" value={total} />{advanced && <><KpiCard label="Direct product costs" value={direct} /><KpiCard label="Operating expenses" value={total - direct} /></>}<KpiCard label="Entries" value={rows.length} kind="int" /></div>
-      <BankFeed />
-      <FixedCosts rows={fixed.data ?? []} loading={fixed.isLoading} onOpen={(e) => setEdit(e)} />
-      {expenses.error && <ErrorBox error={expenses.error} />}
-      {expenses.isLoading ? <Skeleton rows={8} className="card p-5" /> : <DataTable rows={rows} columns={cols} rowKey={(r) => r.id} onRowClick={(r) => r.auto_source === "bank" ? undefined : setEdit(r)} initialSort={{ key: "expense_date", dir: "desc" }} />}
+      <TabBar tab={tab} onChange={setTab} reviewCount={toReview} />
+      {tab === "review" && <ReviewInbox />}
+      {tab === "bank" && <BankFeed />}
+      {tab === "subs" && <FixedCosts rows={fixed.data ?? []} loading={fixed.isLoading} onOpen={(e) => setEdit(e)} />}
+      {tab === "all" && <>
+        <DateRangeBar range={range} onChange={setRange} />
+        <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4"><KpiCard label="Total expenses" value={total} />{advanced && <><KpiCard label="Direct product costs" value={direct} /><KpiCard label="Operating expenses" value={total - direct} /></>}<KpiCard label="Entries" value={rows.length} kind="int" />{toReview > 0 && <button type="button" className="text-left" onClick={() => setTab("review")}><KpiCard label="Items to review" value={toReview} kind="int" /></button>}</div>
+        {expenses.error && <ErrorBox error={expenses.error} />}
+        {expenses.isLoading ? <Skeleton rows={8} className="card p-5" /> : <DataTable rows={rows} columns={cols} rowKey={(r) => r.id} onRowClick={(r) => r.auto_source === "bank" ? undefined : setEdit(r)} initialSort={{ key: "expense_date", dir: "desc" }} />}
+      </>}
       {edit && <ExpenseModal expense={edit === "new" || edit === "subscription" ? undefined : edit} subscription={edit === "subscription"} categories={cats.data ?? []} onClose={() => setEdit(null)} onDelete={(e) => { setEdit(null); setDel(e); }} />}
       <ConfirmDialog open={!!del} title="Delete this expense?" body="It is archived (soft-deleted) and kept in the audit log." danger confirmLabel="Delete" onCancel={() => setDel(null)} onConfirm={async () => { const e = del!; setDel(null); try { await write.mutateAsync(async () => unwrap(await supabase.from("expenses").update({ deleted_at: new Date().toISOString() }).eq("id", e.id).select("id"))); toast.push("Expense deleted"); } catch (err) { toast.push((err as Error).message, "err"); } }} />
+    </div>
+  );
+}
+
+/* ---------- tabs ---------- */
+type Tab = "all" | "review" | "subs" | "bank";
+const TABS: { key: Tab; label: string }[] = [{ key: "all", label: "All expenses" }, { key: "review", label: "Review" }, { key: "subs", label: "Subscriptions" }, { key: "bank", label: "Bank feed" }];
+
+function TabBar({ tab, onChange, reviewCount }: { tab: Tab; onChange: (t: Tab) => void; reviewCount: number }) {
+  return (
+    <div role="tablist" aria-label="Expenses sections" className="mb-4 flex gap-1 overflow-x-auto rounded-xl bg-ivory-100 p-1">
+      {TABS.map((t) => (
+        <button key={t.key} role="tab" aria-selected={tab === t.key} onClick={() => onChange(t.key)}
+          className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium ${tab === t.key ? "bg-white text-teal-900 shadow-sm" : "text-charcoal/60 hover:text-teal-900"}`}>
+          {t.label}{t.key === "review" && reviewCount > 0 && <span className="ml-1.5 rounded-full bg-gold px-1.5 py-0.5 text-[10px] font-bold text-charcoal">{reviewCount}</span>}
+        </button>
+      ))}
     </div>
   );
 }

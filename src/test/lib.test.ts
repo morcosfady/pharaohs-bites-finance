@@ -84,3 +84,24 @@ describe("insights", () => {
     expect(out.every((i) => !/NaN|undefined/.test(i.text))).toBe(true);
   });
 });
+
+/* ---- Expenses review helpers ---------------------------------------------- */
+import { ruleText, sourceBadges, ruleActionLabel } from "../lib/expenseReview";
+describe("expense review helpers", () => {
+  it("turns a messy bank description into a rule text", () => {
+    expect(ruleText("WAL-MART #1234 DALLAS TX")).toBe("WAL-MART");
+    expect(ruleText("DEPOSIT ID NUMBER 28114")).toBe("DEPOSIT ID NUMBER");
+    expect(ruleText("Zelle payment from FADY MORCOS WFCT22N8QTN3")).toBe("ZELLE PAYMENT FROM FADY MORCOS");
+    expect(ruleText("COSTCO")).toBe("COSTCO");
+    expect(ruleText("  ab ")).toBe("AB");
+  });
+  it("shows each kind of evidence once, in a stable order", () => {
+    const b = sourceBadges([{ source_type: "receipt" }, { source_type: "bank" }, { source_type: "bank" }]);
+    expect(b.map((x) => x.key)).toEqual(["bank", "receipt"]);
+    expect(sourceBadges(undefined)).toEqual([]);
+  });
+  it("labels rule actions", () => {
+    expect(ruleActionLabel("owner_contribution")).toBe("Owner contribution");
+    expect(ruleActionLabel("whatever")).toBe("whatever");
+  });
+});

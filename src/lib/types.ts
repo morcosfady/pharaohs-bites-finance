@@ -98,7 +98,10 @@ export interface Expense {
   /** 'order_cost' = written automatically from an order's cost snapshot; null = entered by hand. */
   auto_source: string | null;
   bank_transaction_id: string | null;
+  /** ok | needs_review (no category yet) | possible_duplicate (see duplicate_of) */
+  review_status: "ok" | "needs_review" | "possible_duplicate"; duplicate_of: string | null; merged_into: string | null;
   created_at: string; updated_at: string; deleted_at: string | null; expense_categories?: { name: string } | null;
+  expense_sources?: { source_type: string }[] | null;
 }
 
 export interface BankAccount {
@@ -113,12 +116,15 @@ export interface BankTransaction {
   merchant_name: string; /** Plaid convention: positive = money out. */ amount: Num;
   iso_currency_code: string; pending: boolean; plaid_category: string; payment_channel: string;
   expense_id: string | null; ignored: boolean; created_at: string; updated_at: string;
+  /** what the transaction was classified as; only 'expense' is ever counted as a cost */
+  kind: "unclassified" | "expense" | "transfer" | "owner_contribution" | "personal" | "payout" | "money_in" | "pending" | "ignored";
   bank_accounts?: { name: string; mask: string } | null;
 }
 
 export interface BankRule {
   id: string; match_text: string; vendor: string; category_id: string | null;
   cost_type: CostType; skip: boolean; sort_order: number; created_at: string;
+  action: "expense" | "transfer" | "owner_contribution" | "personal" | "payout"; direction: "any" | "out" | "in";
 }
 
 export interface TaxAdjustment { id: string; adjusted_on: string; amount: Num; reason: string; created_at: string }

@@ -94,10 +94,24 @@ export function useRefunds(range?: DateRange) {
 
 export function useExpenses(range?: DateRange) {
   return useQuery({ queryKey: ["expenses", range ? iso(range.from) : "all", range ? iso(range.to) : ""], queryFn: async () => {
-    let q = supabase.from("expenses").select("*, expense_categories(name)").is("deleted_at", null).order("expense_date", { ascending: false });
+    let q = supabase.from("expenses").select("*, expense_categories(name), expense_sources(source_type)").is("deleted_at", null).order("expense_date", { ascending: false });
     if (range) q = q.gte("expense_date", range.from.toISOString().slice(0, 10)).lte("expense_date", range.to.toISOString().slice(0, 10));
     return unwrap(await q) as Expense[];
   }});
+}
+/** Expenses waiting for the owner: no category yet, or maybe a duplicate. Not date-filtered. */
+export function useReviewExpenses() {
+  return useQuery({ queryKey: ["expenses", "review"], queryFn: async () =>
+    unwrap(await supabase.from("expenses").select("*, expense_categories(name), expense_sources(source_type)").is("deleted_at", null).neq("review_status", "ok").order("expense_date", { ascending: false })) as Expense[] });
+}
+/** Bank deposits the rules could not classify yet (never counted as income or expense). */
+export function useMoneyIn() {
+  return useQuery({ queryKey: ["bank_transactions", "money_in"], queryFn: async () =>
+    unwrap(await supabase.from("bank_transactions").select("*, bank_accounts(name, mask)").eq("kind", "money_in").order("posted_on", { ascending: false })) as BankTransaction[] });
+}
+export interface ExpenseIntegrity { possible_duplicates: number; needs_review: number; expenses_without_source: number; bank_amount_mismatch: number; money_in_unclassified: number; duplicate_bank_links: number }
+export function useExpenseIntegrity() {
+  return useQuery({ queryKey: ["expense_integrity"], queryFn: async () => unwrap(await supabase.rpc("expense_integrity")) as unknown as ExpenseIntegrity });
 }
 export function useExpenseCategories() {
   return useQuery({ queryKey: ["expense_categories"], queryFn: async () => unwrap(await supabase.from("expense_categories").select("*").order("sort_order")) as ExpenseCategory[], staleTime: 300_000 });
