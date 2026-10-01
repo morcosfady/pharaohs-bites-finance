@@ -48,7 +48,7 @@ export function GalleryTab({ onOpenExpense, onGoReceipts }: { onOpenExpense: (id
               <li key={it.id}>
                 <button type="button" onClick={() => setOpenId(it.id)} className="group relative block aspect-[3/4] w-full overflow-hidden rounded-xl border border-ivory-200 bg-ivory-100 text-left shadow-sm hover:border-gold" aria-label={`Open ${it.title}`}>
                   {isImage(it.mime) && thumbs[it.id]
-                    ? <img src={thumbs[it.id]} alt="" loading="lazy" className="h-full w-full object-cover transition group-hover:scale-[1.03]" />
+                    ? <img src={thumbs[it.id]} alt="" loading={shown.indexOf(it) < 12 ? "eager" : "lazy"} decoding="async" className="h-full w-full object-cover transition group-hover:scale-[1.03]" />
                     : <span className="grid h-full w-full place-items-center text-charcoal/35"><FileText size={42} /></span>}
                   {it.paths.length > 1 && <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-charcoal/75 px-2 py-0.5 text-[11px] text-white"><Images size={11} /> {it.paths.length}</span>}
                   <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-charcoal/85 via-charcoal/45 to-transparent px-2.5 pb-2 pt-8 text-white">
