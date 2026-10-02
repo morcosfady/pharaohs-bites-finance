@@ -3,7 +3,7 @@ import { FileText, ChevronLeft, ChevronRight, Download, ExternalLink, Search, Im
 import { Skeleton, EmptyState, Modal } from "./ui";
 import { useReceipts } from "../hooks/queries";
 import { supabase } from "../lib/supabase";
-import { toGalleryItems, mergeByPicture, groupByMonth, filterGallery, monthsOf, monthLabel, isImage, type GalleryItem } from "../lib/gallery";
+import { toGalleryItems, mergeByPicture, groupByMonth, filterGallery, monthsOf, monthLabel, isImage, isImagePath, type GalleryItem } from "../lib/gallery";
 import { fmt } from "../lib/money";
 import { fmtDate } from "../lib/dates";
 
@@ -107,7 +107,7 @@ function Viewer({ items, index, onIndex, onClose, onOpenExpense }: { items: Gall
     return () => window.removeEventListener("keydown", onKey);
   }, [index, items.length, onIndex]);
   const url = urls[page] ?? "";
-  const pageIsImage = isImage(it.mime) || /\.(png|jpe?g|webp)$/i.test(it.paths[page] ?? "");
+  const pageIsImage = isImagePath(it.paths[page] ?? "", it.mime);
 
   return (
     <Modal open onClose={onClose} title={it.title} wide>

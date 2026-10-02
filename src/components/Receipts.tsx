@@ -5,6 +5,7 @@ import { useReceipts, useNeedsReceipt, useExpenseItems, useExpenseCategories, us
 import { supabase, unwrap } from "../lib/supabase";
 import { fmt, toCents } from "../lib/money";
 import { fmtDate } from "../lib/dates";
+import { isImagePath } from "../lib/gallery";
 import { fileProblem, safeName, sha256Hex, shrinkImage, receiptStatus } from "../lib/receiptUpload";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ReceiptFile } from "../lib/types";
@@ -159,7 +160,6 @@ function ReceiptDetail({ receipt, onClose, onOpenExpense }: { receipt: ReceiptFi
   const cats = useExpenseCategories();
   const write = useWrite(); const toast = useToast(); const qc = useQueryClient();
   const [urls, setUrls] = useState<string[]>([]);
-  const url = urls[0] ?? "";
   const [busy, setBusy] = useState(false);
   const st = receiptStatus(receipt);
   const paths = [receipt.storage_path, ...(receipt.extra_paths ?? [])].filter(Boolean);
@@ -194,8 +194,9 @@ function ReceiptDetail({ receipt, onClose, onOpenExpense }: { receipt: ReceiptFi
     <Modal open onClose={onClose} title={p?.vendor || receipt.email_subject || "Receipt"} wide>
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          {receipt.mime.startsWith("image/") && urls.map((u, i) => u && <a key={i} href={u} target="_blank" rel="noreferrer" className="mb-2 block"><img src={u} alt={`Receipt page ${i + 1}`} className="max-h-[55vh] w-full rounded-lg border border-ivory-200 object-contain" /></a>)}
-          {url && receipt.mime === "application/pdf" && <a className="btn-ghost" href={url} target="_blank" rel="noreferrer"><FileText size={16} /> Open the PDF</a>}
+          {urls.map((u, i) => !u ? null : isImagePath(paths[i] ?? "", receipt.mime)
+            ? <a key={i} href={u} target="_blank" rel="noreferrer" className="mb-2 block"><img src={u} alt={`Receipt page ${i + 1}`} className="max-h-[55vh] w-full rounded-lg border border-ivory-200 object-contain" /></a>
+            : <a key={i} className="btn-ghost mb-2" href={u} target="_blank" rel="noreferrer"><FileText size={16} /> Open the PDF</a>)}
           {!receipt.storage_path && <p className="rounded-lg bg-ivory-50 px-3 py-2 text-sm text-charcoal/60">Read from the email text. {receipt.email_subject}</p>}
         </div>
         <div className="space-y-3 text-sm">

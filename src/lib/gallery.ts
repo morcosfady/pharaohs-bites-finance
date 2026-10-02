@@ -14,6 +14,9 @@ const MONTHS = ["January", "February", "March", "April", "May", "June", "July", 
 
 export const isImage = (mime: string) => mime.startsWith("image/");
 
+/** Is this one page a picture? Decided by the file name first, because a receipt can mix a screenshot and a PDF. */
+export const isImagePath = (path: string, mime = "") => /\.pdf$/i.test(path) ? false : (/\.(png|jpe?g|webp|gif)$/i.test(path) || mime.startsWith("image/"));
+
 /** Receipts with at least one stored picture. A receipt can have several pages (main picture first). */
 export function toGalleryItems(files: Pick<ReceiptFile, "id" | "storage_path" | "extra_paths" | "mime" | "parsed" | "email_subject" | "original_name" | "created_at" | "expense_id" | "source">[]): GalleryItem[] {
   return files.filter((f) => f.storage_path).map((f) => ({

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { toGalleryItems, mergeByPicture, groupByMonth, filterGallery, monthsOf, monthLabel } from "../lib/gallery";
+import { isImagePath, toGalleryItems, mergeByPicture, groupByMonth, filterGallery, monthsOf, monthLabel } from "../lib/gallery";
 import { dueLabel, totalDue, budgetTone, budgetView } from "../lib/bills";
 import { trendData, topVendors } from "../lib/trends";
 import { parseSize, itemKey, unitPrice, buildIngredientPrices } from "../lib/ingredients";
@@ -198,5 +198,15 @@ describe("gallery: one tile per picture", () => {
   it("does not change the month totals", () => {
     const groups = groupByMonth(mergeByPicture(toGalleryItems(files)));
     expect(groups[0].totalCents).toBe(3099 + 999 + 1698 + 2348);
+  });
+});
+
+describe("a receipt with a picture and a PDF", () => {
+  it("decides each page by its own file type", () => {
+    expect(isImagePath("originals/order-screenshot.png", "image/png")).toBe(true);
+    expect(isImagePath("originals/order.pdf", "image/png")).toBe(false);      // PDF page of a receipt whose cover is a picture
+    expect(isImagePath("originals/order.PDF", "")).toBe(false);
+    expect(isImagePath("originals/photo.jpeg", "")).toBe(true);
+    expect(isImagePath("originals/noext", "image/jpeg")).toBe(true);           // no extension: trust the stored type
   });
 });
