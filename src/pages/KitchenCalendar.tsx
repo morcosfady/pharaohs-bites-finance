@@ -93,7 +93,8 @@ export function KitchenCalendarPage() {
                           aria-label={`${format(d, "EEEE, MMMM d")}, ${past ? "past" : isClosed ? "closed" : "open"}${n ? `, ${n} order${n > 1 ? "s" : ""}` : ""}`}
                           className={`flex min-h-[3.75rem] flex-col items-center justify-center rounded-lg border text-sm font-medium transition sm:min-h-[4.5rem] ${isToday ? "border-2 border-gold" : "border-transparent"} ${cls}`}>
                           <span>{d.getDate()}</span>
-                          {isClosed && !past ? <span className="text-[9px] font-semibold uppercase sm:text-[10px]">Closed</span> : n > 0 ? <span className="text-[9px] sm:text-[10px]">{n} order{n > 1 ? "s" : ""}</span> : null}
+                          {isClosed && !past && <span className="text-[9px] font-semibold uppercase leading-none sm:text-[10px]">Closed</span>}
+                          <span title={`${n} order${n === 1 ? "" : "s"}`} className={`mt-0.5 min-w-[1.4rem] rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${n > 0 ? "bg-gold text-charcoal" : isClosed && !past ? "bg-white/25 text-white" : "bg-charcoal/10 text-charcoal/40"}`}>{n}</span>
                         </button>
                       );
                     })}
@@ -107,10 +108,11 @@ export function KitchenCalendarPage() {
             </div>
             <div className="mt-3 flex flex-wrap gap-4 text-xs text-charcoal/60">
               <span className="flex items-center gap-1.5"><i className="h-3 w-3 rounded bg-positive/20" /> Open</span>
+              <span className="flex items-center gap-1.5"><i className="h-3 w-3 rounded-full bg-gold" /> Orders placed for that day (grey 0 = none yet)</span>
               <span className="flex items-center gap-1.5"><i className="h-3 w-3 rounded bg-negative" /> Closed (red on the website)</span>
               <span className="flex items-center gap-1.5"><i className="h-3 w-3 rounded border-2 border-gold" /> Today</span>
             </div>
-            <p className="mt-2 text-xs text-charcoal/50">Customers can only book from tomorrow, so closing today does not change the website; it is there for your own planning. The order count is orders placed for that day.</p>
+            <p className="mt-2 text-xs text-charcoal/50">Customers can only book from tomorrow, so closing today does not change the website; it is there for your own planning.</p>
           </section>
 
           <section className="card h-fit p-4">
