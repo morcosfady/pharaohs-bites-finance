@@ -49,11 +49,11 @@ export function receiptHtml(orderNumber: string, info: OrderInfo, lines: Array<{
   const when = new Date(info.requestedAt).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "America/Chicago" });
   const win = /Delivery window: ([^|]+?) on /.exec(info.instructions)?.[1] ?? "";
   const money = (n: number) => "$" + n.toFixed(2);
-  // Texas cottage food label info (H&S Code 437.0193): on the receipt, safe handling at 12 pt (16px) minimum.
+  // Texas cottage food label info (H&S Code 437.0193). Owner chose a small safe-handling line (10px) despite the 12 pt rule for receipts.
   const foodLines = lines.filter((l) => !RESALE.has(l.slug));
   const hasTcs = foodLines.some((l) => TCS.has(l.slug));
   const storeBought = foodLines.filter((l) => STORE_BOUGHT.has(l.slug)).map((l) => l.name);
-  const foodInfo = `<tr><td style="padding:14px 28px 16px;color:#a39373;font-size:10px;line-height:1.4"><span style="color:#c9a24a;font-size:10px;letter-spacing:2px">FOOD INFO</span><br>Pharaoh&rsquo;s Bites, Texas Cottage Food Reg. #20668<br>THIS PRODUCT WAS PRODUCED IN A PRIVATE RESIDENCE THAT IS NOT SUBJECT TO GOVERNMENTAL LICENSING OR INSPECTION.${storeBought.length ? `<br>${esc(storeBought.join(", "))} ${storeBought.length > 1 ? "are" : "is"} store-bought, not a cottage food.` : ""}${hasTcs ? `<br>Made on: ${esc(when)}<br><span style="display:block;margin-top:8px;color:#d8ccb0;font-size:16px;line-height:1.5"><b>SAFE HANDLING INSTRUCTIONS:</b> To prevent illness from bacteria, keep this food refrigerated or frozen until the food is prepared for consumption.</span>` : ""}</td></tr>
+  const foodInfo = `<tr><td style="padding:14px 28px 16px;color:#a39373;font-size:10px;line-height:1.4"><span style="color:#c9a24a;font-size:10px;letter-spacing:2px">FOOD INFO</span><br>Pharaoh&rsquo;s Bites, Texas Cottage Food Reg. #20668<br>THIS PRODUCT WAS PRODUCED IN A PRIVATE RESIDENCE THAT IS NOT SUBJECT TO GOVERNMENTAL LICENSING OR INSPECTION.${storeBought.length ? `<br>${esc(storeBought.join(", "))} ${storeBought.length > 1 ? "are" : "is"} store-bought, not a cottage food.` : ""}${hasTcs ? `<br>Made on: ${esc(when)}<br><span style="display:block;margin-top:6px;color:#a39373;font-size:10px;line-height:1.4"><b>SAFE HANDLING INSTRUCTIONS:</b> To prevent illness from bacteria, keep this food refrigerated or frozen until the food is prepared for consumption.</span>` : ""}</td></tr>
 <tr><td style="padding:0 28px"><div style="height:1px;background:#c9a24a;opacity:.6"></div></td></tr>
 `;
   return `<!doctype html><html><body style="margin:0;background:#14110c;font-family:Georgia,serif">
