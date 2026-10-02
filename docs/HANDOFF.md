@@ -1,7 +1,7 @@
 # Pharaoh's Bites: full project handoff
 > **Newer:** see `docs/HANDOFF-2026-09-30-payments-alerts.md` for everything that changed after this file (online payment, delivery fee, alerts, receipts, cleanup).
 
-**Written:** 2026-09-29 (end of a long working session).
+**Written:** 2026-09-29. **Updated:** 2026-10-01 (section 14: marketing & social media).
 **Purpose:** everything a fresh chat (or a new person) needs to keep working on the business's website, dashboard and backend without re-discovering anything. Read sections 1 to 3 first; use the rest as reference and runbooks.
 
 > Older docs are partly stale. `docs/SESSION-LOG.md` (dashboard repo) and `README.md` / `PROJECT-LOG.md` (website repo) describe earlier stages (for example they mention a reservations page and 46 dishes that no longer exist). **This file is the current source of truth.** Where it disagrees with those, trust this one.
@@ -44,7 +44,7 @@ Both repos are **public**. **Never commit secrets** (Supabase service-role key, 
 - Hours: **24/7** (owner's decision; shown on Contact and Catering pages and in schema.org data).
 - Service area: **all over the DFW area** (owner removed the list of neighborhoods/cities; do not reintroduce Uptown/Plano/Frisco etc. in delivery copy).
 - Currency: USD. Minimum order in config: **$20** (advisory, the site only warns).
-- Instagram/Facebook URLs in `config.js` are empty.
+- Social accounts now exist (IG @pharaohs.bites, FB pharaohs.bites, TikTok @pharaohsbites, Nextdoor page), see section 14; their URLs in `config.js` are still empty.
 
 ### Accounts (no passwords or keys here, only what exists where)
 - **GitHub:** `morcosfady` (authenticated in the `gh` CLI on the owner's PC).
@@ -352,3 +352,59 @@ Contents: Party Tray = Feteer Meshaltet + Sides Platter + 1 main (Macarona Becha
 
 ### Texas cottage food registration (DSHS)
 Registration **#20668** (Cottage Food Registry, in the name of the sole proprietor, DBA Pharaoh's Bites; attributes TCSP and NPAR, CFVD deliberately not selected). **On 2026-10-01 the owner submitted two updates**: first rice pudding, hummus and baba ganoush, then Om Ali and Egyptian orzo soup, all added to the registered product list as TCS (refrigerated) foods; DSHS showed "Your application data has been submitted" both times. The registered list now covers the whole website menu except the store-bought add-ons (honey, tahini) and Diet Coke. Done through the DSHS Online Licensing Registry: Quick Start Menu > the license dropdown "Add Cottage Food Registration Options" > Select; the product list is one text box. The registrant answers the sworn attestation themselves; nobody else does or enters credentials. Not registered on purpose: white honey, black honey and tahini (store-bought honey and tahini are only allowed as feteer add-ons, or check with Collin County health). Open items from the owner's own notes: DBA filing in McKinney, Food Handler certificate (about $10, online), Texas sales tax permit. Labels must show Reg. #20668, allergens, the private-residence statement, and for TCS foods a "Made on" date plus "Keep refrigerated".
+
+---
+
+## 14. Marketing & social media (added 2026-10-01)
+
+### Accounts (logins saved in the in-app browser pane; never store passwords here)
+| Platform | Handle / page | Status |
+|---|---|---|
+| Instagram | **@pharaohs.bites** | Live, bio updated, linked to FB |
+| Facebook | Page **pharaohs.bites** | Live, linked to IG |
+| TikTok | **@pharaohsbites** | Live |
+| Nextdoor | Business page `nextdoor.com/page/pharaohsbites-dallas-tx` | Cover set, home address hidden, **NOT verified yet** |
+
+- Bios on all 3 main platforms: Egyptian home kitchen, Feteer Meshaltet, **plant-based meat** wording, website link. No "halal", no "baked bread" claims. IG bio is capped at 150 chars.
+- `config.js` Instagram/Facebook URLs can now be filled in (still empty on the site, to do).
+
+### Content rules (owner decisions)
+1. **Every post, reel, caption or ad must include `https://pharaohsbites.com/`** (root URL, not `/index.html`).
+2. **Owner approves every video before posting.**
+3. **Free delivery (promo FIRSTBITE) only within 5 miles.** FIRSTBITE is built and working on the site.
+4. AI-generated videos keep the **AI label** on.
+5. **No emojis** in Nextdoor ad copy (emojis fine elsewhere).
+6. Business WhatsApp is **+1 (787) 968-4078**. Never use the owner's personal number in ads.
+7. **No mass DMs** to a competitor's followers (spam/ban risk). Use 1-to-1 personal outreach only (bilingual EN/AR template was drafted).
+8. Ignore "pay a fee to get featured / description fee" DMs: scam pattern.
+
+### What was published
+- **Commercial reel v2** (31 s, 9:16): posted on IG, FB and TikTok with caption + hashtags + website link, AI label on. TikTok's first upload silently failed; the re-upload (lighter caption, 8 hashtags) is public.
+- **Facebook groups:** reel shared to 6 Dallas Arabic groups (Day 1). **Day 2** (6 more groups: Arabs Texas America, Arabs in Dallas fort worth Denton, Arabs in DFW, Arab community groups) is scheduled for **Oct 2, 11:30 AM CT**, plus a check of 4 pending group approvals.
+- **FB boost (paid):** the reel, goal = website visitors, button "See menu", headline "Egyptian Feteer in Dallas", 15 mi radius around the home area, **$6/day x 5 days = $30**, Oct 1 to 6, WhatsApp (787) 968-4078.
+- **Scheduled review tasks** (report only, never change or spend): 48 h boost review (Oct 3 evening CT) and final results (Oct 7 morning CT).
+
+### Assets (on the owner's PC, `F:\Pharaoh's bites`)
+| File | What |
+|---|---|
+| `Reels\PharaohsBites_Commercial_v2.mp4` | The posted commercial (v1 kept) |
+| `Reels\Commercial_v2_caption.txt` | Caption + hashtags |
+| `Reels\_v2\make_reel.py`, `make_music_v2.py` | Rebuild scripts (Python + PIL + NumPy + ffmpeg). Music is **original**: maqam Hijaz, oud plucks, darbuka maqsum, finger-cymbal + silk-swish transitions. No licensed music. |
+| `Reels\PharaohsBites_Story_Flyer.mp4` | 15 s 9:16 story from the flyer, with music |
+| `Photos\social\nextdoor_cover.jpg` | Nextdoor cover 1200x560 (feteer left, text right) |
+| `Photos\social\PharaohsBites_Flyer_Square.jpg` | 1080x1080 flyer for Nextdoor ad (Om Ali row removed) |
+
+### How-to notes
+- **IG stories can't be posted from Instagram web.** Use Meta Business Suite > Create story (set to Instagram). The owner picks the file (browser tools can't open local file pickers).
+- Facebook auto-replaces the last hashtag sometimes (e.g. #foodreelsvideo); check before posting.
+- FB group post box can double-type text; verify the link appears once.
+- Nextdoor verification needs **the owner's (mom's) ID + selfie (Persona) + EIN**; the EIN is in her name, so it fails with anyone else's ID. Owner enters these herself.
+- Nextdoor ads: $3 / $5 / $10 per day, **billed monthly upfront, auto-renews**. Recommendation: Basic $3/day or wait until verified.
+
+### Open items
+1. **Nextdoor:** verify with mom's ID, then publish the drafted first business post.
+2. **5-mile wording:** flyer, captions and FB ad still say "free delivery on first order" without "within 5 miles". Update.
+3. Live posts that used `/index.html` links: switch to the root URL where editable.
+4. **IG story** draft open in Business Suite; owner must add the video and post.
+5. Done: Om Ali and orzo soup were added to the DSHS registration in the second update (2026-10-01).
+6. Fill IG/FB links in website `config.js` and footer.
