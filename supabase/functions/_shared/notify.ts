@@ -10,11 +10,52 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 export type OrderInfo = { pickup?: boolean; name: string; phone: string; email: string; address: string; instructions: string; requestedAt: string; items: Array<{ slug: string; quantity: number; options: string }>; deliveryFee: number; miles: number };
 const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-function receiptHtml(orderNumber: string, info: OrderInfo, lines: Array<{ qty: number; name: string; options: string }>, subtotal: number, total: number): string {
-  const rows = lines.map((l) => `<tr><td style="padding:8px 0;color:#f3e9d2;border-bottom:1px solid #3a3226">${l.qty} &times; ${esc(l.name)}${l.options ? `<br><span style="color:#b9a880;font-size:12px">${esc(l.options)}</span>` : ""}</td></tr>`).join("");
+// Allergens per dish (mirror of assets/js/data.js on the website; combos = every possible pick) for the receipt.
+const ALLERGENS: Record<string, string[]> = {
+  "feteer-meshaltet": ["Milk", "Eggs", "Wheat"],
+  "feteer-beef": ["Milk", "Eggs", "Wheat", "Soy"],
+  "macarona-bechamel": ["Milk", "Wheat", "Soy"],
+  "goulash-beef": ["Milk", "Wheat", "Soy"],
+  "kofta-tray": ["Wheat", "Soy"],
+  "meatballs-spaghetti": ["Eggs", "Wheat", "Soy"],
+  "orzo-soup": ["Wheat"],
+  "om-ali": ["Milk", "Wheat", "Tree nuts"],
+  "goulash-nuts": ["Milk", "Wheat", "Tree nuts"],
+  "round-cake": ["Milk", "Eggs", "Wheat"],
+  "chocolate-pudding": ["Milk", "Soy"],
+  "banana-pudding": ["Milk", "Wheat"],
+  "rice-pudding": ["Milk", "Tree nuts"],
+  "creme-caramel": ["Milk", "Eggs"],
+  "white-cheese": ["Milk"],
+  "tahini": ["Sesame"],
+  "baba-ganoush": ["Sesame"],
+  "hummus": ["Sesame"],
+  "protein-shake": ["Milk", "Soy"],
+  "avocado-drink": ["Milk"],
+  "party-tray": ["Milk", "Eggs", "Wheat", "Soy", "Sesame", "Tree nuts"],
+  "family-feast": ["Milk", "Eggs", "Wheat", "Soy", "Sesame", "Tree nuts"],
+  "egyptian-breakfast": ["Milk", "Eggs", "Wheat", "Soy", "Sesame"],
+  "meal-for-one": ["Milk", "Eggs", "Wheat", "Soy", "Sesame", "Tree nuts"],
+  "feteer-dip-trio": ["Milk", "Sesame"],
+  "pick-3-puddings": ["Milk", "Eggs", "Wheat", "Soy", "Tree nuts"],
+};
+// TCS foods get the safe-handling line + "Made on" date. Store-bought add-ons are not cottage foods; Diet Coke is resale (no disclosure).
+const TCS = new Set(["feteer-beef", "macarona-bechamel", "goulash-beef", "kofta-tray", "meatballs-spaghetti", "lentil-soup", "chocolate-pudding", "banana-pudding", "creme-caramel", "rice-pudding", "white-cheese", "hummus", "baba-ganoush", "protein-shake", "avocado-drink", "om-ali", "party-tray", "family-feast", "egyptian-breakfast", "meal-for-one", "feteer-dip-trio", "pick-3-puddings"]);
+const STORE_BOUGHT = new Set(["tahini", "black-honey", "white-honey"]);
+const RESALE = new Set(["diet-coke"]);
+
+export function receiptHtml(orderNumber: string, info: OrderInfo, lines: Array<{ qty: number; name: string; options: string; slug: string }>, subtotal: number, total: number): string {
+  const rows = lines.map((l) => `<tr><td style="padding:8px 0;color:#f3e9d2;border-bottom:1px solid #3a3226">${l.qty} &times; ${esc(l.name)}${l.options ? `<br><span style="color:#b9a880;font-size:12px">${esc(l.options)}</span>` : ""}${ALLERGENS[l.slug]?.length ? `<br><span style="color:#a39373;font-size:12px;line-height:1.5">Contains: ${esc(ALLERGENS[l.slug].join(", "))}</span>` : ""}</td></tr>`).join("");
   const when = new Date(info.requestedAt).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "America/Chicago" });
   const win = /Delivery window: ([^|]+?) on /.exec(info.instructions)?.[1] ?? "";
   const money = (n: number) => "$" + n.toFixed(2);
+  // Texas cottage food label info (H&S Code 437.0193): on the receipt, safe handling at 12 pt (16px) minimum.
+  const foodLines = lines.filter((l) => !RESALE.has(l.slug));
+  const hasTcs = foodLines.some((l) => TCS.has(l.slug));
+  const storeBought = foodLines.filter((l) => STORE_BOUGHT.has(l.slug)).map((l) => l.name);
+  const foodInfo = `<tr><td style="padding:16px 28px 18px;color:#a39373;font-size:12px;line-height:1.55"><span style="color:#c9a24a;font-size:12px;letter-spacing:2px">FOOD INFO</span><br>Pharaoh&rsquo;s Bites, Texas Cottage Food Reg. #20668<br>THIS PRODUCT WAS PRODUCED IN A PRIVATE RESIDENCE THAT IS NOT SUBJECT TO GOVERNMENTAL LICENSING OR INSPECTION.${storeBought.length ? `<br>${esc(storeBought.join(", "))} ${storeBought.length > 1 ? "are" : "is"} store-bought, not a cottage food.` : ""}${hasTcs ? `<br>Made on: ${esc(when)}<br><span style="display:block;margin-top:8px;color:#d8ccb0;font-size:16px;line-height:1.5"><b>SAFE HANDLING INSTRUCTIONS:</b> To prevent illness from bacteria, keep this food refrigerated or frozen until the food is prepared for consumption.</span>` : ""}</td></tr>
+<tr><td style="padding:0 28px"><div style="height:1px;background:#c9a24a;opacity:.6"></div></td></tr>
+`;
   return `<!doctype html><html><body style="margin:0;background:#14110c;font-family:Georgia,serif">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#14110c"><tr><td align="center" style="padding:24px 12px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#1e1a13;border:1px solid #c9a24a;border-radius:14px;overflow:hidden">
@@ -34,7 +75,7 @@ function receiptHtml(orderNumber: string, info: OrderInfo, lines: Array<{ qty: n
 <tr><td style="padding:22px 28px 4px;color:#c9a24a;font-size:12px;letter-spacing:2px">${info.pickup ? "PICKUP" : "DELIVERY"}</td></tr>
 <tr><td style="padding:0 28px 22px;color:#f3e9d2;font-size:15px;line-height:1.6">${esc(when)}${win ? " &middot; " + esc(win) : ""}<br><span style="color:#b9a880">${esc(info.pickup ? (Deno.env.get("KITCHEN_ADDRESS") ?? "We will send you the pickup address") : info.address)}</span></td></tr>
 <tr><td style="padding:0 28px"><div style="height:1px;background:#c9a24a;opacity:.6"></div></td></tr>
-<tr><td align="center" style="padding:20px 28px 26px;color:#b9a880;font-size:13px;line-height:1.7">Questions? Message us on WhatsApp <a href="https://wa.me/17879684078" style="color:#c9a24a;text-decoration:none">+1 (787) 968-4078</a><br>pharaohsbites.com</td></tr>
+${foodInfo}<tr><td align="center" style="padding:20px 28px 26px;color:#b9a880;font-size:13px;line-height:1.7">Questions? Message us on WhatsApp <a href="https://wa.me/17879684078" style="color:#c9a24a;text-decoration:none">+1 (787) 968-4078</a><br>pharaohsbites.com</td></tr>
 </table></td></tr></table></body></html>`;
 }
 
@@ -79,7 +120,7 @@ export async function notifyAll(supabase: ReturnType<typeof createClient>, order
     const prices = new Map((prods ?? []).map((p: { slug: string; selling_price: number | string }) => [p.slug, Number(p.selling_price)]));
     const { data: fin } = await supabase.from("order_financials").select("total, net_product_sales").eq("order_number", orderNumber).maybeSingle();
     const total = Number(fin?.total ?? 0), subtotal = Number(fin?.net_product_sales ?? 0);
-    const lines = info.items.map((i) => ({ qty: i.quantity, name: names.get(i.slug) ?? i.slug, options: i.options }));
+    const lines = info.items.map((i) => ({ qty: i.quantity, name: names.get(i.slug) ?? i.slug, options: i.options, slug: i.slug }));
 
     const topic = Deno.env.get("NTFY_TOPIC");
     const tgToken = Deno.env.get("TELEGRAM_BOT_TOKEN"), tgChat = Deno.env.get("TELEGRAM_CHAT_ID");
