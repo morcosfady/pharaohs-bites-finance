@@ -106,15 +106,23 @@ export function ExpensesPage() {
 type Tab = "all" | "trends" | "marketing" | "receipts" | "gallery" | "review" | "mileage" | "tax" | "subs" | "bank";
 const TABS: { key: Tab; label: string; short: string }[] = [{ key: "all", label: "All expenses", short: "All" }, { key: "trends", label: "Trends", short: "Trends" }, { key: "marketing", label: "Marketing", short: "Marketing" }, { key: "receipts", label: "Receipts", short: "Receipts" }, { key: "gallery", label: "Gallery", short: "Gallery" }, { key: "review", label: "Review", short: "Review" }, { key: "mileage", label: "Mileage", short: "Miles" }, { key: "tax", label: "Tax", short: "Tax" }, { key: "subs", label: "Subscriptions", short: "Subs" }, { key: "bank", label: "Bank feed", short: "Bank" }];
 
+/* A soft accent colour per tab so the sections are easy to tell apart (dot when idle, tinted pill when open). */
+const TAB_COLOR: Record<Tab, string> = { all: "#0e4b48", trends: "#3d6fa8", marketing: "#d1782b", receipts: "#2f855a", gallery: "#7c5cb0", review: "#c0392b", mileage: "#0f8a9d", tax: "#8a6d1d", subs: "#a14d7a", bank: "#4b5d6e" };
+
 function TabBar({ tab, onChange, reviewCount }: { tab: Tab; onChange: (t: Tab) => void; reviewCount: number }) {
   return (
     <div role="tablist" aria-label="Expenses sections" className="mb-4 flex gap-0.5 overflow-x-auto rounded-xl bg-ivory-100 p-1 sm:gap-1">
-      {TABS.map((t) => (
-        <button key={t.key} role="tab" aria-selected={tab === t.key} onClick={() => onChange(t.key)}
-          className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm font-medium sm:px-3 ${tab === t.key ? "bg-white text-teal-900 shadow-sm" : "text-charcoal/60 hover:text-teal-900"}`}>
-          <span className="sm:hidden">{t.short}</span><span className="hidden sm:inline">{t.label}</span>{t.key === "review" && reviewCount > 0 && <span className="ml-1.5 rounded-full bg-gold px-1.5 py-0.5 text-[10px] font-bold text-charcoal">{reviewCount}</span>}
-        </button>
-      ))}
+      {TABS.map((t) => {
+        const c = TAB_COLOR[t.key], on = tab === t.key;
+        return (
+          <button key={t.key} role="tab" aria-selected={on} onClick={() => onChange(t.key)}
+            style={on ? { backgroundColor: `${c}1f`, color: c, boxShadow: `inset 0 -2px 0 ${c}` } : undefined}
+            className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm font-medium sm:px-3 ${on ? "" : "text-charcoal/60 hover:bg-white/60"}`}>
+            <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: c, opacity: on ? 1 : 0.55 }} />
+            <span className="sm:hidden">{t.short}</span><span className="hidden sm:inline">{t.label}</span>{t.key === "review" && reviewCount > 0 && <span className="ml-1.5 rounded-full bg-gold px-1.5 py-0.5 text-[10px] font-bold text-charcoal">{reviewCount}</span>}
+          </button>
+        );
+      })}
     </div>
   );
 }
