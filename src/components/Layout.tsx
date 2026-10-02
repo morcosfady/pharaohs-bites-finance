@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, ShoppingBag, BarChart3, Users, Receipt, CreditCard, Truck, FileText, Percent, Settings, Database, LogOut, Menu, Bell, X, Lightbulb, ChefHat, CircleDollarSign } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, BarChart3, Users, Receipt, CreditCard, Truck, FileText, Percent, Settings, Database, LogOut, Menu, Bell, X, Lightbulb, ChefHat, CircleDollarSign, CalendarDays } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { useAdvanced } from "../hooks/useMode";
 import { useQueryClient } from "@tanstack/react-query";
@@ -10,6 +10,7 @@ import { differenceInCalendarDays } from "date-fns";
 const NAV = [
   { to: "/", label: "Home", icon: LayoutDashboard, end: true },
   { to: "/orders", label: "Orders", icon: ShoppingBag },
+  { to: "/calendar", label: "Kitchen Calendar", icon: CalendarDays, color: "#b79cf0" },
   { to: "/menu", label: "Menu & Profit", icon: ChefHat },
   { to: "/sales", label: "Sales by Dish", icon: CircleDollarSign },
   { to: "/customers", label: "Customers", icon: Users },
@@ -48,8 +49,8 @@ export function Layout() {
   const nav = (
     <nav className="flex flex-col gap-0.5 p-3">
       {items.map((n) => (
-        <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${isActive ? "bg-gold/15 font-medium text-gold-soft" : "text-ivory/75 hover:bg-white/5 hover:text-ivory"}`}>
-          <n.icon size={18} /> {n.label}
+        <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${isActive ? (n.color ? "font-medium" : "bg-gold/15 font-medium text-gold-soft") : "text-ivory/75 hover:bg-white/5 hover:text-ivory"}`} style={({ isActive }) => (n.color && isActive ? { backgroundColor: `${n.color}2e`, color: n.color } : undefined)}>
+          <n.icon size={18} style={n.color ? { color: n.color } : undefined} /> {n.label}
           {n.to === "/orders" && pending > 0 && <span className="ml-auto rounded-full bg-gold px-2 py-0.5 text-[10px] font-semibold text-teal-900">{pending}</span>}
         </NavLink>
       ))}

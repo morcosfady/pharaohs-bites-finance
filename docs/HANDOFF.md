@@ -408,3 +408,7 @@ Registration **#20668** (Cottage Food Registry, in the name of the sole propriet
 4. **IG story** draft open in Business Suite; owner must add the video and post.
 5. Done: Om Ali and orzo soup were added to the DSHS registration in the second update (2026-10-01).
 6. Fill IG/FB links in website `config.js` and footer.
+
+## 15. Kitchen Calendar (added 2026-10-01)
+
+Dashboard tab **Kitchen Calendar** (violet; `src/pages/KitchenCalendar.tsx`). Tap a future day to close it, tap again to reopen; "Close week" per row; optional private note. Table `closed_days` (migration 0067): anon may read only the `day` column (the website uses it), admins do everything. Website (`initSchedule` in `main.js`, `financeClosedDaysEndpoint` in `config.js`, `.cal-day.is-closed` in `pages.css`) draws closed days red with a "Fully booked" hover tip and refuses to select them; if the fetch fails the calendar stays open. `create-order` also rejects a closed day (Chicago date of the requested time) with "That day is fully booked", so the rule cannot be bypassed. Customers can only book from tomorrow, so closing *today* changes nothing on the website. Orders already placed for a closed day are untouched. Website cache versions: pages.css 136, config.js 108, main.js 121.

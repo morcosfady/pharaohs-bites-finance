@@ -152,6 +152,11 @@ Deno.serve(async (req) => {
     auth: { persistSession: false },
   });
 
+  // ---- days the owner switched off in the Kitchen Calendar ---------------------------------
+  const { data: closedRow, error: closedErr } = await supabase.from("closed_days").select("day").eq("day", dayIn(KITCHEN_TZ, requestedDate)).maybeSingle();
+  if (closedErr) console.error("closed_days read failed", closedErr.message);
+  if (closedRow) return json({ ok: false, error: "That day is fully booked. Please pick another date." }, 400, headers);
+
   // ---- combo choices: checked against combo_slots, then written as the readable options line --------
   const { data: slotRows, error: slotErr } = await supabase.from("combo_slots").select("*").in("combo_slug", [...new Set(items.map((i) => i.slug))]);
   if (slotErr) { console.error("combo_slots read failed", slotErr.message); return json({ ok: false, error: "could not check combo choices" }, 500, headers); }

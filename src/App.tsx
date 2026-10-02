@@ -17,6 +17,7 @@ import { ReportsPage } from "./pages/Reports";
 import { TaxPage } from "./pages/Tax";
 import { InsightsPage } from "./pages/Insights";
 import { DataPage } from "./pages/Data";
+import { KitchenCalendarPage } from "./pages/KitchenCalendar";
 import { SettingsPage } from "./pages/Settings";
 
 /** Everything under here requires a signed-in, approved admin. The database
@@ -53,6 +54,7 @@ export default function App() {
           <Route path="tax" element={<TaxPage />} />
           <Route path="insights" element={<InsightsPage />} />
           <Route path="data" element={<DataPage />} />
+          <Route path="calendar" element={<KitchenCalendarPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
