@@ -17,7 +17,7 @@ const ALLERGENS: Record<string, string[]> = {
   "macarona-bechamel": ["Milk", "Wheat", "Soy"],
   "goulash-beef": ["Milk", "Wheat", "Soy"],
   "kofta-tray": ["Wheat", "Soy"],
-  "meatballs-spaghetti": ["Eggs", "Wheat", "Soy"],
+  "meatballs-spaghetti": ["Wheat", "Soy"],
   "orzo-soup": ["Wheat"],
   "koshary": ["Wheat"],
   "om-ali": ["Milk", "Wheat", "Tree nuts"],
