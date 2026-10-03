@@ -19,6 +19,7 @@ import { InsightsPage } from "./pages/Insights";
 import { DataPage } from "./pages/Data";
 import { KitchenCalendarPage } from "./pages/KitchenCalendar";
 import { SettingsPage } from "./pages/Settings";
+import { WebsitePulsePage } from "./pages/WebsitePulse";
 
 /** Everything under here requires a signed-in, approved admin. The database
  *  enforces the same rule; this only chooses what to render. */
@@ -55,6 +56,7 @@ export default function App() {
           <Route path="insights" element={<InsightsPage />} />
           <Route path="data" element={<DataPage />} />
           <Route path="calendar" element={<KitchenCalendarPage />} />
+          <Route path="pulse" element={<WebsitePulsePage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
