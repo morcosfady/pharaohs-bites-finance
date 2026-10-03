@@ -27,6 +27,17 @@ async function geocodeBackup(address: string): Promise<{ lat: number; lon: numbe
   } catch { return "error"; }
 }
 
+// Last resort: the middle of the customer's ZIP code, so a lookup outage never blocks an order.
+async function geocodeZip(zip: string): Promise<{ lat: number; lon: number } | null | "error"> {
+  try {
+    const res = await fetch("https://api.zippopotam.us/us/" + encodeURIComponent(zip.slice(0, 5)), { signal: AbortSignal.timeout(5000) });
+    if (res.status === 404) return null;
+    if (!res.ok) return "error";
+    const p = (await res.json())?.places?.[0];
+    return p ? { lat: Number(p.latitude), lon: Number(p.longitude) } : null;
+  } catch { return "error"; }
+}
+
 function haversineMiles(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
   const r = (d: number) => d * Math.PI / 180;
   const h = Math.sin(r(b.lat - a.lat) / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(r(b.lon - a.lon) / 2) ** 2;
@@ -42,7 +53,12 @@ export async function quoteDelivery(street: string, city: string, state: string,
   let where = await geocode(address);
   if (where === "error" || !where) {
     const backup = await geocodeBackup(address);
-    if (backup || where === "error") where = backup;
+    if (backup) where = backup;
+    else if (where === "error" || backup === "error") where = await geocodeBackup(`${street}, ${city}, ${state}`);
+  }
+  if (where === "error" || !where) {
+    const z = await geocodeZip(zip);
+    if (z) where = z;
   }
   if (where === "error") return { ok: false, status: 503, error: "could not check the delivery address, please try again" };
   if (!where) return { ok: false, status: 400, error: "we could not find that address, please check the street, city and ZIP" };
