@@ -37,6 +37,10 @@ verify_jwt = false
 # Called by Stripe; authenticated by the Stripe signature instead of a JWT.
 verify_jwt = false
 
+[functions.track]
+# Public website activity log; applies its own origin allow-list, validation and rate limit.
+verify_jwt = false
+
 [functions.delivery-quote]
 # Public read-only price quote for the order page; applies its own origin allow-list.
 verify_jwt = false

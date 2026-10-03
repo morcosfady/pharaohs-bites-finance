@@ -54,6 +54,7 @@ type Body = {
   checkout_token?: unknown;
   pay_online?: unknown;
   promo?: unknown;
+  visitor_id?: unknown;
   fulfillment?: unknown;
   customer?: { name?: unknown; phone?: unknown; street?: unknown; apt?: unknown; city?: unknown; state?: unknown; zip?: unknown; instructions?: unknown; requested_at?: unknown; email?: unknown };
   items?: Array<{ slug?: unknown; quantity?: unknown; options?: unknown; choices?: unknown }>;
@@ -264,6 +265,12 @@ Deno.serve(async (req) => {
     // keep the function alive until the alert is sent, without making the customer wait
     // deno-lint-ignore no-explicit-any
     const rt = (globalThis as any).EdgeRuntime; if (rt?.waitUntil) rt.waitUntil(notify); else await notify;
+  }
+  // Website Pulse: remember which visitor placed this order (anonymous id sent by the website).
+  const visitor = str(body.visitor_id, 40);
+  if (visitor && /^[A-Za-z0-9_-]{8,40}$/.test(visitor)) {
+    const { error: vErr } = await supabase.from("site_events").insert({ visitor_id: visitor, kind: "order_placed", page: "order", detail: data as string, meta: { ...(freeOrder ? { free: "yes" } : {}), ...(promoCode ? { code: promoCode } : {}) } });
+    if (vErr) console.error("site event failed", vErr.message);
   }
   return json({ ok: true, order_number: data as string, delivery_fee: deliveryFee, miles, ...(promoCode ? { promo: promoCode } : {}), ...(freeOrder ? { free: true } : {}) }, 200, headers);
 });

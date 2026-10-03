@@ -4544,3 +4544,24 @@ alter table promo_codes add column if not exists max_subtotal numeric;
 update promo_codes set vegan_only = true, max_subtotal = 100,
   welcome_message = '🌱 Surprise! Your vegan order is on us (up to $100), delivery included. Thank you for being our customer, enjoy every bite! 💚'
 where code = 'SPARKLY_SVATZ';
+
+-- 0074_site_events.sql
+create table if not exists site_events (
+  id         bigint generated always as identity primary key,
+  created_at timestamptz not null default now(),
+  visitor_id text not null,
+  kind       text not null check (kind in ('visit', 'add_to_basket', 'checkout_started', 'order_placed', 'problem')),
+  page       text not null default '',
+  detail     text not null default '',
+  meta       jsonb not null default '{}'::jsonb,
+  ip_hash    text not null default ''
+);
+create index if not exists site_events_time on site_events (created_at desc);
+create index if not exists site_events_visitor on site_events (visitor_id, created_at);
+create index if not exists site_events_ip on site_events (ip_hash, created_at);
+
+alter table site_events enable row level security;
+revoke all on site_events from anon, authenticated;
+grant select on site_events to authenticated;
+drop policy if exists site_events_admin_read on site_events;
+create policy site_events_admin_read on site_events for select to authenticated using (is_admin());
