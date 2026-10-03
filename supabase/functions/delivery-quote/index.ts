@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
   if (normCode(body.promo)) {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
     const r = await checkPromo(supabase, body.promo, clean(body.phone, 40).replace(/\D/g, ""), clean(body.email, 120), q.miles, normAddress(street, clean(body.apt, 60), zip));
-    promo = r.ok ? { valid: true, code: r.code } : { valid: false, message: r.error };
+    promo = r.ok ? { valid: true, code: r.code, message: r.message } : { valid: false, message: r.error };
   }
   return json({ ok: true, delivery_fee: q.fee, miles: q.miles, ...(promo ? { promo } : {}) }, 200, headers);
 });

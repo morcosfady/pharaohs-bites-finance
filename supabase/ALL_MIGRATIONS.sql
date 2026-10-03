@@ -4486,3 +4486,17 @@ from product_categories c where c.name = 'Sides'
 on conflict (slug) do update set name = excluded.name, name_ar = excluded.name_ar,
   description = excluded.description, image_url = excluded.image_url,
   selling_price = excluded.selling_price, is_active = true, deleted_at = null;
+
+-- 0069_mix90_promo.sql
+alter table promo_codes add column if not exists single_use boolean not null default false;
+alter table promo_codes add column if not exists max_miles numeric default 5;
+alter table promo_codes add column if not exists welcome_message text;
+
+-- Database-level guarantee: only one used redemption can ever exist for MIX90.
+create unique index if not exists promo_used_once_mix90 on promo_redemptions(code) where used_at is not null and code = 'MIX90';
+
+insert into promo_codes (code, kind, single_use, max_miles, welcome_message)
+values ('MIX90', 'free_delivery', true, null,
+        'Welcome, Mix90! 💛 Thank you for supporting Pharaoh''s Bites. Your delivery is on us. Enjoy every bite!')
+on conflict (code) do update set single_use = true, max_miles = null, active = true,
+  welcome_message = excluded.welcome_message;

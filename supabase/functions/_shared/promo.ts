@@ -16,16 +16,21 @@ export function normEmail(e: string): string {
 /** Free-delivery promo codes only cover addresses this close to the kitchen. */
 export const PROMO_MAX_MILES = 5;
 
-export type PromoCheck = { ok: true; code: string; email_norm: string } | { ok: false; error: string };
+export type PromoCheck = { ok: true; code: string; email_norm: string; message?: string } | { ok: false; error: string };
 
 /** Is this code real, active, and not yet used by this phone number or email? */
 export async function checkPromo(supabase: any, rawCode: unknown, phoneDigits: string, email: string, miles?: number, addressNorm = ""): Promise<PromoCheck> {
   const code = normCode(rawCode);
   if (!code) return { ok: false, error: "enter a promo code" };
-  const { data: promo } = await supabase.from("promo_codes").select("code, active").eq("code", code).maybeSingle();
+  const { data: promo } = await supabase.from("promo_codes").select("code, active, single_use, max_miles, welcome_message").eq("code", code).maybeSingle();
   if (!promo || !promo.active) return { ok: false, error: "that promo code is not valid" };
-  if (typeof miles === "number" && miles > PROMO_MAX_MILES) {
-    return { ok: false, error: `Sorry, ${code} free delivery is for addresses within ${PROMO_MAX_MILES} miles of our kitchen, and yours is about ${miles} miles away. You can still order, and delivery is just charged at the normal fee.` };
+  const maxMiles = promo.max_miles == null ? null : Number(promo.max_miles);
+  if (maxMiles !== null && typeof miles === "number" && miles > maxMiles) {
+    return { ok: false, error: `Sorry, ${code} free delivery is for addresses within ${maxMiles} miles of our kitchen, and yours is about ${miles} miles away. You can still order, and delivery is just charged at the normal fee.` };
+  }
+  if (promo.single_use) {
+    const { data: taken } = await supabase.from("promo_redemptions").select("id").eq("code", code).not("used_at", "is", null).limit(1);
+    if (taken && taken.length) return { ok: false, error: `${code} is a one-time code and has already been used` };
   }
   const emailNorm = normEmail(email);
   const filters = [];
@@ -41,7 +46,7 @@ export async function checkPromo(supabase: any, rawCode: unknown, phoneDigits: s
       return { ok: false, error: `${code} has already been used with this phone number or email. It can only be used once per customer` };
     }
   }
-  return { ok: true, code, email_norm: emailNorm };
+  return { ok: true, code, email_norm: emailNorm, message: promo.welcome_message || undefined };
 }
 
 /** Mark this order's redemption as used (called once the order is paid / confirmed). Never throws. */
@@ -57,6 +62,15 @@ export async function markPromoUsed(supabase: any, orderId: string) {
 export async function reconcilePromo(supabase: any, orderId: string): Promise<boolean> {
   const { data: mine } = await supabase.from("promo_redemptions").select("id, code, phone_digits, email_norm, address_norm, fee_waived, used_at").eq("order_id", orderId).maybeSingle();
   if (!mine || mine.used_at) return false;
+  const { data: pc } = await supabase.from("promo_codes").select("single_use").eq("code", mine.code).maybeSingle();
+  if (pc?.single_use) {
+    const { data: taken } = await supabase.from("promo_redemptions").select("id").eq("code", mine.code).neq("order_id", orderId).not("used_at", "is", null).limit(1);
+    if (taken && taken.length) {
+      await supabase.from("promo_redemptions").delete().eq("id", mine.id);
+      await supabase.from("orders").update({ delivery_fee: mine.fee_waived, promo_code: null }).eq("id", orderId);
+      return true;
+    }
+  }
   const filters = [];
   if (mine.phone_digits) filters.push(`phone_digits.eq.${mine.phone_digits}`);
   if (mine.email_norm) filters.push(`email_norm.eq.${String(mine.email_norm).replace(/[,()]/g, "")}`);
