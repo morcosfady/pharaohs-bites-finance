@@ -1,7 +1,7 @@
 # Pharaoh's Bites: full project handoff
 > **Newer:** see `docs/HANDOFF-2026-09-30-payments-alerts.md` for everything that changed after this file (online payment, delivery fee, alerts, receipts, cleanup).
 
-**Written:** 2026-09-29. **Updated:** 2026-10-01 (section 14: marketing & social media).
+**Written:** 2026-09-29. **Updated:** 2026-10-01 (section 14: marketing & social media). **Updated 2026-10-03: section 16 (koshary, vegan, promos, almond milk, weekend schedule, Website Pulse).**
 **Purpose:** everything a fresh chat (or a new person) needs to keep working on the business's website, dashboard and backend without re-discovering anything. Read sections 1 to 3 first; use the rest as reference and runbooks.
 
 > Older docs are partly stale. `docs/SESSION-LOG.md` (dashboard repo) and `README.md` / `PROJECT-LOG.md` (website repo) describe earlier stages (for example they mention a reservations page and 46 dishes that no longer exist). **This file is the current source of truth.** Where it disagrees with those, trust this one.
@@ -273,7 +273,8 @@ Earlier work (naming, branding, dashboard build, catalog syncs, etc.) is in `doc
 1. Put the photo in `assets/img/menu-real/<slug>.webp` (or jpg). Keep it under ~350 KB; landscape 3:2 or 4:3 looks best in rows; portrait photos (1086x1448) also work.
 2. Add an entry in `assets/js/data.js` `MENU` (`id` = the slug, `cat` one of `mains|soups|desserts|sides|drinks`, `name`, `ar`, `price`, `desc`, `tags`, `img`). Optional flags: `featured`, `signature`.
 3. Add the product to Supabase **first** (new migration, see below), otherwise orders containing it will fail on the server. Template: `supabase/migrations/0038_diet_coke.sql` (insert into `products ... select ... from product_categories c where c.name = 'Drinks' on conflict (slug) do update ...`; set `selling_price` and `ingredient_cost`). Apply with `supabase db query --linked -f ...` and append to `ALL_MIGRATIONS.sql`.
-4. Bump `data.js` version in all HTML, test locally, commit, push.
+4. Also add the dish to the maps in `supabase/functions/_shared/notify.ts` (allergens, TCS, Arabic name), set `products.vegan = true` if it is vegan (and tag it `"Vegan"` in `data.js`), then redeploy `create-order`.
+5. Bump `data.js` version in all HTML, test locally, commit, push. (See section 16 for hidden add-ons, `milkVariant` and `suggestItems`.)
 
 ### Change a price
 Update **both** `data.js` (`price`) and the database (`update products set selling_price = ... where slug = '...'` via a new migration file). Bump `data.js` version.
@@ -412,3 +413,53 @@ Registration **#20668** (Cottage Food Registry, in the name of the sole propriet
 ## 15. Kitchen Calendar (added 2026-10-01)
 
 Dashboard tab **Kitchen Calendar** (violet; `src/pages/KitchenCalendar.tsx`). Tap a future day to close it, tap again to reopen; "Close week" per row; optional private note. Table `closed_days` (migration 0067): anon may read only the `day` column (the website uses it), admins do everything. Website (`initSchedule` in `main.js`, `financeClosedDaysEndpoint` in `config.js`, `.cal-day.is-closed` in `pages.css`) draws closed days red with a "Fully booked" hover tip and refuses to select them; if the fetch fails the calendar stays open. `create-order` also rejects a closed day (Chicago date of the requested time) with "That day is fully booked", so the rule cannot be bypassed. Customers can only book from tomorrow, so closing *today* changes nothing on the website. Orders already placed for a closed day are untouched. Website cache versions: pages.css 136, config.js 108, main.js 121.
+
+## 16. October 2-3, 2026 update (koshary, vegan, promos, almond milk, weekend schedule, Website Pulse)
+
+Everything below is **live** (migrations 0068 to 0074 applied, functions deployed, both repos pushed). Short rule for any new session: read this section first, it is newer than sections 7 and 13.
+
+### 16.1 New dishes and menu changes
+- **Koshary Tray** (`koshary`, mains, $25, ingredients $9.40, packaging $1.30, Wheat allergen, vegan). Migration `0068`. Photo `assets/img/menu-real/koshary.webp`.
+- **Extra Tomato Sauce** (`koshary-sauce`, $1, **cost left at $0 on purpose**, owner said not to add a cost). Hidden add-on: never listed on the menu, offered in a prompt after Koshary is added (`suggestItems` + `onlyWith` in `data.js`), capped at one cup per Koshary, removed from the basket if Koshary is removed. `create-order` also refuses sauce without a Koshary.
+- **Almond-milk drinks** (migration `0071`): hidden products `avocado-drink-almond` ($9, vegan, no honey, Tree nuts) and `protein-shake-almond` ($10, still Milk and Soy because the protein powder is not confirmed plant-based, Tree nuts). Both cost $3.50. Adding either drink opens a "Which milk?" prompt (whole, or almond +$1) via `milkVariant` in `data.js`. The "Meal for One" combo shake slot is unchanged (whole milk only).
+- Meatballs & Spaghetti: Eggs removed from its allergens (owner: no eggs). Orzo soup is now tagged Vegan.
+- **Vegan**: green leaf badge and a **Vegan** filter tab on the order page. Vegan dishes: Koshary, Kofta Tray, Meatballs & Spaghetti, Lentil Soup, Orzo Soup, and the Avocado Drink (vegan with almond milk, `veganOption`). Sides and Diet Coke are deliberately **not** tagged vegan (owner's decision). The database flag is `products.vegan` (migration `0073`); the website tag is `"Vegan"` in `data.js`. **Keep both in sync.**
+- `supabase/functions/_shared/notify.ts` has per-dish maps (allergens, TCS safe-handling, Arabic names). Every new dish must be added there too (koshary and the almond drinks are).
+
+### 16.2 Promo codes (table `promo_codes`, helper `_shared/promo.ts`)
+Columns: `kind` (`free_delivery` | `free_order`), `single_use`, `max_miles` (null = no cap), `welcome_message` (shown in green when applied), `vegan_only`, `max_subtotal`.
+| Code | Rule |
+|---|---|
+| `FIRSTBITE` | free delivery, once per customer, within 5 miles |
+| `MIX90` | free delivery, **one use in total** (anyone), any distance, custom welcome message (for the DJ dadomix90) |
+| `SPARKLY_SVATZ` | **whole order free**, one use in total, **vegan dishes only, up to $100 of food** (over $100 is refused, no partial discount) |
+- One-time enforcement is in the database (partial unique indexes on `promo_redemptions` for MIX90 and SPARKLY_SVATZ), plus a check in `checkPromo` and `reconcilePromo`.
+- Free-order flow (`create-order`): discount = subtotal, delivery 0, total $0, order confirmed immediately (no Stripe step), payment_status `paid`, method `other`; if two people race for the one-time code the loser's order is cancelled with a clear message.
+- The website sends the basket to `delivery-quote` so vegan/$100 rules show live, and re-checks when the basket changes. Delivery orders only (pickup cannot use promos).
+- To add another code: insert a row in `promo_codes` in a new migration (+ unique index if one-time and `free_order`), update this table.
+
+### 16.3 Delivery quote reliability
+The US Census geocoder was down on 2026-10-02 and customers saw "check your address". `_shared/delivery.ts` now tries **Census, then Photon (OpenStreetMap), then the same without the ZIP, then the ZIP-code centre** (api.zippopotam.us), so a lookup outage never blocks an order. The ZIP fallback can be off by a mile or two. (Nominatim blocks Supabase IPs, do not use it.) Fees verified: kitchen coordinates come from secrets `KITCHEN_LAT/LON`; a downtown Dallas test address gave 20.7 mi and $41.23, **worth checking the kitchen coordinates are right**.
+
+### 16.4 Weekend schedule (website `main.js` `WINDOWS`, `create-order`)
+- Mon-Fri unchanged: delivery 8-11 AM and 8-11 PM; pickup 2-4, 4-6, 6-8 PM.
+- **Sat/Sun: delivery only**, 4 windows: 8-11 AM, 11 AM-2 PM, 2-5 PM, 5-8 PM. Pickup is greyed out on weekends and the server refuses a weekend pickup.
+
+### 16.5 Website Pulse (dashboard tab, orange pulse icon)
+- Page `src/pages/WebsitePulse.tsx`, logic and plain-words problem texts in `src/lib/siteActivity.ts` (tested in `src/test/siteActivity.test.ts`).
+- Data: table `site_events` (migration `0074`, admin-read only, kept 180 days) written by Edge Function **`track`** (`verify_jwt = false`, origin allow-list, per-IP rate limit, bots ignored). `create-order` writes the `order_placed` event (website sends `visitor_id`).
+- Website tracker: `Track` module near the top of `main.js` (random visitor id in localStorage `nb:vid`, events: visit, add_to_basket, checkout_started, problem; endpoint `financeTrackEndpoint` in `config.js`). **Open the site once with `?me=1` on each of the owner's devices to stop counting their own visits** (`?me=0` turns it back on). Only personal data stored: first name + last 4 phone digits + ZIP on a **failed order**.
+- Tab shows: visitors, who ordered, the 5-step journey, **where visitors come from** (donut + tiles for QR flyer, Nextdoor, Instagram, Facebook, TikTok, YouTube, X, Snapchat, Pinterest, Reddit, LinkedIn, Threads, WhatsApp, Telegram, Google, Bing, Email, Direct), dishes left in baskets, day-by-day chart, problems in plain words, a visitor list, and copyable **tracking links**.
+- **Source tagging**: visits are classified from `?src=` / `utm_source` first, then the referrer. `pharaohsbites.com/qr` (file `qr.html`) redirects to `/?src=qr` for flyer QR codes; Nextdoor/Instagram bio links should use `/?src=nextdoor`, `/?src=instagram` etc. Without tags, flyer/Nextdoor visits show as "Direct". **Open question: where does the QR on the current printed flyer point?** If it opens the plain site, those scans count as Direct until reprinted.
+
+### 16.6 Other
+- Instagram bio: the URL was hidden behind "more". Advice given: put `https://pharaohsbites.com/?src=instagram` in **Edit profile > Links** and remove the URL line from the bio text. Owner does this on their phone (Instagram login is never typed by Claude).
+- A test order (`PB-2026-00139`, free-order test with a throwaway code) was placed on the live system on 2026-10-03 and deleted straight after; the owner may have received one Telegram alert. **Tell the owner before placing any test order.**
+- Versions at the end of this session: `data.js?v=116`, `main.js?v=134`, `pages.css?v=144`, `config.js?v=109`.
+
+### 16.7 Open items for the owner
+1. Enter the real cost of the extra tomato sauce (currently $0) if wanted.
+2. Confirm the protein powder is plant-based if an almond-milk **vegan** protein shake is wanted (then add `vegan` + tag to `protein-shake-almond`).
+3. Check the kitchen coordinates (secrets `KITCHEN_LAT/LON`) against a few real customer addresses.
+4. Reprint the flyer with the `/qr` link (or tell Claude where the current QR points).
+5. Partial discount for SPARKLY_SVATZ above $100 was **not** built (would need a card step for the remainder).
