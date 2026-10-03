@@ -131,6 +131,11 @@ Deno.serve(async (req) => {
   const dateProblem = deliveryDateProblem(requestedDate);
   if (dateProblem) return json({ ok: false, error: dateProblem }, 400, headers);
   const requestedAt: string = requestedDate.toISOString();
+  // Pickup is Monday to Friday only; Saturday and Sunday are delivery only.
+  if (isPickup) {
+    const wd = new Date(dayIn(KITCHEN_TZ, requestedDate) + "T12:00:00Z").getUTCDay();
+    if (wd === 0 || wd === 6) return json({ ok: false, error: "Pickup is not available on Saturday or Sunday. Please choose delivery or a weekday." }, 400, headers);
+  }
 
   if (!Array.isArray(body.items) || body.items.length === 0 || body.items.length > MAX_ITEMS) {
     return json({ ok: false, error: "invalid items" }, 400, headers);
