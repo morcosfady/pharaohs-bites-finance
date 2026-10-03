@@ -4521,3 +4521,14 @@ on conflict (slug) do update set name = excluded.name, name_ar = excluded.name_a
   description = excluded.description, image_url = excluded.image_url,
   selling_price = excluded.selling_price, ingredient_cost = excluded.ingredient_cost,
   is_active = true, deleted_at = null;
+
+-- 0072_free_order_promo.sql
+alter table promo_codes add constraint promo_codes_kind_check check (kind in ('free_delivery', 'free_order'));
+
+create unique index if not exists promo_used_once_sparkly on promo_redemptions(code) where used_at is not null and code = 'SPARKLY_SVATZ';
+
+insert into promo_codes (code, kind, single_use, max_miles, welcome_message)
+values ('SPARKLY_SVATZ', 'free_order', true, null,
+        '🎉 Surprise! Your whole order is on us, food and delivery. Thank you for being our customer, enjoy every bite! 💚')
+on conflict (code) do update set kind = 'free_order', single_use = true, max_miles = null, active = true,
+  welcome_message = excluded.welcome_message;

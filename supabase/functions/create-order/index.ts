@@ -196,13 +196,13 @@ Deno.serve(async (req) => {
   }
 
   // ---- promo code (FIRSTBITE = free delivery, once per customer) ---------------
-  let promoCode = "", promoEmail = "", feeWaived = 0, promoAddr = "";
+  let promoCode = "", promoEmail = "", feeWaived = 0, promoAddr = "", freeOrder = false;
   if (normCode(body.promo)) {
     if (isPickup) return json({ ok: false, error: "promo codes apply to delivery orders" }, 400, headers);
     promoAddr = normAddress(street, apt, zip);
     const pc = await checkPromo(supabase, body.promo, phoneDigits, email, miles, promoAddr);
     if (!pc.ok) return json({ ok: false, error: pc.error }, 400, headers);
-    promoCode = pc.code; promoEmail = pc.email_norm; feeWaived = deliveryFee; deliveryFee = 0;
+    promoCode = pc.code; promoEmail = pc.email_norm; feeWaived = deliveryFee; deliveryFee = 0; freeOrder = !!pc.free;
   }
 
   // ---- rate limit per IP -------------------------------------------------
@@ -216,7 +216,7 @@ Deno.serve(async (req) => {
   // ---- create atomically via SQL function ---------------------------------
   const { data, error } = await supabase.rpc("intake_website_order", {
     p_token: token,
-    p_customer: { name, phone, phone_digits: phoneDigits, street, apt, city, state, zip, instructions: promoCode ? `Promo ${promoCode} (free delivery)${instructions ? " | " + instructions : ""}`.slice(0, 500) : instructions, requested_at: requestedAt },
+    p_customer: { name, phone, phone_digits: phoneDigits, street, apt, city, state, zip, instructions: promoCode ? `Promo ${promoCode} (${freeOrder ? "FREE ORDER" : "free delivery"})${instructions ? " | " + instructions : ""}`.slice(0, 500) : instructions, requested_at: requestedAt },
     p_items: items,
   });
 
@@ -231,29 +231,41 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: "could not save order" }, 500, headers);
   }
 
+  // A free-order promo needs no card: the order is confirmed straight away like a non-paid order.
+  const payNow = payOnline && !freeOrder;
   const info: OrderInfo = { pickup: isPickup, name, phone, email, address: `${street}${apt ? ", " + apt : ""}, ${city}, ${state} ${zip}`, instructions, requestedAt, items, deliveryFee, miles };
   // Pay-online orders stay "pending" and silent until Stripe confirms payment (stripe-webhook
   // then confirms the order and sends the alert + receipt). Other orders are confirmed now.
-  const { error: feeErr } = await supabase.from("orders").update({ delivery_fee: deliveryFee, delivery_miles: isPickup ? null : miles, customer_email: email, ...(promoCode ? { promo_code: promoCode } : {}), ...(isPickup ? { delivery_method: "pickup" } : {}), ...(payOnline ? { notify_payload: info } : { status: "confirmed" }) }).eq("order_number", data as string);
+  const { error: feeErr } = await supabase.from("orders").update({ delivery_fee: deliveryFee, delivery_miles: isPickup ? null : miles, customer_email: email, ...(promoCode ? { promo_code: promoCode } : {}), ...(isPickup ? { delivery_method: "pickup" } : {}), ...(payNow ? { notify_payload: info } : { status: "confirmed" }) }).eq("order_number", data as string);
   if (feeErr) console.error("delivery fee update failed", feeErr.message);
   if (promoCode) {
     const { data: po } = await supabase.from("orders").select("id").eq("order_number", data as string).maybeSingle();
     if (po?.id) {
-      const { error: rErr } = await supabase.from("promo_redemptions").insert({ code: promoCode, order_id: po.id, phone_digits: phoneDigits, email_norm: promoEmail, address_norm: promoAddr, fee_waived: feeWaived });
+      const { error: rErr } = await supabase.from("promo_redemptions").insert({ code: promoCode, order_id: po.id, phone_digits: phoneDigits, email_norm: promoEmail, address_norm: promoAddr, fee_waived: feeWaived, ...(freeOrder ? { used_at: new Date().toISOString() } : {}) });
+      if (freeOrder && rErr) {
+        // Someone else claimed the one-time code a moment ago: cancel this order, nothing is free.
+        console.error("free order code already taken", rErr.message);
+        await supabase.from("orders").update({ status: "cancelled", promo_code: null }).eq("id", po.id);
+        return json({ ok: false, error: "That promo code was just used by someone else. Please remove it and place your order again." }, 409, headers);
+      }
       if (rErr) console.error("promo redemption failed", rErr.message);
-      else if (!payOnline) await markPromoUsed(supabase, po.id);
+      else if (freeOrder) {
+        const { data: so } = await supabase.from("orders").select("subtotal").eq("id", po.id).maybeSingle();
+        const { error: dErr } = await supabase.from("orders").update({ discount: Number(so?.subtotal ?? 0), discount_reason: `Promo ${promoCode} (free order)`, payment_status: "paid", payment_method: "other" }).eq("id", po.id);
+        if (dErr) console.error("free order discount failed", dErr.message);
+      } else if (!payOnline) await markPromoUsed(supabase, po.id);
     }
   }
   // keep the email on the customer record too (only when it was empty)
   const { data: ordRow } = await supabase.from("orders").select("customer_id").eq("order_number", data as string).maybeSingle();
   if (ordRow?.customer_id) await supabase.from("customers").update({ email }).eq("id", ordRow.customer_id).eq("email", "");
-  if (!payOnline) {
+  if (!payNow) {
     const notify = notifyAll(supabase, data as string, info);
     // keep the function alive until the alert is sent, without making the customer wait
     // deno-lint-ignore no-explicit-any
     const rt = (globalThis as any).EdgeRuntime; if (rt?.waitUntil) rt.waitUntil(notify); else await notify;
   }
-  return json({ ok: true, order_number: data as string, delivery_fee: deliveryFee, miles, ...(promoCode ? { promo: promoCode } : {}) }, 200, headers);
+  return json({ ok: true, order_number: data as string, delivery_fee: deliveryFee, miles, ...(promoCode ? { promo: promoCode } : {}), ...(freeOrder ? { free: true } : {}) }, 200, headers);
 });
 
 function json(payload: unknown, status: number, headers: Record<string, string>) {

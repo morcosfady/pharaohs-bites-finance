@@ -16,13 +16,13 @@ export function normEmail(e: string): string {
 /** Free-delivery promo codes only cover addresses this close to the kitchen. */
 export const PROMO_MAX_MILES = 5;
 
-export type PromoCheck = { ok: true; code: string; email_norm: string; message?: string } | { ok: false; error: string };
+export type PromoCheck = { ok: true; code: string; email_norm: string; message?: string; free?: boolean } | { ok: false; error: string };
 
 /** Is this code real, active, and not yet used by this phone number or email? */
 export async function checkPromo(supabase: any, rawCode: unknown, phoneDigits: string, email: string, miles?: number, addressNorm = ""): Promise<PromoCheck> {
   const code = normCode(rawCode);
   if (!code) return { ok: false, error: "enter a promo code" };
-  const { data: promo } = await supabase.from("promo_codes").select("code, active, single_use, max_miles, welcome_message").eq("code", code).maybeSingle();
+  const { data: promo } = await supabase.from("promo_codes").select("code, active, kind, single_use, max_miles, welcome_message").eq("code", code).maybeSingle();
   if (!promo || !promo.active) return { ok: false, error: "that promo code is not valid" };
   const maxMiles = promo.max_miles == null ? null : Number(promo.max_miles);
   if (maxMiles !== null && typeof miles === "number" && miles > maxMiles) {
@@ -46,7 +46,7 @@ export async function checkPromo(supabase: any, rawCode: unknown, phoneDigits: s
       return { ok: false, error: `${code} has already been used with this phone number or email. It can only be used once per customer` };
     }
   }
-  return { ok: true, code, email_norm: emailNorm, message: promo.welcome_message || undefined };
+  return { ok: true, code, email_norm: emailNorm, message: promo.welcome_message || undefined, free: promo.kind === "free_order" };
 }
 
 /** Mark this order's redemption as used (called once the order is paid / confirmed). Never throws. */
