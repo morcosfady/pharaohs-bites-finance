@@ -2,11 +2,12 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { format, formatDistanceToNow } from "date-fns";
-import { Smartphone, Monitor, Tablet, ShoppingBag, ShoppingBasket, Eye, AlertTriangle, Info } from "lucide-react";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
+import { Copy, Smartphone, Monitor, Tablet, ShoppingBag, ShoppingBasket, Eye, AlertTriangle, Info } from "lucide-react";
 import { supabase, unwrap } from "../lib/supabase";
 import { DateRangeBar, useDateRange } from "../components/DateRangeBar";
-import { PageHeader, Skeleton, ErrorBox, EmptyState } from "../components/ui";
-import { buildPulse, type Outcome, type SiteEvent, type Visitor } from "../lib/siteActivity";
+import { PageHeader, Skeleton, ErrorBox, EmptyState, useToast } from "../components/ui";
+import { buildPulse, sourceInfo, SOURCE_INFO, MAIN_CHANNELS, type Outcome, type SiteEvent, type Visitor } from "../lib/siteActivity";
 import type { DateRange } from "../lib/dates";
 
 /** Accent colour of this tab (nav icon + headings). */
@@ -67,6 +68,11 @@ export function WebsitePulsePage() {
   const [filter, setFilter] = useState<"all" | Outcome>("all");
   const [showTech, setShowTech] = useState(false);
   const f = pulse.funnel;
+  const toast = useToast();
+  const SITE = "https://pharaohsbites.com";
+  const copy = (text: string) => navigator.clipboard.writeText(text).then(() => toast.push("Link copied"), () => toast.push("Could not copy, select the link and copy it", "err"));
+  const seen = new Set(pulse.sources.map((s) => s.name));
+  const empty = MAIN_CHANNELS.filter((n) => !seen.has(n));
 
   const visitorsShown = pulse.visitors.filter((v) => filter === "all" || v.outcome === filter).slice(0, 60);
   const problems = pulse.problems.filter((p) => showTech || p.level !== "technical");
@@ -79,6 +85,25 @@ export function WebsitePulsePage() {
     { label: "Order placed", n: f.ordered, icon: ShoppingBag },
   ];
 
+  const linksSection = (
+    <section className="card p-4">
+      <h2 className="font-display text-lg font-semibold" style={{ color: PULSE_COLOR }}>Your tracking links</h2>
+      <p className="mb-3 text-xs text-charcoal/60">Use these exact links where you share the website, and every visit is counted under the right name. Without them, many visits (flyer QR codes, Nextdoor, Instagram bio) just show up as “Direct”. The QR code on a new flyer should open the first link.</p>
+      <ul className="grid gap-2 md:grid-cols-2">
+        {SOURCE_INFO.filter((s) => s.tag).map((s) => {
+          const link = s.tag === "qr" ? `${SITE}/qr` : `${SITE}/?src=${s.tag}`;
+          return (
+            <li key={s.tag} className="flex items-center gap-3 rounded-lg bg-ivory-50 px-3 py-2">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: s.color }}>{s.mark}</span>
+              <div className="min-w-0 flex-1"><div className="text-sm font-medium text-teal-900">{s.name}</div><div className="truncate text-xs text-charcoal/60" title={link}>{link}</div></div>
+              <button type="button" className="btn-ghost inline-flex items-center gap-1 text-xs" onClick={() => copy(link)}><Copy size={14} /> Copy</button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+
   return (
     <div>
       <PageHeader title="Website Pulse" crumbs={["Home", "Website Pulse"]} />
@@ -87,7 +112,9 @@ export function WebsitePulsePage() {
 
       {q.error ? <ErrorBox error={q.error} /> : q.isLoading ? <Skeleton rows={8} className="card p-5" /> : f.visited === 0 ? (
         <div className="card"><EmptyState title="No visits recorded for this period yet" hint="Visits appear here within a minute. Your own visits are not counted if you opened the website once with ?me=1 on that device." /></div>
-      ) : (
+      ) : null}
+      {q.error || q.isLoading || f.visited > 0 ? null : <div className="mt-4">{linksSection}</div>}
+      {q.error || q.isLoading || f.visited === 0 ? null : (
         <div className="grid gap-4">
           {/* Headline numbers */}
           <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -114,24 +141,56 @@ export function WebsitePulsePage() {
             </div>
           </section>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            {/* Where from */}
-            <section className="card p-4">
-              <h2 className="font-display text-lg font-semibold" style={{ color: PULSE_COLOR }}>Where visitors come from</h2>
-              <p className="mb-3 text-xs text-charcoal/60">“Direct” means they typed the address or opened a saved link.</p>
-              <div className="grid gap-2.5">
-                {pulse.sources.map((s) => (
-                  <div key={s.name}>
-                    <div className="mb-1 flex justify-between text-sm"><span>{s.name}</span><span>{s.visitors} visitor{s.visitors === 1 ? "" : "s"} · <b className="text-positive">{s.ordered} ordered</b></span></div>
-                    <Bar value={s.visitors} max={pulse.sources[0].visitors} color="#2a6f6b" />
-                  </div>
-                ))}
+          {/* Where visitors come from */}
+          <section className="card p-4">
+            <h2 className="font-display text-lg font-semibold" style={{ color: PULSE_COLOR }}>Where visitors come from</h2>
+            <p className="mb-4 text-xs text-charcoal/60">Which of your channels (flyer, Instagram, Nextdoor...) bring people in, and which of them actually order. Channels with no visitors yet are greyed out.</p>
+            <div className="grid items-center gap-4 lg:grid-cols-[240px_1fr]">
+              <div className="mx-auto h-56 w-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={pulse.sources} dataKey="visitors" nameKey="name" innerRadius={62} outerRadius={100} paddingAngle={2} stroke="none">
+                      {pulse.sources.map((s) => <Cell key={s.name} fill={sourceInfo(s.name).color} />)}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="pointer-events-none -mt-36 text-center"><div className="font-display text-3xl font-semibold text-teal-900">{f.visited}</div><div className="text-xs text-charcoal/60">visitors</div></div>
               </div>
-              <div className="mt-4 flex flex-wrap gap-3 border-t border-ivory-200 pt-3 text-sm">
-                {pulse.devices.map((d) => <span key={d.name} className="inline-flex items-center gap-1.5 rounded-full bg-ivory-100 px-3 py-1 capitalize"><DeviceIcon d={d.name} /> {d.name}: {d.visitors} ({pctOf(d.visitors, f.visited)})</span>)}
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                {pulse.sources.map((s) => {
+                  const info = sourceInfo(s.name);
+                  return (
+                    <div key={s.name} className="rounded-xl border border-ivory-200 bg-white p-3">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white" style={{ backgroundColor: info.color }}>{info.mark}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-medium text-teal-900">{s.name}</div>
+                          <div className="text-xs text-charcoal/60">{pctOf(s.visitors, f.visited)} of all visitors</div>
+                        </div>
+                        <div className="text-right"><div className="font-display text-2xl font-semibold leading-none text-teal-900">{s.visitors}</div><div className="text-[10px] uppercase text-charcoal/50">visitors</div></div>
+                      </div>
+                      <div className="mt-2"><Bar value={s.visitors} max={pulse.sources[0].visitors} color={info.color} /></div>
+                      <div className="mt-1.5 flex justify-between text-xs"><span className={s.ordered ? "font-medium text-positive" : "text-charcoal/50"}>{s.ordered} ordered</span><span className="text-charcoal/50">{pctOf(s.ordered, s.visitors)} bought</span></div>
+                    </div>
+                  );
+                })}
+                {empty.map((n) => {
+                  const info = sourceInfo(n);
+                  return (
+                    <div key={n} className="rounded-xl border border-dashed border-ivory-300 bg-ivory-50/60 p-3 opacity-70">
+                      <div className="flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ivory-200 text-sm font-bold text-charcoal/50">{info.mark}</span><div className="flex-1 font-medium text-charcoal/60">{n}</div><div className="text-xs text-charcoal/50">no visitors yet</div></div>
+                    </div>
+                  );
+                })}
               </div>
-            </section>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3 border-t border-ivory-200 pt-3 text-sm">
+              {pulse.devices.map((d) => <span key={d.name} className="inline-flex items-center gap-1.5 rounded-full bg-ivory-100 px-3 py-1 capitalize"><DeviceIcon d={d.name} /> {d.name}: {d.visitors} ({pctOf(d.visitors, f.visited)})</span>)}
+            </div>
+          </section>
 
+          <div className="grid gap-4 lg:grid-cols-2">
             {/* Left behind */}
             <section className="card p-4">
               <h2 className="font-display text-lg font-semibold" style={{ color: PULSE_COLOR }}>Added to the basket but not bought</h2>
@@ -218,6 +277,8 @@ export function WebsitePulsePage() {
             </div>
             {pulse.visitors.length > 60 && filter === "all" && <p className="mt-2 text-xs text-charcoal/50">Showing the 60 most recent of {pulse.visitors.length}.</p>}
           </section>
+
+          {linksSection}
 
           <p className="text-xs text-charcoal/50">Good to know: a “visitor” is one browser. Someone who comes back on another phone counts as two. Your own visits are skipped once you open the website with <code>?me=1</code> on that device. Records are kept for 6 months.</p>
         </div>

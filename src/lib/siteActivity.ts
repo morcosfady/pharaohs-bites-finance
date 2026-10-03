@@ -48,6 +48,34 @@ export type Pulse = {
   problems: Problem[];
 };
 
+/** Every channel we recognise: colour + short mark for its tile, and the tag that goes in a link (?src=...). */
+export const SOURCE_INFO: { name: string; color: string; mark: string; tag: string; where: string }[] = [
+  { name: "QR code (flyer)", color: "#1f2937", mark: "QR", tag: "qr", where: "The QR code on your flyer" },
+  { name: "Nextdoor", color: "#00b246", mark: "N", tag: "nextdoor", where: "Nextdoor posts and ads" },
+  { name: "Instagram", color: "#d6249f", mark: "IG", tag: "instagram", where: "Instagram bio and stories" },
+  { name: "Facebook", color: "#1877f2", mark: "f", tag: "facebook", where: "Facebook page and ads" },
+  { name: "TikTok", color: "#111111", mark: "TT", tag: "tiktok", where: "TikTok bio" },
+  { name: "YouTube", color: "#ff0000", mark: "YT", tag: "youtube", where: "YouTube channel" },
+  { name: "X (Twitter)", color: "#0f1419", mark: "X", tag: "x", where: "X / Twitter bio" },
+  { name: "Snapchat", color: "#f5c400", mark: "SC", tag: "snapchat", where: "Snapchat" },
+  { name: "Pinterest", color: "#e60023", mark: "P", tag: "pinterest", where: "Pinterest" },
+  { name: "Reddit", color: "#ff4500", mark: "R", tag: "reddit", where: "Reddit" },
+  { name: "LinkedIn", color: "#0a66c2", mark: "in", tag: "linkedin", where: "LinkedIn" },
+  { name: "Threads", color: "#222222", mark: "@", tag: "threads", where: "Threads" },
+  { name: "WhatsApp", color: "#25d366", mark: "WA", tag: "whatsapp", where: "WhatsApp status and chats" },
+  { name: "Telegram", color: "#229ed9", mark: "TG", tag: "telegram", where: "Telegram" },
+  { name: "Google", color: "#4285f4", mark: "G", tag: "google", where: "Google search and your Google profile" },
+  { name: "Bing", color: "#008373", mark: "B", tag: "bing", where: "Bing search" },
+  { name: "Email", color: "#8b5e3c", mark: "@", tag: "email", where: "Emails and newsletters" },
+  { name: "Direct", color: "#6b7280", mark: "↗", tag: "", where: "Typed the address or opened a saved link" },
+  { name: "Other website", color: "#9ca3af", mark: "…", tag: "", where: "A link on some other website" },
+];
+
+export const sourceInfo = (name: string) => SOURCE_INFO.find((s) => s.name === name) ?? { name, color: "#9ca3af", mark: name.slice(0, 2).toUpperCase(), tag: "", where: "" };
+
+/** Channels worth showing as an empty tile even before the first visit. */
+export const MAIN_CHANNELS = ["QR code (flyer)", "Nextdoor", "Instagram", "Facebook", "TikTok", "Google", "WhatsApp"];
+
 const dayKey = (iso: string) => {
   const d = new Date(iso);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
