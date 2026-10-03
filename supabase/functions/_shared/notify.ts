@@ -87,6 +87,8 @@ const AR_NAMES: Record<string, string> = {
   "goulash-beef": "صينية جلاش باللحمة",
   "kofta-tray": "صينية كفتة بالصلصة والأرز",
   "meatballs-spaghetti": "كرات لحم نباتية بالمكرونة",
+  "koshary": "كشري",
+  "koshary-sauce": "صلصة طماطم إضافية",
   "lentil-soup": "شوربة عدس",
   "om-ali": "أم علي",
   "goulash-nuts": "صينية جلاش بالمكسرات",

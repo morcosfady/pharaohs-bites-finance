@@ -147,6 +147,12 @@ Deno.serve(async (req) => {
     rawChoices.push(it?.choices);
   }
 
+  // ---- extra koshary sauce is only an add-on: never more cups than koshary trays ----------------
+  const qtyOf = (slug: string) => items.filter((i) => i.slug === slug).reduce((n, i) => n + i.quantity, 0);
+  if (qtyOf("koshary-sauce") > qtyOf("koshary")) {
+    return json({ ok: false, error: "Extra tomato sauce can only be ordered with a Koshary Tray" }, 400, headers);
+  }
+
   // ---- service client (server-side only) ---------------------------------
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
     auth: { persistSession: false },
