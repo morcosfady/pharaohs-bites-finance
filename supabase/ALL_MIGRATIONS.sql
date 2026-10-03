@@ -4500,3 +4500,7 @@ values ('MIX90', 'free_delivery', true, null,
         'Welcome, Mix90! 💛 Thank you for supporting Pharaoh''s Bites. Your delivery is on us. Enjoy every bite!')
 on conflict (code) do update set single_use = true, max_miles = null, active = true,
   welcome_message = excluded.welcome_message;
+
+-- 0070_mix90_message.sql
+update promo_codes set welcome_message = 'Welcome, Mix90! 💛 Thank you for being our customer. Your delivery is on us. Enjoy every bite!'
+where code = 'MIX90';
