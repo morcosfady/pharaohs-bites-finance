@@ -4504,3 +4504,20 @@ on conflict (code) do update set single_use = true, max_miles = null, active = t
 -- 0070_mix90_message.sql
 update promo_codes set welcome_message = 'Welcome, Mix90! 💛 Thank you for being our customer. Your delivery is on us. Enjoy every bite!'
 where code = 'MIX90';
+
+-- 0071_almond_milk_drinks.sql
+select v.slug, v.name, v.name_ar, c.id, v.description, v.image_url, v.price, 'review', 3.50, 0, 0
+from product_categories c,
+(values
+  ('avocado-drink-almond', 'Avocado Drink (Almond Milk)', 'عصير أفوكادو بحليب اللوز',
+   'Creamy avocado blended with almond milk, no honey. 100% vegan.',
+   'https://morcosfady.github.io/pharaohs-bites/assets/img/menu-real/avocado-drink.webp', 9.00),
+  ('protein-shake-almond', 'Special Chocolate Protein Shake (Almond Milk)', 'مشروب البروتين بالشوكولاتة بحليب اللوز',
+   'A rich, creamy chocolate 22g protein shake blended smooth with almond milk and served chilled.',
+   'https://morcosfady.github.io/pharaohs-bites/assets/img/menu-real/protein-shake.webp', 10.00)
+) as v(slug, name, name_ar, description, image_url, price)
+where c.name = 'Drinks'
+on conflict (slug) do update set name = excluded.name, name_ar = excluded.name_ar,
+  description = excluded.description, image_url = excluded.image_url,
+  selling_price = excluded.selling_price, ingredient_cost = excluded.ingredient_cost,
+  is_active = true, deleted_at = null;

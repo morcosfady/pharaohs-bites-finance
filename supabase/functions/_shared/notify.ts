@@ -19,6 +19,7 @@ const ALLERGENS: Record<string, string[]> = {
   "kofta-tray": ["Wheat", "Soy"],
   "meatballs-spaghetti": ["Eggs", "Wheat", "Soy"],
   "orzo-soup": ["Wheat"],
+  "koshary": ["Wheat"],
   "om-ali": ["Milk", "Wheat", "Tree nuts"],
   "goulash-nuts": ["Milk", "Wheat", "Tree nuts"],
   "round-cake": ["Milk", "Eggs", "Wheat"],
@@ -32,6 +33,8 @@ const ALLERGENS: Record<string, string[]> = {
   "hummus": ["Sesame"],
   "protein-shake": ["Milk", "Soy"],
   "avocado-drink": ["Milk"],
+  "avocado-drink-almond": ["Tree nuts"],
+  "protein-shake-almond": ["Milk", "Soy", "Tree nuts"],
   "party-tray": ["Milk", "Eggs", "Wheat", "Soy", "Sesame", "Tree nuts"],
   "family-feast": ["Milk", "Eggs", "Wheat", "Soy", "Sesame", "Tree nuts"],
   "egyptian-breakfast": ["Milk", "Eggs", "Wheat", "Soy", "Sesame"],
@@ -40,7 +43,7 @@ const ALLERGENS: Record<string, string[]> = {
   "pick-3-puddings": ["Milk", "Eggs", "Wheat", "Soy", "Tree nuts"],
 };
 // TCS foods get the safe-handling line + "Made on" date. Store-bought add-ons are not cottage foods; Diet Coke is resale (no disclosure).
-const TCS = new Set(["feteer-beef", "macarona-bechamel", "goulash-beef", "kofta-tray", "meatballs-spaghetti", "lentil-soup", "chocolate-pudding", "banana-pudding", "creme-caramel", "rice-pudding", "white-cheese", "hummus", "baba-ganoush", "protein-shake", "avocado-drink", "om-ali", "party-tray", "family-feast", "egyptian-breakfast", "meal-for-one", "feteer-dip-trio", "pick-3-puddings"]);
+const TCS = new Set(["feteer-beef", "macarona-bechamel", "goulash-beef", "kofta-tray", "koshary", "meatballs-spaghetti", "lentil-soup", "chocolate-pudding", "banana-pudding", "creme-caramel", "rice-pudding", "white-cheese", "hummus", "baba-ganoush", "protein-shake", "avocado-drink", "avocado-drink-almond", "protein-shake-almond", "om-ali", "party-tray", "family-feast", "egyptian-breakfast", "meal-for-one", "feteer-dip-trio", "pick-3-puddings"]);
 const STORE_BOUGHT = new Set(["tahini", "black-honey", "white-honey"]);
 const RESALE = new Set(["diet-coke"]);
 
@@ -105,6 +108,8 @@ const AR_NAMES: Record<string, string> = {
   "hummus": "حمص",
   "protein-shake": "مشروب البروتين بالشوكولاتة",
   "avocado-drink": "عصير أفوكادو",
+  "avocado-drink-almond": "عصير أفوكادو بحليب اللوز",
+  "protein-shake-almond": "مشروب البروتين بحليب اللوز",
   "diet-coke": "دايت كوكاكولا",
   "feteer-dip-trio": "طبق الإضافات",
   "feteer-and-dip-trio": "فطير مع ثلاثية الإضافات",
