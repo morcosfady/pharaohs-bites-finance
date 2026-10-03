@@ -38,18 +38,21 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ ok: false, error: "method" }, 405, headers);
   if (!origin || !ALLOWED_ORIGINS.includes(origin)) return json({ ok: false, error: "origin not allowed" }, 403, headers);
 
-  let body: { street?: unknown; city?: unknown; state?: unknown; zip?: unknown; promo?: unknown; apt?: unknown; phone?: unknown; email?: unknown };
+  let body: { street?: unknown; city?: unknown; state?: unknown; zip?: unknown; promo?: unknown; apt?: unknown; phone?: unknown; email?: unknown; items?: unknown };
   try { body = await req.json(); } catch { return json({ ok: false, error: "invalid json" }, 400, headers); }
   const street = clean(body.street, 200), city = clean(body.city, 80), state = clean(body.state, 2).toUpperCase(), zip = clean(body.zip, 10);
   if (!street || !city || !/^[A-Z]{2}$/.test(state) || !/^\d{5}(-\d{4})?$/.test(zip)) return json({ ok: false, error: "incomplete address" }, 400, headers);
 
+  const quoteItems = Array.isArray(body.items)
+    ? (body.items as Array<{ slug?: unknown; quantity?: unknown }>).slice(0, 60).filter((i) => typeof i?.slug === "string" && Number.isInteger(i?.quantity)).map((i) => ({ slug: String(i.slug), quantity: Number(i.quantity) }))
+    : undefined;
   const q = await quoteDelivery(street, city, state, zip);
   if (!q.ok) return json({ ok: false, error: q.error }, q.status, headers);
   // Promo check (read-only): is this code valid and unused for this phone / email?
   let promo: { valid: boolean; code?: string; message?: string; free?: boolean } | undefined;
   if (normCode(body.promo)) {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
-    const r = await checkPromo(supabase, body.promo, clean(body.phone, 40).replace(/\D/g, ""), clean(body.email, 120), q.miles, normAddress(street, clean(body.apt, 60), zip));
+    const r = await checkPromo(supabase, body.promo, clean(body.phone, 40).replace(/\D/g, ""), clean(body.email, 120), q.miles, normAddress(street, clean(body.apt, 60), zip), quoteItems);
     promo = r.ok ? { valid: true, code: r.code, message: r.message, free: !!r.free } : { valid: false, message: r.error };
   }
   return json({ ok: true, delivery_fee: q.fee, miles: q.miles, ...(promo ? { promo } : {}) }, 200, headers);

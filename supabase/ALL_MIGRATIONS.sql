@@ -4532,3 +4532,15 @@ values ('SPARKLY_SVATZ', 'free_order', true, null,
         '🎉 Surprise! Your whole order is on us, food and delivery. Thank you for being our customer, enjoy every bite! 💚')
 on conflict (code) do update set kind = 'free_order', single_use = true, max_miles = null, active = true,
   welcome_message = excluded.welcome_message;
+
+-- 0073_promo_vegan_cap.sql
+alter table products add column if not exists vegan boolean not null default false;
+update products set vegan = true
+ where slug in ('koshary', 'koshary-sauce', 'kofta-tray', 'meatballs-spaghetti', 'lentil-soup', 'orzo-soup', 'avocado-drink-almond');
+
+alter table promo_codes add column if not exists vegan_only boolean not null default false;
+alter table promo_codes add column if not exists max_subtotal numeric;
+
+update promo_codes set vegan_only = true, max_subtotal = 100,
+  welcome_message = '🌱 Surprise! Your vegan order is on us (up to $100), delivery included. Thank you for being our customer, enjoy every bite! 💚'
+where code = 'SPARKLY_SVATZ';

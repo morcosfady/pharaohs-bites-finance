@@ -19,10 +19,10 @@ export const PROMO_MAX_MILES = 5;
 export type PromoCheck = { ok: true; code: string; email_norm: string; message?: string; free?: boolean } | { ok: false; error: string };
 
 /** Is this code real, active, and not yet used by this phone number or email? */
-export async function checkPromo(supabase: any, rawCode: unknown, phoneDigits: string, email: string, miles?: number, addressNorm = ""): Promise<PromoCheck> {
+export async function checkPromo(supabase: any, rawCode: unknown, phoneDigits: string, email: string, miles?: number, addressNorm = "", items?: Array<{ slug: string; quantity: number }>): Promise<PromoCheck> {
   const code = normCode(rawCode);
   if (!code) return { ok: false, error: "enter a promo code" };
-  const { data: promo } = await supabase.from("promo_codes").select("code, active, kind, single_use, max_miles, welcome_message").eq("code", code).maybeSingle();
+  const { data: promo } = await supabase.from("promo_codes").select("code, active, kind, single_use, max_miles, welcome_message, vegan_only, max_subtotal").eq("code", code).maybeSingle();
   if (!promo || !promo.active) return { ok: false, error: "that promo code is not valid" };
   const maxMiles = promo.max_miles == null ? null : Number(promo.max_miles);
   if (maxMiles !== null && typeof miles === "number" && miles > maxMiles) {
@@ -31,6 +31,19 @@ export async function checkPromo(supabase: any, rawCode: unknown, phoneDigits: s
   if (promo.single_use) {
     const { data: taken } = await supabase.from("promo_redemptions").select("id").eq("code", code).not("used_at", "is", null).limit(1);
     if (taken && taken.length) return { ok: false, error: `${code} is a one-time code and has already been used` };
+  }
+  // Some codes only cover vegan dishes and/or a maximum amount of food.
+  if (items && items.length && (promo.vegan_only || promo.max_subtotal != null)) {
+    const { data: prods } = await supabase.from("products").select("slug, name, selling_price, vegan").in("slug", items.map((i) => i.slug));
+    const bySlug = new Map((prods ?? []).map((p: any) => [p.slug, p]));
+    if (promo.vegan_only) {
+      const notVegan = items.filter((i) => !(bySlug.get(i.slug) as any)?.vegan).map((i) => (bySlug.get(i.slug) as any)?.name ?? i.slug);
+      if (notVegan.length) return { ok: false, error: `${code} works on vegan dishes only. Please remove: ${[...new Set(notVegan)].join(", ")}.` };
+    }
+    if (promo.max_subtotal != null) {
+      const sub = items.reduce((n, i) => n + i.quantity * Number((bySlug.get(i.slug) as any)?.selling_price ?? 0), 0);
+      if (sub > Number(promo.max_subtotal)) return { ok: false, error: `${code} covers up to $${Number(promo.max_subtotal)} of food and your dishes come to $${sub.toFixed(2)}. Please bring your order to $${Number(promo.max_subtotal)} or less.` };
+    }
   }
   const emailNorm = normEmail(email);
   const filters = [];
