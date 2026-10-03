@@ -9,10 +9,21 @@ export const ROAD_FACTOR = 1.3;
 async function geocode(address: string): Promise<{ lat: number; lon: number } | null | "error"> {
   try {
     const url = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?benchmark=Public_AR_Current&format=json&address=" + encodeURIComponent(address);
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) return "error";
     const m = (await res.json())?.result?.addressMatches?.[0];
     return m ? { lat: m.coordinates.y, lon: m.coordinates.x } : null;
+  } catch { return "error"; }
+}
+
+// Backup lookup (OpenStreetMap/Photon) for when the Census service is down or has no match.
+async function geocodeBackup(address: string): Promise<{ lat: number; lon: number } | null | "error"> {
+  try {
+    const url = "https://photon.komoot.io/api/?limit=1&q=" + encodeURIComponent(address);
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000), headers: { "User-Agent": "PharaohsBites-delivery-quote/1.0 (fady.ashraaf@gmail.com)" } });
+    if (!res.ok) return "error";
+    const c = (await res.json())?.features?.[0]?.geometry?.coordinates;
+    return c ? { lat: Number(c[1]), lon: Number(c[0]) } : null;
   } catch { return "error"; }
 }
 
@@ -27,7 +38,12 @@ export type Quote = { ok: true; fee: number; miles: number } | { ok: false; stat
 export async function quoteDelivery(street: string, city: string, state: string, zip: string): Promise<Quote> {
   const kLat = Number(Deno.env.get("KITCHEN_LAT")), kLon = Number(Deno.env.get("KITCHEN_LON"));
   if (!isFinite(kLat) || !isFinite(kLon) || !kLat || !kLon) return { ok: false, status: 503, error: "delivery pricing is not configured" };
-  const where = await geocode(`${street}, ${city}, ${state} ${zip}`);
+  const address = `${street}, ${city}, ${state} ${zip}`;
+  let where = await geocode(address);
+  if (where === "error" || !where) {
+    const backup = await geocodeBackup(address);
+    if (backup || where === "error") where = backup;
+  }
   if (where === "error") return { ok: false, status: 503, error: "could not check the delivery address, please try again" };
   if (!where) return { ok: false, status: 400, error: "we could not find that address, please check the street, city and ZIP" };
   const miles = Math.round(haversineMiles({ lat: kLat, lon: kLon }, where) * ROAD_FACTOR * 10) / 10;
