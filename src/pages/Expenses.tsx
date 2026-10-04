@@ -44,6 +44,7 @@ export function ExpensesPage() {
     setEdit(data as Expense);
   };
   const [tab, setTab] = useState<Tab>("all");
+  const [rview, setRview] = useState<"list" | "pictures">("list");
   const integrity = useExpenseIntegrity();
   const toReview = (integrity.data?.needs_review ?? 0) + (integrity.data?.possible_duplicates ?? 0) + (integrity.data?.money_in_unclassified ?? 0);
   /* Recipe-based order cost (the automatic Kitchen entries) is not shown here -- Expenses is
@@ -81,8 +82,12 @@ export function ExpensesPage() {
       {tab === "review" && <ReviewInbox />}
       {tab === "bank" && <BankFeed />}
       {tab === "tax" && <TaxTab onOpenExpense={openById} />}
-      {tab === "receipts" && <ReceiptsTab onOpenExpense={openById} />}
-      {tab === "gallery" && <GalleryTab onOpenExpense={openById} onGoReceipts={() => setTab("receipts")} />}
+      {tab === "receipts" && <>
+        <div className="mb-4 inline-flex rounded-full bg-ivory-100 p-1 text-sm" role="tablist" aria-label="Receipts view">
+          {([["list", "Add and list"], ["pictures", "Pictures"]] as const).map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={rview === k} onClick={() => setRview(k)} className={`rounded-full px-4 py-1.5 ${rview === k ? "bg-teal-800 text-white" : "text-charcoal/70"}`}>{l}</button>)}
+        </div>
+        {rview === "list" ? <ReceiptsTab onOpenExpense={openById} /> : <GalleryTab onOpenExpense={openById} onGoReceipts={() => setRview("list")} />}
+      </>}
       {tab === "trends" && <TrendsTab range={range} onRange={setRange} />}
       {tab === "marketing" && <><DateRangeBar range={range} onChange={setRange} /><MarketingTab range={range} onAdd={(ch) => { setMkChannel(ch ?? ""); setEdit("marketing"); }} onOpenExpense={openById} /></>}
       {tab === "mileage" && <><DateRangeBar range={range} onChange={setRange} /><MileageTab range={range} gas={gas} /></>}
@@ -103,11 +108,11 @@ export function ExpensesPage() {
 }
 
 /* ---------- tabs ---------- */
-type Tab = "all" | "trends" | "marketing" | "receipts" | "gallery" | "review" | "mileage" | "tax" | "subs" | "bank";
-const TABS: { key: Tab; label: string; short: string }[] = [{ key: "all", label: "All expenses", short: "All" }, { key: "trends", label: "Trends", short: "Trends" }, { key: "marketing", label: "Marketing", short: "Marketing" }, { key: "receipts", label: "Receipts", short: "Receipts" }, { key: "gallery", label: "Gallery", short: "Gallery" }, { key: "review", label: "Review", short: "Review" }, { key: "mileage", label: "Mileage", short: "Miles" }, { key: "tax", label: "Tax", short: "Tax" }, { key: "subs", label: "Subscriptions", short: "Subs" }, { key: "bank", label: "Bank feed", short: "Bank" }];
+type Tab = "all" | "trends" | "marketing" | "receipts" | "review" | "mileage" | "tax" | "subs" | "bank";
+const TABS: { key: Tab; label: string; short: string }[] = [{ key: "all", label: "All expenses", short: "All" }, { key: "trends", label: "Trends", short: "Trends" }, { key: "marketing", label: "Marketing", short: "Marketing" }, { key: "receipts", label: "Receipts", short: "Receipts" }, { key: "review", label: "Review", short: "Review" }, { key: "mileage", label: "Mileage", short: "Miles" }, { key: "tax", label: "Tax", short: "Tax" }, { key: "subs", label: "Subscriptions", short: "Subs" }, { key: "bank", label: "Bank feed", short: "Bank" }];
 
 /* A soft accent colour per tab so the sections are easy to tell apart (dot when idle, tinted pill when open). */
-const TAB_COLOR: Record<Tab, string> = { all: "#0e4b48", trends: "#3d6fa8", marketing: "#d1782b", receipts: "#2f855a", gallery: "#7c5cb0", review: "#c0392b", mileage: "#0f8a9d", tax: "#8a6d1d", subs: "#a14d7a", bank: "#4b5d6e" };
+const TAB_COLOR: Record<Tab, string> = { all: "#0e4b48", trends: "#3d6fa8", marketing: "#d1782b", receipts: "#2f855a", review: "#c0392b", mileage: "#0f8a9d", tax: "#8a6d1d", subs: "#a14d7a", bank: "#4b5d6e" };
 
 function TabBar({ tab, onChange, reviewCount }: { tab: Tab; onChange: (t: Tab) => void; reviewCount: number }) {
   return (
