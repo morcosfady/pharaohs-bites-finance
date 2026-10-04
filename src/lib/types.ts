@@ -138,7 +138,7 @@ export interface BankTransaction {
   iso_currency_code: string; pending: boolean; plaid_category: string; payment_channel: string;
   expense_id: string | null; ignored: boolean; created_at: string; updated_at: string;
   /** what the transaction was classified as; only 'expense' is ever counted as a cost */
-  kind: "unclassified" | "expense" | "transfer" | "owner_contribution" | "personal" | "payout" | "money_in" | "pending" | "ignored";
+  kind: "unclassified" | "expense" | "transfer" | "owner_contribution" | "personal" | "payout" | "money_in" | "deposit" | "pending" | "ignored";
   bank_accounts?: { name: string; mask: string } | null;
 }
 

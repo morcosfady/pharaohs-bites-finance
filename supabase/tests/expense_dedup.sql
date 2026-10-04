@@ -211,6 +211,22 @@ begin
   exception when unique_violation then null; end;
 end $$;
 
+-- ---- fewer questions: names that share a word merge on their own; an unrelated name is still asked; deposits are not asked ----
+do $$
+declare e1 uuid; e2 uuid; b uuid; b2 uuid; b3 uuid; n0 bigint;
+begin
+  insert into expenses (expense_date, vendor, description, amount_before_tax, sales_tax_paid, cost_type)
+  values ('2027-03-01', 'Nextdoor Ads', 'ads', 90, 0, 'operating') returning id into e1;
+  b := _bank('fq-1', 'NEXTDOOR ADS SAN FRANCISCO CA', 90, '2027-03-02');
+  perform _expect('fewer questions: shared word merges by itself', (select expense_id = e1 from bank_transactions where id = b)::int, 1);
+  insert into expenses (expense_date, vendor, description, amount_before_tax, sales_tax_paid, cost_type)
+  values ('2027-03-05', 'Sunrise Bakery', 'x', 33, 0, 'operating') returning id into e2;
+  b2 := _bank('fq-2', 'ZZQ HOLDINGS', 33, '2027-03-06');
+  perform _expect('fewer questions: unrelated name is still asked', (select count(*) from expenses where id = (select expense_id from bank_transactions where id = b2) and review_status = 'possible_duplicate'), 1);
+  b3 := _bank('fq-3', 'ODD DEPOSIT FROM SOMEONE', -12, '2027-03-07');
+  perform _expect('fewer questions: unexplained deposit is not asked', (select count(*) from bank_transactions where id = b3 and kind <> 'money_in'), 1);
+end $$;
+
 -- ---- global invariants ---------------------------------------------------------------------
 do $$
 declare r jsonb := expense_integrity();

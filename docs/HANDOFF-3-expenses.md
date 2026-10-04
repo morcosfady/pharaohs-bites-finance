@@ -137,3 +137,9 @@ Until `ANTHROPIC_API_KEY` is set, receipts the owner sends are read by the assis
 ## Next
 
 Phase 4 food cost intelligence is not built. It needs receipt line items (now stored in `expense_items`) to have data, so start it after some real receipts have been read.
+
+
+## 2026-10-04: fewer questions (migration 0075)
+- Same amount + same days + names sharing a word (`vendors_alike`) now merge by themselves (bank charge or receipt). Only a match with no shared word is still asked in Review.
+- A deposit with no rule becomes bank kind `deposit`: never a sale/expense/profit, never asked. Sales come only from orders. Review no longer lists 'Money in'.
+- `merge_expenses_core` = merge without the admin check (used by the backfill and migrations); `merge_expenses` wraps it.
