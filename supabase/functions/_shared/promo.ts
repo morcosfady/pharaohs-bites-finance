@@ -16,17 +16,21 @@ export function normEmail(e: string): string {
 /** Free-delivery promo codes only cover addresses this close to the kitchen. */
 export const PROMO_MAX_MILES = 5;
 
-export type PromoCheck = { ok: true; code: string; email_norm: string; message?: string; free?: boolean } | { ok: false; error: string };
+export type PromoCheck = { ok: true; code: string; email_norm: string; message?: string; free?: boolean; percent?: number } | { ok: false; error: string };
 
 /** Is this code real, active, and not yet used by this phone number or email? */
 export async function checkPromo(supabase: any, rawCode: unknown, phoneDigits: string, email: string, miles?: number, addressNorm = "", items?: Array<{ slug: string; quantity: number }>): Promise<PromoCheck> {
   const code = normCode(rawCode);
   if (!code) return { ok: false, error: "enter a promo code" };
-  const { data: promo } = await supabase.from("promo_codes").select("code, active, kind, single_use, max_miles, welcome_message, vegan_only, max_subtotal").eq("code", code).maybeSingle();
+  const { data: promo } = await supabase.from("promo_codes").select("code, active, kind, single_use, max_miles, welcome_message, vegan_only, max_subtotal, percent_off, first_order_only").eq("code", code).maybeSingle();
   if (!promo || !promo.active) return { ok: false, error: "that promo code is not valid" };
   const maxMiles = promo.max_miles == null ? null : Number(promo.max_miles);
   if (maxMiles !== null && typeof miles === "number" && miles > maxMiles) {
     return { ok: false, error: `Sorry, ${code} free delivery is for addresses within ${maxMiles} miles of our kitchen, and yours is about ${miles} miles away. You can still order, and delivery is just charged at the normal fee.` };
+  }
+  // "First order" codes: refused when this phone number or email already has an earlier order.
+  if (promo.first_order_only && (await hasEarlierOrder(supabase, phoneDigits, email))) {
+    return { ok: false, error: `${code} is for a first order only, and we already have an order from you. Thank you for ordering with us again!` };
   }
   if (promo.single_use) {
     const { data: taken } = await supabase.from("promo_redemptions").select("id").eq("code", code).not("used_at", "is", null).limit(1);
@@ -59,7 +63,28 @@ export async function checkPromo(supabase: any, rawCode: unknown, phoneDigits: s
       return { ok: false, error: `${code} has already been used with this phone number or email. It can only be used once per customer` };
     }
   }
-  return { ok: true, code, email_norm: emailNorm, message: promo.welcome_message || undefined, free: promo.kind === "free_order" };
+  return { ok: true, code, email_norm: emailNorm, message: promo.welcome_message || undefined, free: promo.kind === "free_order", ...(promo.kind === "percent_off" ? { percent: Number(promo.percent_off) } : {}) };
+}
+
+/** Has this phone number or email placed an order before (paid or confirmed, not cancelled)? */
+async function hasEarlierOrder(supabase: any, phoneDigits: string, email: string): Promise<boolean> {
+  const live = (q: any) => q.is("deleted_at", null).not("status", "in", "(pending_whatsapp_confirmation,cancelled)").limit(1);
+  if (phoneDigits) {
+    const { data: cs } = await supabase.from("customers").select("id").eq("phone_normalized", phoneDigits);
+    const ids = (cs ?? []).map((c: any) => c.id);
+    if (ids.length) {
+      const { data, error } = await live(supabase.from("orders").select("id").in("customer_id", ids));
+      if (error) console.error("earlier order check failed", error.message);
+      if (data && data.length) return true;
+    }
+  }
+  const e = email.trim();
+  if (e) {
+    const { data, error } = await live(supabase.from("orders").select("id").ilike("customer_email", e.replace(/[%_,()]/g, "")));
+    if (error) console.error("earlier order check failed", error.message);
+    if (data && data.length) return true;
+  }
+  return false;
 }
 
 /** Mark this order's redemption as used (called once the order is paid / confirmed). Never throws. */
@@ -75,12 +100,20 @@ export async function markPromoUsed(supabase: any, orderId: string) {
 export async function reconcilePromo(supabase: any, orderId: string): Promise<boolean> {
   const { data: mine } = await supabase.from("promo_redemptions").select("id, code, phone_digits, email_norm, address_norm, fee_waived, used_at").eq("order_id", orderId).maybeSingle();
   if (!mine || mine.used_at) return false;
-  const { data: pc } = await supabase.from("promo_codes").select("single_use").eq("code", mine.code).maybeSingle();
+  const { data: pc } = await supabase.from("promo_codes").select("single_use, kind").eq("code", mine.code).maybeSingle();
+  // Taking the promo back: the delivery fee returns (free delivery) or the discount is removed (percent off).
+  const reset = async () => {
+    await supabase.from("promo_redemptions").delete().eq("id", mine.id);
+    await supabase.from("orders").update({ promo_code: null, ...(pc?.kind === "percent_off" ? { discount: 0, discount_reason: "" } : { delivery_fee: mine.fee_waived }) }).eq("id", orderId);
+    if (pc?.kind === "percent_off") {
+      const { data: o } = await supabase.from("orders").select("notify_payload").eq("id", orderId).maybeSingle();
+      if (o?.notify_payload) { const { discount: _d, promo: _p, ...rest } = o.notify_payload; await supabase.from("orders").update({ notify_payload: rest }).eq("id", orderId); }
+    }
+  };
   if (pc?.single_use) {
     const { data: taken } = await supabase.from("promo_redemptions").select("id").eq("code", mine.code).neq("order_id", orderId).not("used_at", "is", null).limit(1);
     if (taken && taken.length) {
-      await supabase.from("promo_redemptions").delete().eq("id", mine.id);
-      await supabase.from("orders").update({ delivery_fee: mine.fee_waived, promo_code: null }).eq("id", orderId);
+      await reset();
       return true;
     }
   }
@@ -91,7 +124,6 @@ export async function reconcilePromo(supabase: any, orderId: string): Promise<bo
   if (!filters.length) return false;
   const { data: used } = await supabase.from("promo_redemptions").select("id").eq("code", mine.code).neq("order_id", orderId).not("used_at", "is", null).or(filters.join(",")).limit(1);
   if (!used || !used.length) return false;
-  await supabase.from("promo_redemptions").delete().eq("id", mine.id);
-  await supabase.from("orders").update({ delivery_fee: mine.fee_waived, promo_code: null }).eq("id", orderId);
+  await reset();
   return true;
 }

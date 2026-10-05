@@ -7,7 +7,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 // Customer: a styled receipt email through the business Gmail relay (Apps
 // Script; RECEIPT_URL + RECEIPT_TOKEN, never exposed to the browser).
 // Failures here never block the order.
-export type OrderInfo = { pickup?: boolean; name: string; phone: string; email: string; address: string; instructions: string; requestedAt: string; items: Array<{ slug: string; quantity: number; options: string }>; deliveryFee: number; miles: number };
+export type OrderInfo = { pickup?: boolean; name: string; phone: string; email: string; address: string; instructions: string; requestedAt: string; items: Array<{ slug: string; quantity: number; options: string }>; deliveryFee: number; miles: number; discount?: number; promo?: string };
 const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 // Allergens per dish (mirror of assets/js/data.js on the website; combos = every possible pick) for the receipt.
@@ -72,7 +72,8 @@ export function receiptHtml(orderNumber: string, info: OrderInfo, lines: Array<{
 <tr><td style="padding:20px 28px 4px;color:#c9a24a;font-size:12px;letter-spacing:2px">YOUR ORDER</td></tr>
 <tr><td style="padding:0 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr>
 <tr><td style="padding:14px 28px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="color:#d8ccb0;font-size:14px">
-<tr><td style="padding:3px 0">Dishes</td><td align="right">${money(subtotal)}</td></tr>
+<tr><td style="padding:3px 0">Dishes</td><td align="right">${money(subtotal + (info.discount ?? 0))}</td></tr>
+${info.discount ? `<tr><td style="padding:3px 0">Promo ${info.promo ?? ""}</td><td align="right">-${money(info.discount)}</td></tr>` : ""}
 <tr><td style="padding:3px 0">${info.pickup ? "Pickup" : `Delivery (${info.miles} mi)`}</td><td align="right">${info.pickup ? "Free" : money(info.deliveryFee)}</td></tr>
 <tr><td style="padding:10px 0 0;color:#c9a24a;font-size:17px;border-top:1px solid #3a3226">Total</td><td align="right" style="padding:10px 0 0;color:#c9a24a;font-size:17px;border-top:1px solid #3a3226"><b>${money(total)}</b></td></tr></table></td></tr>
 <tr><td style="padding:22px 28px 4px;color:#c9a24a;font-size:12px;letter-spacing:2px">${info.pickup ? "PICKUP" : "DELIVERY"}</td></tr>
@@ -155,7 +156,8 @@ export async function notifyAll(supabase: ReturnType<typeof createClient>, order
         "🛒 ITEMS",
         ...itemLines,
         rule,
-        `🧮 Dishes: ${usd(subtotal)}`,
+        `🧮 Dishes: ${usd(subtotal + (info.discount ?? 0))}`,
+        ...(info.discount ? [`🏷️ Promo ${info.promo ?? ""}: -${usd(info.discount)}`] : []),
         `🚗 Delivery (${info.miles} mi): ${usd(info.deliveryFee)}`,
         `✅ TOTAL: ${usd(total)}`,
       ].join("\n");
@@ -178,7 +180,8 @@ export async function notifyAll(supabase: ReturnType<typeof createClient>, order
           "<b>🛒 ITEMS</b>",
           ...info.items.flatMap((i) => [`🍽️ <b>${i.quantity} ×</b> ${esc(names.get(i.slug) ?? i.slug)}${i.options ? " (" + esc(i.options) + ")" : ""} — ${usd(i.quantity * (prices.get(i.slug) ?? 0))}`, ...(AR_NAMES[i.slug] ? [`🇪🇬 <i>${esc(AR_NAMES[i.slug])}</i>`] : [])]),
           bar,
-          `🧮 Dishes: ${usd(subtotal)}`,
+          `🧮 Dishes: ${usd(subtotal + (info.discount ?? 0))}`,
+          ...(info.discount ? [`🏷️ Promo ${esc(info.promo ?? "")}: -${usd(info.discount)}`] : []),
           info.pickup ? "🛍️ Pickup: free" : `🚗 Delivery (${info.miles} mi): ${usd(info.deliveryFee)}`,
           `✅ <b>TOTAL: ${usd(total)}</b>`,
           bar,

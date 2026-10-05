@@ -49,11 +49,11 @@ Deno.serve(async (req) => {
   const q = await quoteDelivery(street, city, state, zip);
   if (!q.ok) return json({ ok: false, error: q.error }, q.status, headers);
   // Promo check (read-only): is this code valid and unused for this phone / email?
-  let promo: { valid: boolean; code?: string; message?: string; free?: boolean } | undefined;
+  let promo: { valid: boolean; code?: string; message?: string; free?: boolean; percent?: number } | undefined;
   if (normCode(body.promo)) {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
     const r = await checkPromo(supabase, body.promo, clean(body.phone, 40).replace(/\D/g, ""), clean(body.email, 120), q.miles, normAddress(street, clean(body.apt, 60), zip), quoteItems);
-    promo = r.ok ? { valid: true, code: r.code, message: r.message, free: !!r.free } : { valid: false, message: r.error };
+    promo = r.ok ? { valid: true, code: r.code, message: r.message, free: !!r.free, ...(r.percent ? { percent: r.percent } : {}) } : { valid: false, message: r.error };
   }
   return json({ ok: true, delivery_fee: q.fee, miles: q.miles, ...(promo ? { promo } : {}) }, 200, headers);
 });

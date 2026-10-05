@@ -202,13 +202,14 @@ Deno.serve(async (req) => {
   }
 
   // ---- promo code (FIRSTBITE = free delivery, once per customer) ---------------
-  let promoCode = "", promoEmail = "", feeWaived = 0, promoAddr = "", freeOrder = false;
+  let promoCode = "", promoEmail = "", feeWaived = 0, promoAddr = "", freeOrder = false, promoPercent = 0;
   if (normCode(body.promo)) {
     if (isPickup) return json({ ok: false, error: "promo codes apply to delivery orders" }, 400, headers);
     promoAddr = normAddress(street, apt, zip);
     const pc = await checkPromo(supabase, body.promo, phoneDigits, email, miles, promoAddr, items.map((i) => ({ slug: i.slug, quantity: i.quantity })));
     if (!pc.ok) return json({ ok: false, error: pc.error }, 400, headers);
-    promoCode = pc.code; promoEmail = pc.email_norm; feeWaived = deliveryFee; deliveryFee = 0; freeOrder = !!pc.free;
+    promoCode = pc.code; promoEmail = pc.email_norm; promoPercent = pc.percent ?? 0;
+    feeWaived = promoPercent ? 0 : deliveryFee; if (!promoPercent) deliveryFee = 0; freeOrder = !!pc.free;
   }
 
   // ---- rate limit per IP -------------------------------------------------
@@ -222,7 +223,7 @@ Deno.serve(async (req) => {
   // ---- create atomically via SQL function ---------------------------------
   const { data, error } = await supabase.rpc("intake_website_order", {
     p_token: token,
-    p_customer: { name, phone, phone_digits: phoneDigits, street, apt, city, state, zip, instructions: promoCode ? `Promo ${promoCode} (${freeOrder ? "FREE ORDER" : "free delivery"})${instructions ? " | " + instructions : ""}`.slice(0, 500) : instructions, requested_at: requestedAt },
+    p_customer: { name, phone, phone_digits: phoneDigits, street, apt, city, state, zip, instructions: promoCode ? `Promo ${promoCode} (${freeOrder ? "FREE ORDER" : promoPercent ? promoPercent + "% off dishes" : "free delivery"})${instructions ? " | " + instructions : ""}`.slice(0, 500) : instructions, requested_at: requestedAt },
     p_items: items,
   });
 
@@ -239,10 +240,16 @@ Deno.serve(async (req) => {
 
   // A free-order promo needs no card: the order is confirmed straight away like a non-paid order.
   const payNow = payOnline && !freeOrder;
-  const info: OrderInfo = { pickup: isPickup, name, phone, email, address: `${street}${apt ? ", " + apt : ""}, ${city}, ${state} ${zip}`, instructions, requestedAt, items, deliveryFee, miles };
+  // Percent-off code: the discount is that % of the dishes (delivery is charged as usual).
+  let discount = 0;
+  if (promoPercent) {
+    const { data: sr } = await supabase.from("orders").select("subtotal").eq("order_number", data as string).maybeSingle();
+    discount = Math.round(Number(sr?.subtotal ?? 0) * promoPercent) / 100;
+  }
+  const info: OrderInfo = { pickup: isPickup, name, phone, email, address: `${street}${apt ? ", " + apt : ""}, ${city}, ${state} ${zip}`, instructions, requestedAt, items, deliveryFee, miles, ...(discount ? { discount, promo: promoCode } : {}) };
   // Pay-online orders stay "pending" and silent until Stripe confirms payment (stripe-webhook
   // then confirms the order and sends the alert + receipt). Other orders are confirmed now.
-  const { error: feeErr } = await supabase.from("orders").update({ delivery_fee: deliveryFee, delivery_miles: isPickup ? null : miles, customer_email: email, ...(promoCode ? { promo_code: promoCode } : {}), ...(isPickup ? { delivery_method: "pickup" } : {}), ...(payNow ? { notify_payload: info } : { status: "confirmed" }) }).eq("order_number", data as string);
+  const { error: feeErr } = await supabase.from("orders").update({ delivery_fee: deliveryFee, delivery_miles: isPickup ? null : miles, customer_email: email, ...(promoCode ? { promo_code: promoCode } : {}), ...(discount ? { discount, discount_reason: `Promo ${promoCode} (${promoPercent}% off dishes)` } : {}), ...(isPickup ? { delivery_method: "pickup" } : {}), ...(payNow ? { notify_payload: info } : { status: "confirmed" }) }).eq("order_number", data as string);
   if (feeErr) console.error("delivery fee update failed", feeErr.message);
   if (promoCode) {
     const { data: po } = await supabase.from("orders").select("id").eq("order_number", data as string).maybeSingle();
@@ -277,7 +284,7 @@ Deno.serve(async (req) => {
     const { error: vErr } = await supabase.from("site_events").insert({ visitor_id: visitor, kind: "order_placed", page: "order", detail: data as string, meta: { ...(freeOrder ? { free: "yes" } : {}), ...(promoCode ? { code: promoCode } : {}) } });
     if (vErr) console.error("site event failed", vErr.message);
   }
-  return json({ ok: true, order_number: data as string, delivery_fee: deliveryFee, miles, ...(promoCode ? { promo: promoCode } : {}), ...(freeOrder ? { free: true } : {}) }, 200, headers);
+  return json({ ok: true, order_number: data as string, delivery_fee: deliveryFee, miles, ...(promoCode ? { promo: promoCode } : {}), ...(freeOrder ? { free: true } : {}), ...(discount ? { discount } : {}) }, 200, headers);
 });
 
 function json(payload: unknown, status: number, headers: Record<string, string>) {
