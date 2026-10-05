@@ -33,6 +33,17 @@ function seed(): Store {
     ], recipes: [{ id: "r1", product_id: "p1", ingredient_id: "i1", quantity: 1, unit: "lb", waste_pct: 0 }, { id: "r2", product_id: "p1", ingredient_id: "i2", quantity: 4, unit: "oz", waste_pct: 0 }],
     expenses, expense_categories: [{ id: "x1", name: "Ingredients", cost_type: "direct_product", sort_order: 1 }, { id: "x2", name: "Marketing", cost_type: "operating", sort_order: 2 }, { id: "x3", name: "Bank / payment fees", cost_type: "operating", sort_order: 3 }, { id: "x4", name: "Packaging", cost_type: "direct_product", sort_order: 4 }, { id: "x5", name: "Gas / mileage", cost_type: "operating", sort_order: 5 }],
     payments, refunds: F.REFUNDS.map((r) => ({ ...r })), business_settings: [{ ...F.SETTINGS }], tax_settings: [{ ...F.TAX }], tax_adjustments: [], tax_period_summaries: [], audit_logs: [],
+    promo_codes: [
+      { code: "FIRSTBITE", kind: "free_delivery", active: true, label: "Welcome code", notes: "", single_use: false, max_uses: null, max_miles: 5, vegan_only: false, max_subtotal: null, percent_off: null, first_order_only: false, welcome_message: null, starts_at: null, expires_at: null, created_at: "2026-09-30T12:00:00Z" },
+      { code: "REBELLECREATIVE", kind: "percent_off", active: true, label: "Rebelle Creative", notes: "", single_use: false, max_uses: 20, max_miles: null, vegan_only: false, max_subtotal: null, percent_off: 50, first_order_only: true, welcome_message: null, starts_at: null, expires_at: null, created_at: "2026-10-05T12:00:00Z" },
+      { code: "SPARKLY_SVATZ", kind: "free_order", active: true, label: "Surprise gift", notes: "", single_use: true, max_uses: null, max_miles: null, vegan_only: true, max_subtotal: 100, percent_off: null, first_order_only: false, welcome_message: null, starts_at: null, expires_at: null, created_at: "2026-10-03T12:00:00Z" },
+      { code: "SPRING10", kind: "percent_off", active: true, label: "Old spring sale", notes: "", single_use: false, max_uses: null, max_miles: null, vegan_only: false, max_subtotal: null, percent_off: 10, first_order_only: false, welcome_message: null, starts_at: null, expires_at: "2026-09-01T23:59:59Z", created_at: "2026-08-01T12:00:00Z" },
+    ],
+    promo_redemptions: [
+      { id: "pr1", code: "FIRSTBITE", order_id: "o1", fee_waived: 8, used_at: now(), created_at: now() },
+      { id: "pr2", code: "SPARKLY_SVATZ", order_id: "o2", fee_waived: 6, used_at: now(), created_at: now() },
+    ],
+    site_events: [],
     admin_profiles: [{ user_id: "demo", full_name: "Demo Owner", role: "owner", is_active: true }], order_counters: [{ year: 2026, last_seq: 6 }],
   };
 }

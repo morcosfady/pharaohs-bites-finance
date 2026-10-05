@@ -22,8 +22,16 @@ export type PromoCheck = { ok: true; code: string; email_norm: string; message?:
 export async function checkPromo(supabase: any, rawCode: unknown, phoneDigits: string, email: string, miles?: number, addressNorm = "", items?: Array<{ slug: string; quantity: number }>): Promise<PromoCheck> {
   const code = normCode(rawCode);
   if (!code) return { ok: false, error: "enter a promo code" };
-  const { data: promo } = await supabase.from("promo_codes").select("code, active, kind, single_use, max_miles, welcome_message, vegan_only, max_subtotal, percent_off, first_order_only").eq("code", code).maybeSingle();
+  const { data: promo } = await supabase.from("promo_codes").select("code, active, kind, single_use, max_miles, welcome_message, vegan_only, max_subtotal, percent_off, first_order_only, starts_at, expires_at, max_uses").eq("code", code).maybeSingle();
   if (!promo || !promo.active) return { ok: false, error: "that promo code is not valid" };
+  // Dates and total-uses limit set from the dashboard.
+  const day = (d: string) => new Date(d).toLocaleDateString("en-US", { timeZone: "America/Chicago", month: "long", day: "numeric" });
+  if (promo.starts_at && new Date(promo.starts_at).getTime() > Date.now()) return { ok: false, error: `${code} is not active yet. It starts on ${day(promo.starts_at)}.` };
+  if (promo.expires_at && new Date(promo.expires_at).getTime() < Date.now()) return { ok: false, error: `${code} has expired.` };
+  if (promo.max_uses != null) {
+    const { count } = await supabase.from("promo_redemptions").select("id", { count: "exact", head: true }).eq("code", code).not("used_at", "is", null);
+    if ((count ?? 0) >= Number(promo.max_uses)) return { ok: false, error: `${code} has reached its limit and is no longer available.` };
+  }
   const maxMiles = promo.max_miles == null ? null : Number(promo.max_miles);
   if (maxMiles !== null && typeof miles === "number" && miles > maxMiles) {
     return { ok: false, error: `Sorry, ${code} free delivery is for addresses within ${maxMiles} miles of our kitchen, and yours is about ${miles} miles away. You can still order, and delivery is just charged at the normal fee.` };
@@ -100,7 +108,7 @@ export async function markPromoUsed(supabase: any, orderId: string) {
 export async function reconcilePromo(supabase: any, orderId: string): Promise<boolean> {
   const { data: mine } = await supabase.from("promo_redemptions").select("id, code, phone_digits, email_norm, address_norm, fee_waived, used_at").eq("order_id", orderId).maybeSingle();
   if (!mine || mine.used_at) return false;
-  const { data: pc } = await supabase.from("promo_codes").select("single_use, kind").eq("code", mine.code).maybeSingle();
+  const { data: pc } = await supabase.from("promo_codes").select("single_use, kind, max_uses").eq("code", mine.code).maybeSingle();
   // Taking the promo back: the delivery fee returns (free delivery) or the discount is removed (percent off).
   const reset = async () => {
     await supabase.from("promo_redemptions").delete().eq("id", mine.id);
@@ -110,9 +118,10 @@ export async function reconcilePromo(supabase: any, orderId: string): Promise<bo
       if (o?.notify_payload) { const { discount: _d, promo: _p, ...rest } = o.notify_payload; await supabase.from("orders").update({ notify_payload: rest }).eq("id", orderId); }
     }
   };
-  if (pc?.single_use) {
-    const { data: taken } = await supabase.from("promo_redemptions").select("id").eq("code", mine.code).neq("order_id", orderId).not("used_at", "is", null).limit(1);
-    if (taken && taken.length) {
+  const limit = pc?.single_use ? 1 : pc?.max_uses != null ? Number(pc.max_uses) : null;
+  if (limit !== null) {
+    const { count: takenCount } = await supabase.from("promo_redemptions").select("id", { count: "exact", head: true }).eq("code", mine.code).neq("order_id", orderId).not("used_at", "is", null);
+    if ((takenCount ?? 0) >= limit) {
       await reset();
       return true;
     }
