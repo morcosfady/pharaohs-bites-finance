@@ -427,11 +427,12 @@ Everything below is **live** (migrations 0068 to 0074 applied, functions deploye
 - `supabase/functions/_shared/notify.ts` has per-dish maps (allergens, TCS safe-handling, Arabic names). Every new dish must be added there too (koshary and the almond drinks are).
 
 ### 16.2 Promo codes (table `promo_codes`, helper `_shared/promo.ts`)
-Columns: `kind` (`free_delivery` | `free_order`), `single_use`, `max_miles` (null = no cap), `welcome_message` (shown in green when applied), `vegan_only`, `max_subtotal`.
+Columns: `kind` (`free_delivery` | `free_order` | `percent_off`), `percent_off`, `first_order_only`, `single_use`, `max_miles` (null = no cap), `welcome_message` (shown in green when applied), `vegan_only`, `max_subtotal`.
 | Code | Rule |
 |---|---|
 | `FIRSTBITE` | free delivery, once per customer, within 10 miles |
 | `MIX90` | free delivery, **one use in total** (anyone), any distance, custom welcome message (for the DJ dadomix90) |
+| `REBELLECREATIVE` | **50% off the dishes** (delivery still charged), **first order only**, once per customer, any distance (see 17) |
 | `SPARKLY_SVATZ` | **whole order free**, one use in total, **vegan dishes only, up to $100 of food** (over $100 is refused, no partial discount) |
 - One-time enforcement is in the database (partial unique indexes on `promo_redemptions` for MIX90 and SPARKLY_SVATZ), plus a check in `checkPromo` and `reconcilePromo`.
 - Free-order flow (`create-order`): discount = subtotal, delivery 0, total $0, order confirmed immediately (no Stripe step), payment_status `paid`, method `other`; if two people race for the one-time code the loser's order is cancelled with a clear message.
@@ -463,3 +464,36 @@ The US Census geocoder was down on 2026-10-02 and customers saw "check your addr
 3. Check the kitchen coordinates (secrets `KITCHEN_LAT/LON`) against a few real customer addresses.
 4. Reprint the flyer with the `/qr` link (or tell Claude where the current QR points).
 5. Partial discount for SPARKLY_SVATZ above $100 was **not** built (would need a card step for the remainder).
+
+## 17. October 5-9, 2026 update (promo rules, REBELLECREATIVE, Promos tab)
+
+Everything below is **live** (migrations 0076, 0077, 0078 applied; functions `create-order`, `delivery-quote`, `create-checkout`, `stripe-webhook` deployed; both repos pushed).
+
+### 17.1 One-customer rules for every promo (`_shared/promo.ts`, `_shared/address.ts`)
+- **Once per customer** = same **phone digits OR email** (Gmail dots and `+tags` ignored) **OR delivery address** (street + unit + ZIP, normalised: "2000 PRESTON ROAD." = "2000 Preston Rd"; a different apartment is a different address). Each refusal tells the customer why.
+- A use counts only after **payment** (`promo_redemptions.used_at`, set in `recordPaidSession` / immediately for free orders). Unpaid applications are "waiting". Unique partial indexes on phone, email and address (where `used_at` is not null) back this up in the database.
+- `reconcilePromo` (called by `create-checkout` right before Stripe): if the same customer already used the code on another paid order, or a total-uses limit was reached, the promo is taken off (fee goes back, or discount removed) so two unpaid orders cannot both get it.
+- Order statuses: an unpaid online order is `pending_whatsapp_confirmation` (there is **no** `pending` value, a filter on it silently returns nothing).
+
+### 17.2 New promo kind: percent off
+- `percent_off` = that % off the **dishes** only (delivery charged as usual). Saved as `orders.discount` with a reason; the Stripe amount is the reduced total. Receipt email, Telegram alert and the WhatsApp text show a "Promo" line (`OrderInfo.discount`, `OrderInfo.promo`).
+- `first_order_only` refuses a phone or email that already has a confirmed/paid (not cancelled, not deleted) order.
+- **REBELLECREATIVE** = 50% off dishes, first order only, any distance.
+- Website: promo row in the totals (`data-promo-row` in `order.html`, `promoDiscount()` in `main.js`).
+
+### 17.3 FIRSTBITE
+Free delivery within **10 miles** (was 5, migration 0078). The distance lives in `promo_codes.max_miles`, so the order check, the website and the dashboard follow it. Only fixed text: `qr.html` footer. Printed flyer, captions and the Facebook ad may still say "within 5 miles" (owner to update).
+
+### 17.4 Dashboard "Promos" tab (`src/pages/Promos.tsx`, `src/lib/promos.ts`, route `/promos`, pink ticket icon)
+- Per code: status (Active / Paused / Starts soon / Expired / Used up), offer in plain words, rule tags, usage bar, given away (discount + fee waived), paid by customers, last used, refused attempts by reason (from `site_events` problems of type `promo`, last 90 days), "Who used it" list with order links, Copy code / Copy message, Pause / Resume, Edit.
+- Top: 4 KPI tiles, "Needs your attention" list (ending soon, 1 use left, applied but unpaid after 6 h, quiet 2 weeks, 3+ refusals in a week), filters, "Latest uses".
+- **New promo** form creates codes (free delivery, percent off, free order; miles, food cap, first order only, vegan only, total uses, start and end dates). A free-order code needs a total-uses or food-cap limit. Kind and percent cannot be edited after creation.
+- Migration 0077: `promo_codes` got `label`, `notes`, `starts_at`, `expires_at`, `max_uses`, `created_at`; admin RLS can read/insert/update `promo_codes` (no delete, pause instead) and read `promo_redemptions`. `checkPromo` refuses before the start date, after expiry, and at `max_uses`.
+- Demo mode (`npm run demo`) has sample promos in `src/test/mockSupabase.ts`. Tests: `src/test/promos.test.ts`. If vitest times out on this PC, run `npx vitest run <file> --pool=threads`.
+
+### 17.5 Open items
+1. **A real card payment with a promo has not been tested** (the paid step was simulated in the database). Place one real order and check: discount on the Stripe page, Telegram alert, receipt, and that the code then shows "Used" in the Promos tab.
+2. Owner should open the Promos tab once after signing in (verified in demo only, not signed in on the live site).
+3. Update printed or posted material that says "within 5 miles" (now 10).
+4. Test orders were placed and deleted on the live system on 2026-10-05 with pay-online (silent, no Telegram alert). Tell the owner before placing any test order that is not pay-online.
+5. A stray file `segno-1.6.6-py3-none-any.whl` sits untracked in the repo folder (not mine, left alone).
