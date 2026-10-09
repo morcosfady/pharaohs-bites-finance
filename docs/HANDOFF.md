@@ -372,7 +372,7 @@ Registration **#20668** (Cottage Food Registry, in the name of the sole propriet
 ### Content rules (owner decisions)
 1. **Every post, reel, caption or ad must include `https://pharaohsbites.com/`** (root URL, not `/index.html`).
 2. **Owner approves every video before posting.**
-3. **Free delivery (promo FIRSTBITE) only within 5 miles.** FIRSTBITE is built and working on the site.
+3. **Free delivery (promo FIRSTBITE) only within 10 miles.** FIRSTBITE is built and working on the site.
 4. AI-generated videos keep the **AI label** on.
 5. **No emojis** in Nextdoor ad copy (emojis fine elsewhere).
 6. Business WhatsApp is **+1 (787) 968-4078**. Never use the owner's personal number in ads.
@@ -404,7 +404,7 @@ Registration **#20668** (Cottage Food Registry, in the name of the sole propriet
 
 ### Open items
 1. **Nextdoor:** verify with mom's ID, then publish the drafted first business post.
-2. **5-mile wording:** flyer, captions and FB ad still say "free delivery on first order" without "within 5 miles". Update.
+2. **10-mile wording:** flyer, captions and FB ad still say "free delivery on first order" without "within 10 miles". Update.
 3. Live posts that used `/index.html` links: switch to the root URL where editable.
 4. **IG story** draft open in Business Suite; owner must add the video and post.
 5. Done: Om Ali and orzo soup were added to the DSHS registration in the second update (2026-10-01).
@@ -430,7 +430,7 @@ Everything below is **live** (migrations 0068 to 0074 applied, functions deploye
 Columns: `kind` (`free_delivery` | `free_order`), `single_use`, `max_miles` (null = no cap), `welcome_message` (shown in green when applied), `vegan_only`, `max_subtotal`.
 | Code | Rule |
 |---|---|
-| `FIRSTBITE` | free delivery, once per customer, within 5 miles |
+| `FIRSTBITE` | free delivery, once per customer, within 10 miles |
 | `MIX90` | free delivery, **one use in total** (anyone), any distance, custom welcome message (for the DJ dadomix90) |
 | `SPARKLY_SVATZ` | **whole order free**, one use in total, **vegan dishes only, up to $100 of food** (over $100 is refused, no partial discount) |
 - One-time enforcement is in the database (partial unique indexes on `promo_redemptions` for MIX90 and SPARKLY_SVATZ), plus a check in `checkPromo` and `reconcilePromo`.

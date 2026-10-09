@@ -14,7 +14,7 @@ export function normEmail(e: string): string {
 }
 
 /** Free-delivery promo codes only cover addresses this close to the kitchen. */
-export const PROMO_MAX_MILES = 5;
+export const PROMO_MAX_MILES = 10;
 
 export type PromoCheck = { ok: true; code: string; email_norm: string; message?: string; free?: boolean; percent?: number } | { ok: false; error: string };
 
