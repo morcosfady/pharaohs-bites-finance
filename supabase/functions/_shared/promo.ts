@@ -34,7 +34,7 @@ export async function checkPromo(supabase: any, rawCode: unknown, phoneDigits: s
   }
   const maxMiles = promo.max_miles == null ? null : Number(promo.max_miles);
   if (maxMiles !== null && typeof miles === "number" && miles > maxMiles) {
-    return { ok: false, error: `Sorry, ${code} free delivery is for addresses within ${maxMiles} miles of our kitchen, and yours is about ${miles} miles away. You can still order, and delivery is just charged at the normal fee.` };
+    return { ok: false, error: `Sorry, ${code} free delivery only works within ${maxMiles} miles of our kitchen, and your address is about ${miles} miles away. You can still place your order: delivery will be charged at the normal fee.` };
   }
   // "First order" codes: refused when this phone number or email already has an earlier order.
   if (promo.first_order_only && (await hasEarlierOrder(supabase, phoneDigits, email))) {
