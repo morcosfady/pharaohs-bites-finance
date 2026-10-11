@@ -501,3 +501,4 @@ Free delivery within **10 miles** (was 5, migration 0078). The distance lives in
 ### 17.4 Flat delivery promo kind and AHMAD (2026-10-11)
 - Migration 0079 adds promo kind `flat_delivery` (+ `promo_codes.delivery_flat`). `checkPromo` returns `flat`; `create-order` charges `min(normal fee, flat)` and stores the saving in `promo_redemptions.fee_waived`; `reconcilePromo` adds the saving back if the code is withdrawn. Dashboard Promos tab: "Delivery for a fixed price" option with a price box.
 - AHMAD = delivery $10, one-time (single_use), any distance, label "Ahmad". Deployed: create-order, delivery-quote, create-checkout. Tested live with a fake order (cleaned up).
+- Telegram new-order alert: the delivery address is now a Google Maps link (`notify.ts`, `<a href=".../maps/search/?api=1&query=...">`), so a tap opens the GPS app. Deployed create-order, create-checkout, stripe-webhook (2026-10-11).

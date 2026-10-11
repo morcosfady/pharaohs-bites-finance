@@ -174,7 +174,7 @@ export async function notifyAll(supabase: ReturnType<typeof createClient>, order
           `🙋 <b>${esc(info.name)}</b>`,
           `📱 ${esc(info.phone)}`,
           `✉️ ${esc(info.email)}`,
-          info.pickup ? "🛍️ <b>PICKUP</b> (no delivery)" : `🏠 ${esc(info.address)}`,
+          info.pickup ? "🛍️ <b>PICKUP</b> (no delivery)" : `🏠 <a href="https://www.google.com/maps/search/?api=1&amp;query=${encodeURIComponent(info.address)}">${esc(info.address)}</a>`,
           ...(note ? [`📝 <i>${esc(note)}</i>`] : []),
           bar,
           "<b>🛒 ITEMS</b>",
