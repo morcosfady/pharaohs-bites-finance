@@ -43,7 +43,7 @@ function usePromos() {
   });
 }
 
-const KIND_ICON: Record<PromoKind, typeof Truck> = { free_delivery: Truck, percent_off: Percent, free_order: Gift };
+const KIND_ICON: Record<PromoKind, typeof Truck> = { free_delivery: Truck, percent_off: Percent, free_order: Gift, flat_delivery: Truck };
 
 function Kpi({ icon: Icon, label, value, sub, color }: { icon: typeof Users; label: string; value: string; sub?: string; color: string }) {
   return (
@@ -166,13 +166,13 @@ function PromoCard({ s, onEdit, onToggle, orders }: { s: PromoStats; onEdit: () 
 const dateValue = (iso: string | null) => (iso ? format(new Date(iso), "yyyy-MM-dd") : "");
 
 type Draft = {
-  code: string; kind: PromoKind; percent: string; label: string; notes: string; welcome: string;
+  code: string; kind: PromoKind; percent: string; flat: string; label: string; notes: string; welcome: string;
   startsAt: string; expiresAt: string; maxUses: string; maxMiles: string; maxSubtotal: string; firstOrder: boolean; vegan: boolean;
 };
 
-const blankDraft = (): Draft => ({ code: "", kind: "free_delivery", percent: "20", label: "", notes: "", welcome: "", startsAt: "", expiresAt: "", maxUses: "", maxMiles: "", maxSubtotal: "", firstOrder: false, vegan: false });
+const blankDraft = (): Draft => ({ code: "", kind: "free_delivery", percent: "20", flat: "10", label: "", notes: "", welcome: "", startsAt: "", expiresAt: "", maxUses: "", maxMiles: "", maxSubtotal: "", firstOrder: false, vegan: false });
 const draftFrom = (p: PromoCode): Draft => ({
-  code: p.code, kind: p.kind, percent: String(p.percent_off ?? ""), label: p.label, notes: p.notes, welcome: p.welcome_message ?? "",
+  code: p.code, kind: p.kind, percent: String(p.percent_off ?? ""), flat: String(p.delivery_flat ?? ""), label: p.label, notes: p.notes, welcome: p.welcome_message ?? "",
   startsAt: dateValue(p.starts_at), expiresAt: dateValue(p.expires_at), maxUses: p.single_use ? "1" : p.max_uses != null ? String(p.max_uses) : "",
   maxMiles: p.max_miles != null ? String(p.max_miles) : "", maxSubtotal: p.max_subtotal != null ? String(p.max_subtotal) : "", firstOrder: p.first_order_only, vegan: p.vegan_only,
 });
@@ -190,6 +190,7 @@ function PromoForm({ editing, existing, onClose }: { editing: PromoCode | null; 
       if (!CODE_RE.test(code)) return toast.push("The code needs 3 to 30 letters, numbers, dashes or underscores (no spaces).", "err");
       if (existing.includes(code)) return toast.push(`${code} already exists. Edit it instead.`, "err");
       if (d.kind === "percent_off" && !(Number(d.percent) > 0 && Number(d.percent) <= 100)) return toast.push("Type a percentage between 1 and 100.", "err");
+      if (d.kind === "flat_delivery" && !(Number(d.flat) >= 0 && d.flat.trim() !== "")) return toast.push("Type the delivery price, for example 10.", "err");
       if (d.kind === "free_order" && num(d.maxUses) === null && num(d.maxSubtotal) === null) return toast.push("A free-order code gives the whole order away. Set a limit on total uses or on the food amount first.", "err");
     }
     const maxUses = num(d.maxUses);
@@ -207,6 +208,7 @@ function PromoForm({ editing, existing, onClose }: { editing: PromoCode | null; 
         return unwrap(await supabase.from("promo_codes").insert({
           code, kind: d.kind, active: true, single_use: false, ...common,
           percent_off: d.kind === "percent_off" ? Number(d.percent) : null,
+          delivery_flat: d.kind === "flat_delivery" ? Number(d.flat) : null,
           max_miles: num(d.maxMiles), max_subtotal: num(d.maxSubtotal), first_order_only: d.firstOrder, vegan_only: d.vegan,
         }).select());
       });
@@ -225,9 +227,11 @@ function PromoForm({ editing, existing, onClose }: { editing: PromoCode | null; 
               <select className="input" value={d.kind} onChange={(e) => set("kind", e.target.value as PromoKind)}>
                 <option value="free_delivery">Free delivery</option>
                 <option value="percent_off">Percent off the dishes</option>
+                <option value="flat_delivery">Delivery for a fixed price</option>
                 <option value="free_order">Whole order free</option>
               </select>
             </Field>
+            {d.kind === "flat_delivery" && <Field label="Delivery price ($)" hint="Charged instead of the normal fee, any distance."><input className="input" inputMode="decimal" value={d.flat} onChange={(e) => set("flat", e.target.value.replace(/[^0-9.]/g, ""))} /></Field>}
             {d.kind === "percent_off" && <Field label="Percent off the dishes"><input className="input" inputMode="numeric" value={d.percent} onChange={(e) => set("percent", e.target.value.replace(/[^0-9.]/g, ""))} /></Field>}
           </>
         )}

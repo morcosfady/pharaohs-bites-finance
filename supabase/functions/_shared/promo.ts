@@ -16,13 +16,13 @@ export function normEmail(e: string): string {
 /** Free-delivery promo codes only cover addresses this close to the kitchen. */
 export const PROMO_MAX_MILES = 10;
 
-export type PromoCheck = { ok: true; code: string; email_norm: string; message?: string; free?: boolean; percent?: number } | { ok: false; error: string };
+export type PromoCheck = { ok: true; code: string; email_norm: string; message?: string; free?: boolean; percent?: number; flat?: number } | { ok: false; error: string };
 
 /** Is this code real, active, and not yet used by this phone number or email? */
 export async function checkPromo(supabase: any, rawCode: unknown, phoneDigits: string, email: string, miles?: number, addressNorm = "", items?: Array<{ slug: string; quantity: number }>): Promise<PromoCheck> {
   const code = normCode(rawCode);
   if (!code) return { ok: false, error: "enter a promo code" };
-  const { data: promo } = await supabase.from("promo_codes").select("code, active, kind, single_use, max_miles, welcome_message, vegan_only, max_subtotal, percent_off, first_order_only, starts_at, expires_at, max_uses").eq("code", code).maybeSingle();
+  const { data: promo } = await supabase.from("promo_codes").select("code, active, kind, single_use, max_miles, welcome_message, vegan_only, max_subtotal, percent_off, first_order_only, starts_at, expires_at, max_uses, delivery_flat").eq("code", code).maybeSingle();
   if (!promo || !promo.active) return { ok: false, error: "that promo code is not valid" };
   // Dates and total-uses limit set from the dashboard.
   const day = (d: string) => new Date(d).toLocaleDateString("en-US", { timeZone: "America/Chicago", month: "long", day: "numeric" });
@@ -71,7 +71,7 @@ export async function checkPromo(supabase: any, rawCode: unknown, phoneDigits: s
       return { ok: false, error: `${code} has already been used with this phone number or email. It can only be used once per customer` };
     }
   }
-  return { ok: true, code, email_norm: emailNorm, message: promo.welcome_message || undefined, free: promo.kind === "free_order", ...(promo.kind === "percent_off" ? { percent: Number(promo.percent_off) } : {}) };
+  return { ok: true, code, email_norm: emailNorm, message: promo.welcome_message || undefined, free: promo.kind === "free_order", ...(promo.kind === "percent_off" ? { percent: Number(promo.percent_off) } : {}), ...(promo.kind === "flat_delivery" ? { flat: Number(promo.delivery_flat) } : {}) };
 }
 
 /** Has this phone number or email placed an order before (paid or confirmed, not cancelled)? */
@@ -112,7 +112,10 @@ export async function reconcilePromo(supabase: any, orderId: string): Promise<bo
   // Taking the promo back: the delivery fee returns (free delivery) or the discount is removed (percent off).
   const reset = async () => {
     await supabase.from("promo_redemptions").delete().eq("id", mine.id);
-    await supabase.from("orders").update({ promo_code: null, ...(pc?.kind === "percent_off" ? { discount: 0, discount_reason: "" } : { delivery_fee: mine.fee_waived }) }).eq("id", orderId);
+    // flat delivery: the fee had been lowered, so the saving is added back to what is charged now
+    let fee: number = mine.fee_waived;
+    if (pc?.kind === "flat_delivery") { const { data: cur } = await supabase.from("orders").select("delivery_fee").eq("id", orderId).maybeSingle(); fee = Number(cur?.delivery_fee ?? 0) + Number(mine.fee_waived ?? 0); }
+    await supabase.from("orders").update({ promo_code: null, ...(pc?.kind === "percent_off" ? { discount: 0, discount_reason: "" } : { delivery_fee: fee }) }).eq("id", orderId);
     if (pc?.kind === "percent_off") {
       const { data: o } = await supabase.from("orders").select("notify_payload").eq("id", orderId).maybeSingle();
       if (o?.notify_payload) { const { discount: _d, promo: _p, ...rest } = o.notify_payload; await supabase.from("orders").update({ notify_payload: rest }).eq("id", orderId); }

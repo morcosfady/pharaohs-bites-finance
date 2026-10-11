@@ -209,7 +209,9 @@ Deno.serve(async (req) => {
     const pc = await checkPromo(supabase, body.promo, phoneDigits, email, miles, promoAddr, items.map((i) => ({ slug: i.slug, quantity: i.quantity })));
     if (!pc.ok) return json({ ok: false, error: pc.error }, 400, headers);
     promoCode = pc.code; promoEmail = pc.email_norm; promoPercent = pc.percent ?? 0;
-    feeWaived = promoPercent ? 0 : deliveryFee; if (!promoPercent) deliveryFee = 0; freeOrder = !!pc.free;
+    if (typeof pc.flat === "number") { const nf = Math.min(deliveryFee, pc.flat); feeWaived = deliveryFee - nf; deliveryFee = nf; }
+    else { feeWaived = promoPercent ? 0 : deliveryFee; if (!promoPercent) deliveryFee = 0; }
+    freeOrder = !!pc.free;
   }
 
   // ---- rate limit per IP -------------------------------------------------

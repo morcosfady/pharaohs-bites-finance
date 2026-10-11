@@ -497,3 +497,7 @@ Free delivery within **10 miles** (was 5, migration 0078). The distance lives in
 3. Update printed or posted material that says "within 5 miles" (now 10).
 4. Test orders were placed and deleted on the live system on 2026-10-05 with pay-online (silent, no Telegram alert). Tell the owner before placing any test order that is not pay-online.
 5. A stray file `segno-1.6.6-py3-none-any.whl` sits untracked in the repo folder (not mine, left alone).
+
+### 17.4 Flat delivery promo kind and AHMAD (2026-10-11)
+- Migration 0079 adds promo kind `flat_delivery` (+ `promo_codes.delivery_flat`). `checkPromo` returns `flat`; `create-order` charges `min(normal fee, flat)` and stores the saving in `promo_redemptions.fee_waived`; `reconcilePromo` adds the saving back if the code is withdrawn. Dashboard Promos tab: "Delivery for a fixed price" option with a price box.
+- AHMAD = delivery $10, one-time (single_use), any distance, label "Ahmad". Deployed: create-order, delivery-quote, create-checkout. Tested live with a fake order (cleaned up).

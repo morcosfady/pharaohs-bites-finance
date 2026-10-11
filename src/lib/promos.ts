@@ -2,7 +2,7 @@
 // used, and what it has cost / earned. Pure functions (no database calls) so they can be tested.
 import { addDays, differenceInCalendarDays, format } from "date-fns";
 
-export type PromoKind = "free_delivery" | "percent_off" | "free_order";
+export type PromoKind = "free_delivery" | "percent_off" | "free_order" | "flat_delivery";
 
 export type PromoCode = {
   code: string;
@@ -16,6 +16,7 @@ export type PromoCode = {
   vegan_only: boolean;
   max_subtotal: number | null;
   percent_off: number | null;
+  delivery_flat?: number | null;
   first_order_only: boolean;
   welcome_message: string | null;
   starts_at: string | null;
@@ -72,6 +73,7 @@ export function promoStatus(p: PromoCode, usedCount: number, now = new Date()): 
 export function describeOffer(p: PromoCode): string {
   if (p.kind === "percent_off") return `${p.percent_off ?? 0}% off the dishes`;
   if (p.kind === "free_order") return "The whole order is free";
+  if (p.kind === "flat_delivery") return `Delivery is $${p.delivery_flat ?? 0}, any distance`;
   return p.max_miles != null ? `Free delivery within ${p.max_miles} miles` : "Free delivery";
 }
 
@@ -83,7 +85,7 @@ export function ruleTags(p: PromoCode): string[] {
   const limit = usesAllowed(p);
   if (p.single_use) tags.push("One-time code");
   else if (limit !== null) tags.push(`Max ${limit} uses in total`);
-  if (p.max_miles != null && p.kind !== "free_delivery") tags.push(`Within ${p.max_miles} miles`);
+  if (p.max_miles != null && p.kind !== "free_delivery" && p.kind !== "flat_delivery") tags.push(`Within ${p.max_miles} miles`);
   if (p.vegan_only) tags.push("Vegan dishes only");
   if (p.max_subtotal != null) tags.push(`Up to $${p.max_subtotal} of food`);
   return tags;
