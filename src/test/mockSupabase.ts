@@ -65,7 +65,9 @@ function recalcOrder(orderId: string) {
   const tax = o.tax_manually_set ? n(o.tax_amount) : o.prices_include_tax ? 0 : r2(Math.max(taxable - (sub > 0 ? n(o.discount) * taxable / sub : 0), 0) * n(o.tax_rate_applied));
   const paid = store.payments.filter((p) => p.order_id === orderId && !p.voided_at).reduce((s, p) => s + n(p.amount), 0);
   const refunded = store.refunds.filter((p) => p.order_id === orderId && !p.voided_at).reduce((s, p) => s + n(p.amount), 0);
-  o.subtotal = r2(sub); o.tax_amount = tax; o.total = r2(Math.max(sub - n(o.discount), 0) + n(o.delivery_fee) + tax); o.amount_paid = r2(paid); o.amount_refunded = r2(refunded); o.updated_at = now();
+  // migration 0080 mirror columns (cents) and the driver tip in the total
+  o.taxable_subtotal_cents = Math.round(Math.max(taxable - (sub > 0 ? n(o.discount) * taxable / sub : 0), 0) * 100); o.item_tax_cents = Math.round(tax * 100); o.delivery_tax_cents = 0; o.tax_cents = Math.round(tax * 100);
+  o.subtotal = r2(sub); o.tax_amount = tax; o.total = r2(Math.max(sub - n(o.discount), 0) + n(o.delivery_fee) + tax + n(o.tip_cents) / 100); o.amount_paid = r2(paid); o.amount_refunded = r2(refunded); o.updated_at = now();
   if (o.payment_status !== "disputed") {
     o.payment_status = refunded > 0 && refunded >= paid ? "refunded" : refunded > 0 ? "partially_refunded" : paid <= 0 ? "unpaid" : paid >= n(o.total) ? "paid" : o.payment_status === "deposit_received" ? "deposit_received" : "partially_paid";
   }
@@ -108,7 +110,9 @@ function viewOrderFinancials(): Row[] {
     return { id: o.id, order_number: o.order_number, created_at: o.created_at, completed_at: o.completed_at, status: o.status, payment_status: o.payment_status, payment_method: o.payment_method, delivery_method: o.delivery_method, customer_id: o.customer_id, customer_name: o.customer_name, customer_phone: o.customer_phone,
       gross_product_revenue: o.subtotal, discount: o.discount, net_product_sales: r2(net), delivery_revenue: delivRev, tax_amount: o.tax_amount, total: o.total, amount_paid: o.amount_paid, amount_refunded: o.amount_refunded,
       balance_due: r2(n(o.total) - n(o.amount_paid) + n(o.amount_refunded)), cogs: r2(cogs), packaging_cost: r2(items.reduce((s, i) => s + n(i.quantity) * n(i.unit_packaging_cost), 0)), labor_cost: r2(items.reduce((s, i) => s + n(i.quantity) * n(i.unit_labor_cost), 0)),
-      delivery_cost: n(d?.actual_cost), items_count: items.reduce((s, i) => s + n(i.quantity), 0), gross_profit: r2(net - cogs), contribution_profit: r2(net + delivRev - cogs - n(d?.actual_cost)), deleted_at: o.deleted_at };
+      delivery_cost: n(d?.actual_cost), items_count: items.reduce((s, i) => s + n(i.quantity), 0), gross_profit: r2(net - cogs), contribution_profit: r2(net + delivRev - cogs - n(d?.actual_cost)), deleted_at: o.deleted_at,
+      taxable_subtotal_cents: n(o.taxable_subtotal_cents), item_tax_cents: n(o.item_tax_cents), delivery_tax_cents: n(o.delivery_tax_cents), tax_cents: n(o.tax_cents), tax_rate_applied: o.tax_rate_applied,
+      tip_cents: n(o.tip_cents), tip_percent: o.tip_percent ?? null, tip_type: o.tip_type ?? "none", tip_paid_out: !!o.tip_paid_out, tip_paid_out_at: o.tip_paid_out_at ?? null, delivery_fee: o.delivery_fee };
   });
 }
 function viewProductSales(): Row[] {
@@ -200,7 +204,7 @@ class Builder implements PromiseLike<{ data: unknown; error: null | { message: s
           if (existing) { const before = { ...existing }; Object.assign(existing, row, { updated_at: now() }); afterWrite(this.table, before, existing); out.push(existing); }
           else {
             const rec: Row = { id: uid(), created_at: now(), updated_at: now(), ...row };
-            if (this.table === "orders") { rec.order_number ??= nextNumber(); Object.assign(rec, { status: rec.status ?? "pending_whatsapp_confirmation", payment_status: "unpaid", subtotal: 0, discount: rec.discount ?? 0, delivery_fee: rec.delivery_fee ?? 0, delivery_fee_customer_paid: true, tax_rate_applied: rec.tax_rate_applied ?? 0.0825, tax_amount: 0, tax_manually_set: false, prices_include_tax: false, total: 0, amount_paid: 0, amount_refunded: 0, internal_notes: rec.internal_notes ?? "", customer_notes: "", address_street: rec.address_street ?? "", address_apt: "", address_city: rec.address_city ?? "", address_state: rec.address_state ?? "", address_zip: rec.address_zip ?? "", delivery_instructions: "", requested_at: null, discount_reason: "", delivery_subsidy: 0, confirmed_at: null, completed_at: null, cancelled_at: null, deleted_at: null, source: rec.source ?? "manual" }); }
+            if (this.table === "orders") { rec.order_number ??= nextNumber(); Object.assign(rec, { status: rec.status ?? "pending_whatsapp_confirmation", payment_status: "unpaid", subtotal: 0, discount: rec.discount ?? 0, delivery_fee: rec.delivery_fee ?? 0, delivery_fee_customer_paid: true, tax_rate_applied: rec.tax_rate_applied ?? 0.0825, tax_amount: 0, tax_manually_set: false, prices_include_tax: false, total: 0, amount_paid: 0, amount_refunded: 0, taxable_subtotal_cents: 0, item_tax_cents: 0, delivery_tax_cents: 0, tax_cents: 0, tip_cents: rec.tip_cents ?? 0, tip_percent: rec.tip_percent ?? null, tip_type: rec.tip_type ?? "none", tip_paid_out: false, tip_paid_out_at: null, internal_notes: rec.internal_notes ?? "", customer_notes: "", address_street: rec.address_street ?? "", address_apt: "", address_city: rec.address_city ?? "", address_state: rec.address_state ?? "", address_zip: rec.address_zip ?? "", delivery_instructions: "", requested_at: null, discount_reason: "", delivery_subsidy: 0, confirmed_at: null, completed_at: null, cancelled_at: null, deleted_at: null, source: rec.source ?? "manual" }); }
             if (this.table === "payments" || this.table === "refunds") rec.voided_at = null;
             if (this.table === "payments") rec.paid_at ??= now();
             if (this.table === "refunds") { rec.refunded_at ??= now(); rec.tax_portion ??= 0; }
@@ -245,7 +249,7 @@ async function rpc(fn: string, args: Row) {
   if (fn === "add_order_item") {
     const p = store.products.find((x) => x.id === args.p_product_id); if (!p) return { data: null, error: { message: "product not found" } };
     const labor = Math.round((n(p.labor_minutes) / 60) * n(store.business_settings[0].default_labor_rate_per_hour) * 10000) / 10000;
-    const res = await new Builder("order_items").insert({ order_id: args.p_order_id, product_id: p.id, product_name: p.name, options: args.p_options ?? "", quantity: args.p_quantity, unit_price: p.selling_price, line_total: 0, is_taxable: p.tax_status === "taxable", unit_ingredient_cost: p.ingredient_cost, unit_packaging_cost: p.packaging_cost, unit_labor_cost: labor, unit_other_cost: p.other_direct_cost, refunded_qty: 0 }).select("id").single();
+    const res = await new Builder("order_items").insert({ order_id: args.p_order_id, product_id: p.id, product_name: p.name, options: args.p_options ?? "", quantity: args.p_quantity, unit_price: p.selling_price, line_total: 0, is_taxable: p.tax_status !== "exempt", tax_status: p.tax_status, tax_cents: 0, unit_ingredient_cost: p.ingredient_cost, unit_packaging_cost: p.packaging_cost, unit_labor_cost: labor, unit_other_cost: p.other_direct_cost, refunded_qty: 0 }).select("id").single();
     return { data: (res.data as Row).id, error: null };
   }
   if (fn === "merge_customers") {

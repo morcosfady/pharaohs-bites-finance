@@ -41,8 +41,8 @@ export const DELIVERY_STATUSES: { value: DeliveryStatus; label: string }[] = [
 
 export const TAX_STATUSES: { value: TaxStatus; label: string; cls: string }[] = [
   { value: "taxable", label: "Taxable", cls: "bg-teal-100 text-teal-900" },
-  { value: "nontaxable", label: "Nontaxable", cls: "bg-emerald-100 text-emerald-900" },
-  { value: "review", label: "Needs review", cls: "bg-amber-100 text-amber-900" },
+  { value: "exempt", label: "Exempt (no tax)", cls: "bg-emerald-100 text-emerald-900" },
+  { value: "review", label: "Needs review (taxed)", cls: "bg-amber-100 text-amber-900 ring-1 ring-amber-400" },
 ];
 
 export const CUSTOMER_STATUSES: { value: CustomerStatus; label: string; cls: string }[] = [

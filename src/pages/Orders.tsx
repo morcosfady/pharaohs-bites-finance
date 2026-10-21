@@ -7,8 +7,8 @@ import { PageHeader, Badge, Skeleton, ErrorBox, Modal, Field, useToast, EmptySta
 import { DateRangeBar, useDateRange } from "../components/DateRangeBar";
 import { useOrders, useProducts, useCategories, useWrite } from "../hooks/queries";
 import { ORDER_STATUSES, PAYMENT_STATUSES, PAYMENT_METHODS, cls, label } from "../lib/status";
-import { fmt, toCents } from "../lib/money";
-import { fmtDateTime, inRange } from "../lib/dates";
+import { fmt, toCents, sum } from "../lib/money";
+import { fmtDateTime, inRange, rangeFor } from "../lib/dates";
 import type { Order, OrderItem } from "../lib/types";
 import { supabase, unwrap } from "../lib/supabase";
 import { downloadText, toCsv } from "../lib/csv";
@@ -30,7 +30,7 @@ export function OrdersPage() {
   const advanced = useAdvanced();
   const f = {
     status: sp.get("status") ?? "", payment: sp.get("payment") ?? "", method: sp.get("method") ?? "", product: sp.get("product") ?? "",
-    category: sp.get("category") ?? "", delivery: sp.get("delivery") ?? "", tax: sp.get("tax") ?? "", profit: sp.get("profit") ?? "", all: sp.get("all") === "1",
+    category: sp.get("category") ?? "", delivery: sp.get("delivery") ?? "", tax: sp.get("tax") ?? "", profit: sp.get("profit") ?? "", tip: sp.get("tip") ?? "", all: sp.get("all") === "1",
   };
   const set = (k: string, v: string) => { const n = new URLSearchParams(sp); if (v) n.set(k, v); else n.delete(k); setSp(n, { replace: true }); };
 
@@ -56,7 +56,9 @@ export function OrdersPage() {
       if (!(o.order_items ?? []).some((i) => i.product_id && ids.has(i.product_id))) return false;
     }
     if (f.tax === "taxable" && toCents(o.tax_amount) === 0) return false;
-    if (f.tax === "nontaxable" && toCents(o.tax_amount) > 0) return false;
+    if (f.tax === "exempt" && toCents(o.tax_amount) > 0) return false;
+    if (f.tip === "tip" && !(o.tip_cents > 0)) return false;
+    if (f.tip === "unpaid" && !(o.tip_cents > 0 && !o.tip_paid_out)) return false;
     if (f.profit === "profitable" && o.profit <= 0) return false;
     if (f.profit === "unprofitable" && o.profit > 0) return false;
     if (q && !o.search.includes(q.toLowerCase())) return false;
@@ -74,6 +76,8 @@ export function OrdersPage() {
     { key: "discount", header: "Discount", numeric: true, mobile: false, render: (o) => fmt(toCents(o.discount)), sortValue: (o) => toCents(o.discount) },
     { key: "delivery_fee", header: "Delivery", numeric: true, mobile: false, render: (o) => fmt(toCents(o.delivery_fee)), sortValue: (o) => toCents(o.delivery_fee) },
     { key: "tax_amount", header: "Tax", numeric: true, mobile: false, render: (o) => fmt(toCents(o.tax_amount)), sortValue: (o) => toCents(o.tax_amount) },
+    // the driver's money, not the business's: shown apart and never inside subtotal, revenue or profit
+    { key: "tip_cents", header: "Tip", numeric: true, mobile: false, render: (o) => o.tip_cents > 0 ? <span title={o.tip_paid_out ? "Paid out to the driver" : "Not yet paid out"}>{fmt(o.tip_cents)}{o.tip_paid_out ? " ✓" : ""}</span> : <span className="text-charcoal/40">—</span>, sortValue: (o) => o.tip_cents ?? 0 },
     { key: "total", header: "Total", numeric: true, render: (o) => <b>{fmt(toCents(o.total))}</b>, sortValue: (o) => toCents(o.total) },
     { key: "amount_paid", header: "Paid", numeric: true, render: (o) => fmt(toCents(o.amount_paid)), sortValue: (o) => toCents(o.amount_paid) },
     { key: "balance", header: "Balance", numeric: true, render: (o) => <span className={o.balance > 0 ? "text-negative" : ""}>{fmt(o.balance)}</span> },
@@ -89,7 +93,7 @@ export function OrdersPage() {
   const exportCsv = () => downloadText(`orders-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(filtered.map((o) => ({
     order_number: o.order_number, date: o.created_at, customer: o.customer_name, phone: o.customer_phone, status: o.status, payment_status: o.payment_status,
     payment_method: o.payment_method ?? "", delivery_method: o.delivery_method, subtotal: o.subtotal, discount: o.discount, delivery_fee: o.delivery_fee,
-    tax: o.tax_amount, total: o.total, paid: o.amount_paid, refunded: o.amount_refunded, balance: (o.balance / 100).toFixed(2), cost: (o.cost / 100).toFixed(2), profit: (o.profit / 100).toFixed(2),
+    tax: o.tax_amount, driver_tip: ((o.tip_cents ?? 0) / 100).toFixed(2), tip_paid_out: o.tip_paid_out ? "yes" : "", total: o.total, paid: o.amount_paid, refunded: o.amount_refunded, balance: (o.balance / 100).toFixed(2), cost: (o.cost / 100).toFixed(2), profit: (o.profit / 100).toFixed(2),
     address: [o.address_street, o.address_apt, o.address_city, o.address_state, o.address_zip].filter(Boolean).join(", "),
   }))));
 
@@ -101,6 +105,7 @@ export function OrdersPage() {
         <button className="btn-gold btn-sm" onClick={() => setNewOpen(true)}><Plus size={16} /> Manual order</button>
       </>} />
       <DateRangeBar range={range} onChange={setRange} />
+      <TipsCard orders={orders.data ?? []} />
       <div className="mb-3 flex flex-wrap gap-2">
         <input className="input !min-h-9 !py-1 sm:!w-64" placeholder="Search order #, name, phone, address" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search orders" />
         <select className={sel} value={f.status} onChange={(e) => set("status", e.target.value)} aria-label="Order status"><option value="">Any status</option>{ORDER_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
@@ -110,7 +115,8 @@ export function OrdersPage() {
         <select className={sel} value={f.product} onChange={(e) => set("product", e.target.value)} aria-label="Product"><option value="">Any product</option>{(products.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
         <select className={sel} value={f.category} onChange={(e) => set("category", e.target.value)} aria-label="Category"><option value="">Any category</option>{(cats.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
         <select className={sel} value={f.delivery} onChange={(e) => set("delivery", e.target.value)} aria-label="Fulfilment"><option value="">Delivery or pickup</option><option value="delivery">Delivery</option><option value="pickup">Pickup</option></select>
-        <select className={sel} value={f.tax} onChange={(e) => set("tax", e.target.value)} aria-label="Tax"><option value="">Taxable or not</option><option value="taxable">Taxable</option><option value="nontaxable">Nontaxable</option></select>
+        <select className={sel} value={f.tax} onChange={(e) => set("tax", e.target.value)} aria-label="Tax"><option value="">Taxed or not</option><option value="taxable">Tax charged</option><option value="exempt">No tax</option></select>
+        <select className={sel} value={f.tip} onChange={(e) => set("tip", e.target.value)} aria-label="Driver tip"><option value="">Tip or not</option><option value="tip">With a tip</option><option value="unpaid">Tip not paid out</option></select>
         <select className={sel} value={f.profit} onChange={(e) => set("profit", e.target.value)} aria-label="Profitability"><option value="">Any profitability</option><option value="profitable">Profitable</option><option value="unprofitable">Unprofitable</option></select>
         </>}
         <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={f.all} onChange={(e) => set("all", e.target.checked ? "1" : "")} /> ignore date range</label>
@@ -121,6 +127,40 @@ export function OrdersPage() {
           empty={<EmptyState title="No orders match" hint="Website orders appear here the moment a customer places an order. Try widening the date range." action={<Link to="/orders?all=1" className="btn-ghost btn-sm">Show all orders</Link>} />} />
       )}
       <NewOrderModal open={newOpen} onClose={() => setNewOpen(false)} />
+    </div>
+  );
+}
+
+/** Driver tips are a pass-through: the customer pays them with the order, the business hands them to the
+ *  driver. They are never revenue, never in profit or average order value, never in the $150,000 cottage-food
+ *  sales total. This card only tracks what has and has not been handed over yet. */
+function TipsCard({ orders }: { orders: Order[] }) {
+  const write = useWrite(); const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const live = orders.filter((o) => o.status !== "cancelled" && (o.tip_cents ?? 0) > 0);
+  const week = useMemo(() => rangeFor("this_week"), []); const month = useMemo(() => rangeFor("this_month"), []);
+  const inW = live.filter((o) => inRange(o.created_at, week)), inM = live.filter((o) => inRange(o.created_at, month));
+  const unpaid = live.filter((o) => !o.tip_paid_out);
+  if (!live.length) return null;
+  const setPaid = (o: Order, v: boolean) => write.mutateAsync(async () => unwrap(await supabase.from("orders").update({ tip_paid_out: v }).eq("id", o.id).select("id"))).then(() => toast.push(v ? `Tip for ${o.order_number} marked paid out` : `Tip for ${o.order_number} marked not paid`)).catch((e) => toast.push((e as Error).message, "err"));
+  const markAll = () => Promise.all(unpaid.map((o) => setPaid(o, true)));
+  return (
+    <div className="card mb-3 px-4 py-3 text-sm">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+        <span className="font-medium text-teal-900">🛵 Tips for drivers</span>
+        <span>This week <b>{fmt(sum(inW.map((o) => o.tip_cents)))}</b> <span className="text-charcoal/50">({inW.length})</span></span>
+        <span>This month <b>{fmt(sum(inM.map((o) => o.tip_cents)))}</b> <span className="text-charcoal/50">({inM.length})</span></span>
+        <span className={unpaid.length ? "text-amber-800" : "text-positive"}>Not yet paid out <b>{fmt(sum(unpaid.map((o) => o.tip_cents)))}</b> <span className="text-charcoal/50">({unpaid.length})</span></span>
+        <button className="btn-ghost btn-sm ml-auto" onClick={() => setOpen((v) => !v)}>{open ? "Hide" : "Show"} list</button>
+        {unpaid.length > 0 && <button className="btn-ghost btn-sm" onClick={markAll} disabled={write.isPending}>Mark all paid out</button>}
+      </div>
+      <p className="mt-1 text-xs text-charcoal/50">100% of each tip goes to the driver. Tips are not sales and never count towards revenue, profit or the cottage-food total.</p>
+      {open && <ul className="mt-2 divide-y divide-ivory-200">{live.slice(0, 60).map((o) => (
+        <li key={o.id} className="flex flex-wrap items-center gap-2 py-1.5 text-xs">
+          <Link to={`/orders/${o.id}`} className="font-mono text-teal-800 hover:underline">{o.order_number}</Link><span>{fmtDateTime(o.created_at)}</span><span>{o.customer_name}</span>
+          <span className="ml-auto font-medium">{fmt(o.tip_cents)}{o.tip_percent ? ` (${o.tip_percent}%)` : ""}</span>
+          <label className="flex items-center gap-1"><input type="checkbox" checked={!!o.tip_paid_out} onChange={(e) => setPaid(o, e.target.checked)} /> paid out</label>
+        </li>))}</ul>}
     </div>
   );
 }

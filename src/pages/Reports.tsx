@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Printer, Download } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, Legend, CartesianGrid, LineChart, Line } from "recharts";
 import { DateRangeBar, useDateRange } from "../components/DateRangeBar";
@@ -51,7 +52,7 @@ export function ReportsPage() {
     if (key === "payments") { downloadText(name, toCsv((cur.payments.data ?? []).filter((x) => !x.voided_at).map((x) => ({ date: x.paid_at, order: x.orders?.order_number, customer: x.orders?.customer_name, amount: x.amount, method: x.method, reference: x.reference })))); return; }
     if (key === "outstanding") { downloadText(name, toCsv((cur.orders.data ?? []).filter((o) => o.status !== "cancelled" && toCents(o.balance_due) > 0).map((o) => ({ order: o.order_number, date: o.created_at, customer: o.customer_name, phone: o.customer_phone, total: o.total, paid: o.amount_paid, balance: o.balance_due })))); return; }
     if (key === "delivery") { downloadText(name, toCsv(deliveryRows().map((d) => ({ order: d.order, date: d.date, miles: d.miles, fee: fromCents(d.fee), cost: fromCents(d.cost), profit: fromCents(d.profit), provider: d.provider })))); return; }
-    if (key === "tax") { if (k) downloadText(name, toCsv([{ period_start: toInputDate(range.from), period_end: toInputDate(range.to), total_sales: fromCents(k.netSales), taxable_sales: fromCents(k.taxableSales), nontaxable_sales: fromCents(k.nontaxableSales), tax_collected: fromCents(k.taxCollected), adjustments: fromCents(k.taxLiability - k.taxCollected), estimated_due: fromCents(k.taxLiability) }])); return; }
+    if (key === "tax") { if (k) downloadText(name, toCsv([{ period_start: toInputDate(range.from), period_end: toInputDate(range.to), total_sales: fromCents(k.netSales), taxable_sales: fromCents(k.taxableSales), exempt_sales: fromCents(k.nontaxableSales), tax_collected: fromCents(k.taxCollected), driver_tips_not_sales: fromCents(k.tips), adjustments: fromCents(k.taxLiability - k.taxCollected), estimated_due: fromCents(k.taxLiability) }])); return; }
     if (key === "customers") { downloadText(name, toCsv(customerRows().map((c) => ({ customer: c.name, phone: c.phone, orders: c.orders, revenue: fromCents(c.revenue), profit: fromCents(c.profit) })))); }
   };
   const deliveryRows = () => (deliveries.data ?? []).filter((d) => d.orders && inRange(d.orders.created_at, range) && d.orders.status !== "cancelled").map((d) => { const fee = d.orders!.delivery_fee_customer_paid ? toCents(d.orders!.delivery_fee) : 0; return { id: d.id, order: d.orders!.order_number, date: d.orders!.created_at.slice(0, 10), miles: Number(d.distance_miles), fee, cost: toCents(d.actual_cost), profit: fee - toCents(d.actual_cost), provider: d.provider }; });
@@ -97,9 +98,9 @@ export function ReportsPage() {
             <tbody>{deliveryRows().map((d) => <tr key={d.id}><td>{d.order}</td><td>{d.date}</td><td className="num">{d.miles.toFixed(1)}</td><td className="num">{fmt(d.fee)}</td><td className="num">{fmt(d.cost)}</td><td className={`num ${d.profit < 0 ? "text-negative" : ""}`}>{fmt(d.profit)}</td><td>{d.provider}</td></tr>)}</tbody></table></div></Section>}
           {key === "tax" && (
             <Section title="Estimated sales-tax summary">
-              <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">Estimates only. Confirm rates, taxability and due dates with the Texas Comptroller or a tax professional.</p>
+              <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">Confirm taxability and due dates with the Texas Comptroller (800-252-5555) or a tax professional. Driver tips are never part of sales. The full month-by-month and quarter-by-quarter view is on the <Link to="/tax" className="underline">Sales Tax</Link> page.</p>
               <div className="table-wrap"><table className="table !min-w-0"><tbody>
-                {[["Total net sales", k.netSales], ["Taxable sales (est.)", k.taxableSales], ["Nontaxable sales (est.)", k.nontaxableSales], ["Sales tax collected", k.taxCollected], ["Adjustments & refunded tax", k.taxLiability - k.taxCollected], ["Estimated amount due", k.taxLiability]].map(([l, v], i, a) => <tr key={String(l)} className={i === a.length - 1 ? "font-semibold" : ""}><td>{l}</td><td className="num">{fmt(v as number)}</td></tr>)}
+                {[["Total net sales", k.netSales], ["Taxable sales", k.taxableSales], ["Exempt sales", k.nontaxableSales], ["Sales tax collected", k.taxCollected], ["Adjustments & refunded tax", k.taxLiability - k.taxCollected], ["Estimated amount due", k.taxLiability]].map(([l, v], i, a) => <tr key={String(l)} className={i === a.length - 1 ? "font-semibold" : ""}><td>{l}</td><td className="num">{fmt(v as number)}</td></tr>)}
               </tbody></table></div>
             </Section>
           )}

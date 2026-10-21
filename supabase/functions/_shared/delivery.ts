@@ -1,10 +1,39 @@
-// Delivery pricing: $5 + $1.75 per mile from the kitchen.
-// Miles = straight-line distance x 1.3 (approximate road distance). The address is
-// looked up with the free US Census geocoder. Kitchen coordinates live in the
-// KITCHEN_LAT / KITCHEN_LON secrets so the address is not in the public repo.
-export const FEE_BASE = 5;
-export const FEE_PER_MILE = 1.75;
+// Delivery pricing: distance zones from the kitchen (owner can change the prices here, in ONE place).
+//   0 to 5 mi $5 | over 5 to 10 mi $8 | over 10 to 15 mi $12 | beyond 15 mi: $12 + $1.50 per extra mile or part
+// No maximum, no "free over $X". FIRSTBITE (free delivery within 10 miles) is handled by promo.ts.
+// The website never keeps its own copy of this table: delivery-quote sends it (action "config").
+// Miles = straight-line distance x 1.3 (approximate road distance). The address is looked up
+// with the free US Census geocoder. Kitchen coordinates live in the KITCHEN_LAT / KITCHEN_LON
+// secrets so the address is not in the public repo.
+export const DELIVERY_ZONES: ReadonlyArray<{ upToMiles: number; feeCents: number }> = [
+  { upToMiles: 5, feeCents: 500 },
+  { upToMiles: 10, feeCents: 800 },
+  { upToMiles: 15, feeCents: 1200 },
+];
+export const BEYOND_PER_MILE_CENTS = 150;
 export const ROAD_FACTOR = 1.3;
+
+/** Fee in cents for an estimated road distance. Pure, unit tested from src/test/delivery.test.ts. */
+export function feeCentsForMiles(miles: number): number {
+  const m = Math.max(0, Number(miles) || 0);
+  for (const z of DELIVERY_ZONES) if (m <= z.upToMiles) return z.feeCents;
+  const last = DELIVERY_ZONES[DELIVERY_ZONES.length - 1];
+  // every started mile beyond the last zone counts (15.2 mi -> 1 extra mile); rounded to 1/1000 first so 15.1 - 15 is not 0.0999...
+  const extra = Math.ceil(Math.round((m - last.upToMiles) * 1000) / 1000);
+  return last.feeCents + extra * BEYOND_PER_MILE_CENTS;
+}
+
+/** 0-based zone index (DELIVERY_ZONES.length = beyond the last zone), for highlighting on the website */
+export function zoneIndexForMiles(miles: number): number {
+  const m = Math.max(0, Number(miles) || 0);
+  const i = DELIVERY_ZONES.findIndex((z) => m <= z.upToMiles);
+  return i < 0 ? DELIVERY_ZONES.length : i;
+}
+
+/** What the website is allowed to know (sent by delivery-quote so there is no second copy that can drift). */
+export function publicDeliveryConfig() {
+  return { zones: DELIVERY_ZONES.map((z) => ({ up_to_miles: z.upToMiles, fee_cents: z.feeCents })), beyond_per_mile_cents: BEYOND_PER_MILE_CENTS };
+}
 
 async function geocode(address: string): Promise<{ lat: number; lon: number } | null | "error"> {
   try {
@@ -44,10 +73,12 @@ function haversineMiles(a: { lat: number; lon: number }, b: { lat: number; lon: 
   return 3958.8 * 2 * Math.asin(Math.sqrt(h));
 }
 
-export type Quote = { ok: true; fee: number; miles: number } | { ok: false; status: number; error: string };
+export type Quote = { ok: true; fee: number; feeCents: number; miles: number; zone: number } | { ok: false; status: number; error: string };
 
 export async function quoteDelivery(street: string, city: string, state: string, zip: string): Promise<Quote> {
-  const kLat = Number(Deno.env.get("KITCHEN_LAT")), kLon = Number(Deno.env.get("KITCHEN_LON"));
+  // read through globalThis so the pure pricing functions above can be unit tested under Node (vitest)
+  const env = (globalThis as unknown as { Deno?: { env: { get(k: string): string | undefined } } }).Deno?.env;
+  const kLat = Number(env?.get("KITCHEN_LAT")), kLon = Number(env?.get("KITCHEN_LON"));
   if (!isFinite(kLat) || !isFinite(kLon) || !kLat || !kLon) return { ok: false, status: 503, error: "delivery pricing is not configured" };
   const address = `${street}, ${city}, ${state} ${zip}`;
   let where = await geocode(address);
@@ -63,6 +94,6 @@ export async function quoteDelivery(street: string, city: string, state: string,
   if (where === "error") return { ok: false, status: 503, error: "could not check the delivery address, please try again" };
   if (!where) return { ok: false, status: 400, error: "we could not find that address, please check the street, city and ZIP" };
   const miles = Math.round(haversineMiles({ lat: kLat, lon: kLon }, where) * ROAD_FACTOR * 10) / 10;
-  const fee = Math.round((FEE_BASE + FEE_PER_MILE * miles) * 100) / 100;
-  return { ok: true, fee, miles };
+  const feeCents = feeCentsForMiles(miles);
+  return { ok: true, fee: feeCents / 100, feeCents, miles, zone: zoneIndexForMiles(miles) };
 }

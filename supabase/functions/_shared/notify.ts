@@ -7,8 +7,13 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 // Customer: a styled receipt email through the business Gmail relay (Apps
 // Script; RECEIPT_URL + RECEIPT_TOKEN, never exposed to the browser).
 // Failures here never block the order.
-export type OrderInfo = { pickup?: boolean; name: string; phone: string; email: string; address: string; instructions: string; requestedAt: string; items: Array<{ slug: string; quantity: number; options: string }>; deliveryFee: number; miles: number; discount?: number; promo?: string };
+export type OrderInfo = { pickup?: boolean; name: string; phone: string; email: string; address: string; instructions: string; requestedAt: string; items: Array<{ slug: string; quantity: number; options: string }>; deliveryFee: number; miles: number; discount?: number; promo?: string; taxCents?: number; taxRate?: number; tipCents?: number; tipPercent?: number | null };
+/** Sales tax and driver tip of the order as the database holds them (migration 0080). Read at send time so
+ *  a promo withdrawn right before payment (reconcilePromo) is reflected. */
+export type OrderMoney = { subtotal: number; discount: number; deliveryFee: number; taxCents: number; taxRate: number; tipCents: number; tipPercent: number | null; total: number };
 const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+/** "8.25%" from 0.0825 */
+export const pctLabel = (rate: number) => (rate * 100).toFixed(2).replace(/\.?0+$/, "") + "%";
 
 // Allergens per dish (mirror of assets/js/data.js on the website; combos = every possible pick) for the receipt.
 const ALLERGENS: Record<string, string[]> = {
@@ -47,7 +52,9 @@ const TCS = new Set(["feteer-beef", "macarona-bechamel", "goulash-beef", "kofta-
 const STORE_BOUGHT = new Set(["tahini", "black-honey", "white-honey"]);
 const RESALE = new Set(["diet-coke"]);
 
-export function receiptHtml(orderNumber: string, info: OrderInfo, lines: Array<{ qty: number; name: string; options: string; slug: string }>, subtotal: number, total: number): string {
+export function receiptHtml(orderNumber: string, info: OrderInfo, lines: Array<{ qty: number; name: string; options: string; slug: string }>, subtotal: number, total: number, m?: OrderMoney): string {
+  const taxCents = m?.taxCents ?? info.taxCents ?? 0, tipCents = m?.tipCents ?? info.tipCents ?? 0, tipPct = m?.tipPercent ?? info.tipPercent ?? null, rate = m?.taxRate ?? info.taxRate ?? 0;
+  const deliveryFee = m?.deliveryFee ?? info.deliveryFee;
   const rows = lines.map((l) => `<tr><td style="padding:8px 0;color:#f3e9d2;border-bottom:1px solid #3a3226">${l.qty} &times; ${esc(l.name)}${l.options ? `<br><span style="color:#b9a880;font-size:12px">${esc(l.options)}</span>` : ""}${ALLERGENS[l.slug]?.length ? `<br><span style="color:#a39373;font-size:12px;line-height:1.5">Contains: ${esc(ALLERGENS[l.slug].join(", "))}</span>` : ""}</td></tr>`).join("");
   const when = new Date(info.requestedAt).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "America/Chicago" });
   const win = /Delivery window: ([^|]+?) on /.exec(info.instructions)?.[1] ?? "";
@@ -74,7 +81,9 @@ export function receiptHtml(orderNumber: string, info: OrderInfo, lines: Array<{
 <tr><td style="padding:14px 28px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="color:#d8ccb0;font-size:14px">
 <tr><td style="padding:3px 0">Dishes</td><td align="right">${money(subtotal + (info.discount ?? 0))}</td></tr>
 ${info.discount ? `<tr><td style="padding:3px 0">Promo ${info.promo ?? ""}</td><td align="right">-${money(info.discount)}</td></tr>` : ""}
-<tr><td style="padding:3px 0">${info.pickup ? "Pickup" : `Delivery (${info.miles} mi)`}</td><td align="right">${info.pickup ? "Free" : money(info.deliveryFee)}</td></tr>
+<tr><td style="padding:3px 0">${info.pickup ? "Pickup" : `Delivery (${info.miles} mi)`}</td><td align="right">${info.pickup ? "Free" : money(deliveryFee)}</td></tr>
+<tr><td style="padding:3px 0">Sales tax${rate > 0 ? ` (${pctLabel(rate)})` : ""}</td><td align="right">${money(taxCents / 100)}</td></tr>
+${tipCents > 0 ? `<tr><td style="padding:3px 0">Driver tip${tipPct ? ` (${tipPct}%)` : ""}</td><td align="right">${money(tipCents / 100)}</td></tr>` : ""}
 <tr><td style="padding:10px 0 0;color:#c9a24a;font-size:17px;border-top:1px solid #3a3226">Total</td><td align="right" style="padding:10px 0 0;color:#c9a24a;font-size:17px;border-top:1px solid #3a3226"><b>${money(total)}</b></td></tr></table></td></tr>
 <tr><td style="padding:22px 28px 4px;color:#c9a24a;font-size:12px;letter-spacing:2px">${info.pickup ? "PICKUP" : "DELIVERY"}</td></tr>
 <tr><td style="padding:0 28px 22px;color:#f3e9d2;font-size:15px;line-height:1.6">${esc(when)}${win ? " &middot; " + esc(win) : ""}<br><span style="color:#b9a880">${esc(info.pickup ? (Deno.env.get("KITCHEN_ADDRESS") ?? "We will send you the pickup address") : info.address)}</span></td></tr>
@@ -126,8 +135,15 @@ export async function notifyAll(supabase: ReturnType<typeof createClient>, order
     const { data: prods } = await supabase.from("products").select("slug, name, selling_price").in("slug", info.items.map((i) => i.slug));
     const names = new Map((prods ?? []).map((p: { slug: string; name: string }) => [p.slug, p.name]));
     const prices = new Map((prods ?? []).map((p: { slug: string; selling_price: number | string }) => [p.slug, Number(p.selling_price)]));
-    const { data: fin } = await supabase.from("order_financials").select("total, net_product_sales").eq("order_number", orderNumber).maybeSingle();
+    const { data: fin } = await supabase.from("order_financials").select("total, net_product_sales, discount, delivery_fee, tax_cents, tax_rate_applied, tip_cents, tip_percent").eq("order_number", orderNumber).maybeSingle();
     const total = Number(fin?.total ?? 0), subtotal = Number(fin?.net_product_sales ?? 0);
+    const m: OrderMoney = {
+      subtotal, discount: Number(fin?.discount ?? info.discount ?? 0), deliveryFee: fin ? Number(fin.delivery_fee) : info.deliveryFee,
+      taxCents: Number(fin?.tax_cents ?? info.taxCents ?? 0), taxRate: Number(fin?.tax_rate_applied ?? info.taxRate ?? 0),
+      tipCents: Number(fin?.tip_cents ?? info.tipCents ?? 0), tipPercent: fin?.tip_percent ?? info.tipPercent ?? null, total,
+    };
+    const taxLine = `Sales tax${m.taxRate > 0 ? ` (${pctLabel(m.taxRate)})` : ""}`;
+    const tipLine = m.tipCents > 0 ? `Driver tip: $${(m.tipCents / 100).toFixed(2)}${m.tipPercent ? ` (${m.tipPercent}%)` : ""}` : "";
     const lines = info.items.map((i) => ({ qty: i.quantity, name: names.get(i.slug) ?? i.slug, options: i.options, slug: i.slug }));
 
     const topic = Deno.env.get("NTFY_TOPIC");
@@ -158,7 +174,9 @@ export async function notifyAll(supabase: ReturnType<typeof createClient>, order
         rule,
         `🧮 Dishes: ${usd(subtotal + (info.discount ?? 0))}`,
         ...(info.discount ? [`🏷️ Promo ${info.promo ?? ""}: -${usd(info.discount)}`] : []),
-        `🚗 Delivery (${info.miles} mi): ${usd(info.deliveryFee)}`,
+        info.pickup ? "🛍️ Pickup: free" : `🚗 Delivery (${info.miles} mi): ${usd(m.deliveryFee)}`,
+        `🧾 ${taxLine}: ${usd(m.taxCents / 100)}`,
+        ...(tipLine ? [`🛵 ${tipLine}`] : []),
         `✅ TOTAL: ${usd(total)}`,
       ].join("\n");
       // Telegram (primary): no shared-IP limits.
@@ -182,7 +200,9 @@ export async function notifyAll(supabase: ReturnType<typeof createClient>, order
           bar,
           `🧮 Dishes: ${usd(subtotal + (info.discount ?? 0))}`,
           ...(info.discount ? [`🏷️ Promo ${esc(info.promo ?? "")}: -${usd(info.discount)}`] : []),
-          info.pickup ? "🛍️ Pickup: free" : `🚗 Delivery (${info.miles} mi): ${usd(info.deliveryFee)}`,
+          info.pickup ? "🛍️ Pickup: free" : `🚗 Delivery (${info.miles} mi): ${usd(m.deliveryFee)}`,
+          `🧾 ${esc(taxLine)}: ${usd(m.taxCents / 100)}`,
+          ...(tipLine ? [`🛵 <b>${esc(tipLine)}</b>`] : []),
           `✅ <b>TOTAL: ${usd(total)}</b>`,
           bar,
           `📦 <b>Total items: ${info.items.reduce((n, i) => n + i.quantity, 0)}</b>`,
@@ -213,7 +233,7 @@ export async function notifyAll(supabase: ReturnType<typeof createClient>, order
     if (rUrl && rToken && info.email && !info.email.toLowerCase().endsWith("@example.com")) {
       await fetch(rUrl, {
         method: "POST",
-        body: JSON.stringify({ token: rToken, kind: "receipt", to: info.email, subject: `Your Pharaoh's Bites order ${orderNumber}`, html: receiptHtml(orderNumber, info, lines, subtotal, total) }),
+        body: JSON.stringify({ token: rToken, kind: "receipt", to: info.email, subject: `Your Pharaoh's Bites order ${orderNumber}`, html: receiptHtml(orderNumber, info, lines, subtotal, total, m) }),
         signal: AbortSignal.timeout(20000),
       }).catch((e) => console.error("receipt failed", String(e)));
     }

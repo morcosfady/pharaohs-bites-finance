@@ -11,7 +11,10 @@ export type PaymentMethod = "zelle" | "venmo" | "cash" | "card" | "other";
 export type DeliveryMethod = "delivery" | "pickup";
 export type DeliveryProvider = "owner" | "uber" | "third_party" | "customer_pickup" | "other";
 export type DeliveryStatus = "not_started" | "scheduled" | "out_for_delivery" | "delivered" | "failed" | "picked_up";
-export type TaxStatus = "taxable" | "nontaxable" | "review";
+/** exempt = bakery item sold without utensils; review is charged as taxable until the owner decides */
+export type TaxStatus = "taxable" | "exempt" | "review";
+export type DeliveryTaxMode = "none" | "proportional" | "all";
+export type TipType = "none" | "percent" | "custom";
 export type CustomerStatus = "active" | "vip" | "trouble_maker" | "blocked";
 export type CostType = "direct_product" | "operating";
 export type Num = number | string;
@@ -29,6 +32,8 @@ export interface BusinessSettings {
 export interface TaxSettings {
   id: number; default_tax_rate: Num; prices_include_tax: boolean; filing_frequency: "monthly" | "quarterly" | "annual";
   next_due_date: string | null; reminder_days_before: number; jurisdiction_note: string; updated_at: string;
+  /** migration 0080: switch, delivery-fee rule and the permit's first business date */
+  tax_enabled: boolean; tax_delivery_mode: DeliveryTaxMode; tax_start_date: string;
 }
 
 export interface ProductCategory { id: string; name: string; sort_order: number }
@@ -65,6 +70,11 @@ export interface Order {
   payment_method: PaymentMethod | null; subtotal: Num; discount: Num; discount_reason: string; delivery_fee: Num;
   delivery_fee_customer_paid: boolean; delivery_subsidy: Num; tax_rate_applied: Num; tax_amount: Num;
   tax_manually_set: boolean; prices_include_tax: boolean; total: Num; amount_paid: Num; amount_refunded: Num;
+  /** integer cents (migration 0080). tax_cents = item_tax_cents + delivery_tax_cents = tax_amount x 100. */
+  taxable_subtotal_cents: number; item_tax_cents: number; delivery_tax_cents: number; tax_cents: number;
+  /** driver tip: a pass-through to the driver, never revenue */
+  tip_cents: number; tip_percent: number | null; tip_type: TipType; tip_paid_out: boolean; tip_paid_out_at: string | null;
+  delivery_miles?: Num | null; promo_code?: string | null;
   internal_notes: string; customer_notes: string; created_at: string; updated_at: string; confirmed_at: string | null;
   completed_at: string | null; cancelled_at: string | null; deleted_at: string | null;
   order_items?: OrderItem[]; payments?: Payment[]; refunds?: Refund[]; delivery_records?: DeliveryRecord | DeliveryRecord[] | null;
@@ -75,6 +85,8 @@ export interface OrderItem {
   id: string; order_id: string; product_id: string | null; product_name: string; options: string; quantity: number;
   unit_price: Num; line_total: Num; is_taxable: boolean; unit_ingredient_cost: Num; unit_packaging_cost: Num;
   unit_labor_cost: Num; unit_other_cost: Num; refunded_qty: number;
+  /** snapshot at order time (migration 0080); null on orders placed before it */
+  tax_status?: TaxStatus | null; tax_cents?: number;
 }
 
 export interface OrderStatusHistory { id: string; order_id: string; from_status: OrderStatus | null; to_status: OrderStatus; changed_by: string | null; note: string; created_at: string }
@@ -159,6 +171,9 @@ export interface OrderFinancial {
   gross_product_revenue: Num; discount: Num; net_product_sales: Num; delivery_revenue: Num; tax_amount: Num;
   total: Num; amount_paid: Num; amount_refunded: Num; balance_due: Num; cogs: Num; packaging_cost: Num;
   labor_cost: Num; delivery_cost: Num; items_count: Num; gross_profit: Num; contribution_profit: Num; deleted_at: string | null;
+  /** migration 0080: tax detail (cents) and the driver tip. Tips are NOT in net_product_sales or delivery_revenue. */
+  taxable_subtotal_cents: number; item_tax_cents: number; delivery_tax_cents: number; tax_cents: number; tax_rate_applied: Num;
+  tip_cents: number; tip_percent: number | null; tip_type: TipType; tip_paid_out: boolean; tip_paid_out_at: string | null; delivery_fee: Num;
 }
 
 /** Row of the product_sales view */

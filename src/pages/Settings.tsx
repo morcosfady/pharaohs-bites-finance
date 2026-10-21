@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { PageHeader, Section, Field, Skeleton, ErrorBox, useToast, EditButton } from "../components/ui";
-import { useSettings, useWrite, useCategories, useExpenseCategories } from "../hooks/queries";
+import { useSettings, useWrite, useCategories, useExpenseCategories, useTaxSettings } from "../hooks/queries";
+import { TaxSettingsForm } from "./Tax";
 import { ORDER_STATUSES, PAYMENT_METHODS, DELIVERY_PROVIDERS } from "../lib/status";
 import { supabase, unwrap } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
 import type { BusinessSettings } from "../lib/types";
 
 export function SettingsPage() {
-  const q = useSettings(); const write = useWrite(); const toast = useToast(); const { adminName, session } = useAuth();
+  const q = useSettings(); const tax = useTaxSettings(); const write = useWrite(); const toast = useToast(); const { adminName, session } = useAuth();
   const [f, setF] = useState<Partial<BusinessSettings>>({});
   useEffect(() => { if (q.data) setF(q.data); }, [q.data]);
   if (q.isLoading) return <Skeleton rows={8} className="card p-5" />;
@@ -35,8 +36,12 @@ export function SettingsPage() {
           <div className="grid grid-cols-2 gap-3"><Field label="Currency"><input className="input" value={f.currency ?? "USD"} onChange={u("currency")} /></Field><Field label="Time zone"><input className="input" value={f.timezone ?? "America/Chicago"} onChange={u("timezone")} /></Field></div>
           </div>
         </Section>
+        <Section title="Sales tax (Texas permit)" className="lg:col-span-2">
+          <p className="mb-3 text-xs text-charcoal/60">The rate the website charges at checkout. It lives in one place (this row of the database); the <a href="#/tax" className="text-teal-700 hover:underline">Sales Tax</a> page edits the same values and shows what was collected.</p>
+          {tax.data ? <TaxSettingsForm s={tax.data} save={async (fn, msg) => { try { await write.mutateAsync(fn); toast.push(msg ?? "Saved"); } catch (e) { toast.push((e as Error).message, "err"); } }} /> : <Skeleton rows={3} />}
+        </Section>
         {f.advanced_mode && <Section title="Financial settings">
-          <p className="mb-3 text-xs text-charcoal/60">The default tax rate, filing frequency and due date live on the <a href="#/tax" className="text-teal-700 hover:underline">Sales Tax</a> page.</p>
+          <p className="mb-3 text-xs text-charcoal/60">Filing frequency and due date are in the Sales tax block above.</p>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Default delivery rate ($/mile)"><input className="input" type="number" step="0.01" min="0" value={Number(f.default_delivery_rate_per_mile ?? 0)} onChange={u("default_delivery_rate_per_mile")} /></Field>
             <Field label="Default mileage cost ($/mile)"><input className="input" type="number" step="0.01" min="0" value={Number(f.default_mileage_cost_per_mile ?? 0)} onChange={u("default_mileage_cost_per_mile")} /></Field>

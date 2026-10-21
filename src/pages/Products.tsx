@@ -2,14 +2,14 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { DataTable, type Column } from "../components/DataTable";
-import { PageHeader, Badge, Skeleton, ErrorBox, Modal, Field, useToast, EditButton } from "../components/ui";
+import { PageHeader, Skeleton, ErrorBox, Modal, Field, useToast, EditButton } from "../components/ui";
 import { useProducts, useCategories, useSettings, useWrite, useAllOrderFinancials, useProductSalesFor } from "../hooks/queries";
 import { TAX_STATUSES, cls, label } from "../lib/status";
 import { fmt, toCents, pct, ratio } from "../lib/money";
 import { productUnitCost, REVENUE_STATUSES } from "../lib/metrics";
 import { supabase, unwrap } from "../lib/supabase";
 import { useQuery } from "@tanstack/react-query";
-import type { Product, ProductSale } from "../lib/types";
+import type { Product, ProductSale, TaxStatus } from "../lib/types";
 import { fmtDate } from "../lib/dates";
 import { useAdvanced } from "../hooks/useMode";
 
@@ -25,6 +25,8 @@ export function ProductsPage() {
   const [editing, setEditing] = useState<Product | null>(null);
   const recipeIds = useQuery({ queryKey: ["recipes", "product-ids"], queryFn: async () => new Set((unwrap(await supabase.from("recipes").select("product_id")) as { product_id: string }[]).map((r) => r.product_id)) });
   const advanced = useAdvanced();
+  const write = useWrite(); const toast = useToast();
+  const setTax = async (p: Product, v: TaxStatus) => { try { await write.mutateAsync(async () => unwrap(await supabase.from("products").update({ tax_status: v }).eq("id", p.id).select("id"))); toast.push(`${p.name}: ${label(TAX_STATUSES, v)}`); } catch (e) { toast.push((e as Error).message, "err"); } };
   const includeLabor = settings.data?.include_owner_labor ?? false;
   const laborRate = settings.data?.default_labor_rate_per_hour ?? 0;
 
@@ -41,7 +43,11 @@ export function ProductsPage() {
   const allCols: Column<Row>[] = [
     { key: "name", header: "Product", primary: true, render: (p) => <div className="flex items-center gap-2">{p.image_url && <img src={p.image_url} alt="" className="h-9 w-9 rounded object-cover" loading="lazy" />}<div><div className="font-medium">{p.name}</div><div className="text-xs text-charcoal/50">{p.category}{!p.is_active && " · inactive"}</div></div></div> },
     { key: "selling_price", header: "Price", numeric: true, render: (p) => fmt(toCents(p.selling_price)), sortValue: (p) => toCents(p.selling_price) },
-    { key: "tax_status", header: "Tax", render: (p) => <Badge className={cls(TAX_STATUSES, p.tax_status)}>{label(TAX_STATUSES, p.tax_status)}</Badge> },
+    // taxable / exempt / review. "review" is charged as taxable on the website until the owner decides, hence the warning.
+    { key: "tax_status", header: "Tax", render: (p) => <span className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+      <select className={`badge cursor-pointer border-0 ${cls(TAX_STATUSES, p.tax_status)}`} value={p.tax_status} aria-label={`Tax status for ${p.name}`} onChange={(e) => setTax(p, e.target.value as TaxStatus)}>{TAX_STATUSES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select>
+      {p.tax_status === "review" && <span title="Not decided yet: charged as taxable (safe side). Pick taxable or exempt." aria-label="Needs review" className="text-amber-600">⚠</span>}
+    </span>, sortValue: (p) => p.tax_status },
     { key: "ingredient_cost", header: "Ingredients", numeric: true, mobile: false, render: (p) => fmt(toCents(p.ingredient_cost)), sortValue: (p) => toCents(p.ingredient_cost) },
     { key: "packaging_cost", header: "Packaging", numeric: true, mobile: false, render: (p) => fmt(toCents(p.packaging_cost)), sortValue: (p) => toCents(p.packaging_cost) },
     { key: "unitCost", header: "Unit cost", numeric: true, render: (p) => fmt(p.unitCost) },
@@ -86,7 +92,7 @@ export function ProductModal({ open, onClose, categories, product, hasRecipe }: 
         <Field label="Name"><input className="input" value={f.name} onChange={u("name")} /></Field>
         <Field label="Selling price"><input className="input" type="number" step="0.01" min="0" value={f.selling_price} onChange={u("selling_price")} /></Field>
         <Field label="Category"><select className="input" value={f.category_id} onChange={u("category_id")}><option value="">—</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
-        <Field label="Tax status" hint="You decide taxability; the dashboard never guesses."><select className="input" value={f.tax_status} onChange={u("tax_status")}>{TAX_STATUSES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></Field>
+        <Field label="Tax status" hint="Taxable = prepared food, desserts, drinks. Exempt = bakery sold without utensils. Needs review is charged as taxable until you decide."><select className="input" value={f.tax_status} onChange={u("tax_status")}>{TAX_STATUSES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></Field>
         <Field label="Ingredient cost per unit" hint={hasRecipe ? "Calculated from the recipe; edit the recipe to change it." : "Type what the ingredients cost you for one unit (or build a recipe on the product page)."}><input className="input" type="number" step="0.01" min="0" value={f.ingredient_cost} disabled={hasRecipe} onChange={u("ingredient_cost")} /></Field>
         <Field label="Packaging cost per unit"><input className="input" type="number" step="0.01" min="0" value={f.packaging_cost} onChange={u("packaging_cost")} /></Field>
         {advanced && <>

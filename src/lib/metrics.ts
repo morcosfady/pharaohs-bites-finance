@@ -15,6 +15,10 @@
  * Cash collected         = payments received (includes tax + delivery)
  * Sales-tax liability    = tax collected − adjustments/refunded tax
  * Sales tax is NEVER counted in revenue or profit.
+ * Driver tips            = a pass-through to the driver (orders.tip_cents). They are NOT revenue, NOT in net
+ *                          sales, average order value, profit, or the $150,000 cottage-food sales total
+ *                          (the view's net_product_sales / delivery_revenue never include them). They are only
+ *                          inside "cash collected" because the customer paid them with the order.
  */
 import { toCents, sum, ratio, type Cents } from "./money";
 import type { OrderFinancial, Expense, Payment, Refund, OrderStatus } from "./types";
@@ -29,6 +33,8 @@ export interface Kpis {
   laborCost: Cents; purchases: Cents; operatingExpenses: Cents; grossProfit: Cents; contributionProfit: Cents; netProfit: Cents;
   grossMargin: number | null; netMargin: number | null; avgOrderValue: Cents | null; avgProfitPerOrder: Cents | null;
   outstandingBalance: Cents; taxLiability: Cents; taxableSales: Cents; nontaxableSales: Cents;
+  /** driver tips on revenue orders: shown apart, never part of any sales or profit figure */
+  tips: Cents;
 }
 
 export interface MetricInputs {
@@ -84,8 +90,11 @@ export function computeKpis(i: MetricInputs): Kpis {
   const netProfit = contributionProfit - operatingExpenses;
   const outstandingBalance = sum(live.filter((o) => !["cancelled"].includes(o.status)).map((o) => Math.max(0, toCents(o.balance_due))));
 
-  const taxableSales = taxCollected > 0 ? Math.round(sum(rev.filter((o) => toCents(o.tax_amount) > 0).map((o) => toCents(o.net_product_sales)))) : 0;
+  // taxable sales = the base the tax was charged on (orders.taxable_subtotal_cents since migration 0080);
+  // older rows that charged tax without the column fall back to their net sales
+  const taxableSales = sum(rev.map((o) => toCents(o.tax_amount) > 0 ? (Number(o.taxable_subtotal_cents ?? 0) > 0 ? Number(o.taxable_subtotal_cents) : toCents(o.net_product_sales)) : 0));
   const nontaxableSales = netSales - taxableSales;
+  const tips = sum(rev.map((o) => Number(o.tip_cents ?? 0)));
 
   return {
     completedOrders: completed.length, pendingOrders: pending.length, cancelledOrders: cancelled.length, revenueOrders: rev.length,
@@ -95,7 +104,7 @@ export function computeKpis(i: MetricInputs): Kpis {
     avgOrderValue: rev.length ? Math.round(netSales / rev.length) : null,
     avgProfitPerOrder: rev.length ? Math.round(contributionProfit / rev.length) : null,
     outstandingBalance, taxLiability: taxCollected - refundTax + (i.taxAdjustments ?? 0),
-    taxableSales, nontaxableSales,
+    taxableSales, nontaxableSales, tips,
   };
 }
 
@@ -106,7 +115,8 @@ export const KPI_FORMULAS: Record<string, string> = {
   netSales: "Gross sales − discounts − refunds. Sales tax is never included.",
   deliveryFees: "Delivery fees charged to customers (only when the customer pays them).",
   taxCollected: "Estimated sales tax charged on orders. Held for the Comptroller — not income.",
-  cashCollected: "Customer payments actually received (includes tax and delivery).",
+  cashCollected: "Customer payments actually received (includes tax, delivery and driver tips).",
+  tips: "Driver tips paid by customers with their order. 100% goes to the driver: not revenue, not in sales or profit.",
   cogs: "Recipe cost of the orders sold (menu analysis). Profit uses your real purchases instead.",
   purchases: "Ingredients and packaging you actually bought in the period (from receipts and the bank).",
   packaging: "Packaging portion of COGS.",

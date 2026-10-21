@@ -59,7 +59,7 @@ export function DataPage() {
         for (const r of preview.rows) {
           if (!r.name || !isValidMoney(r.selling_price)) continue;
           const slug = (r.slug || r.name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-          await write.mutateAsync(async () => unwrap(await supabase.from("products").upsert({ slug, name: r.name, selling_price: parseMoney(r.selling_price), tax_status: ["taxable", "nontaxable", "review"].includes(r.tax_status) ? r.tax_status : "review", packaging_cost: parseMoney(r.packaging_cost || "0"), labor_minutes: Number(r.labor_minutes || 0), is_active: r.is_active !== "false" && r.is_active !== "0" }, { onConflict: "slug" }).select("id"))); n++;
+          await write.mutateAsync(async () => unwrap(await supabase.from("products").upsert({ slug, name: r.name, selling_price: parseMoney(r.selling_price), tax_status: ["taxable", "exempt", "review"].includes(r.tax_status) ? r.tax_status : "review", packaging_cost: parseMoney(r.packaging_cost || "0"), labor_minutes: Number(r.labor_minutes || 0), is_active: r.is_active !== "false" && r.is_active !== "0" }, { onConflict: "slug" }).select("id"))); n++;
         }
       } else {
         const existing = new Set((orders.data ?? []).map((o) => o.order_number));

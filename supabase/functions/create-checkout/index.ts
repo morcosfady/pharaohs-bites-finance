@@ -3,6 +3,8 @@
 // Website calls this right after create-order. Two actions:
 //  * create: builds a Stripe Checkout Session for the order's balance (amount
 //    is read from the database, never from the browser) and returns its url.
+//    The session lists the food, delivery, sales tax and driver tip as separate
+//    lines; their sum must equal the order's balance to the cent or no session is made.
 //  * status: says whether the order has been paid (used on the return page).
 // Both need order_number + the checkout_token that created the order.
 // Secrets: STRIPE_SECRET_KEY (set with `supabase secrets set`).
@@ -10,6 +12,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { recordPaidSession } from "../_shared/payments.ts";
 import { reconcilePromo } from "../_shared/promo.ts";
+import { checkoutLines } from "../_shared/checkout.ts";
 
 const ALLOWED_ORIGINS = [
   "https://morcosfady.github.io",
@@ -32,6 +35,7 @@ function corsHeaders(origin: string | null) {
   };
 }
 const json = (p: unknown, status: number, h: Record<string, string>) => new Response(JSON.stringify(p), { status, headers: h });
+const cents = (v: unknown) => Math.round(Number(v ?? 0) * 100);
 
 Deno.serve(async (req) => {
   const origin = req.headers.get("origin");
@@ -53,6 +57,8 @@ Deno.serve(async (req) => {
   // Free delivery is withdrawn if the same customer already used the code on another (paid) order.
   let promoWithdrawn = false;
   if (action === "create") promoWithdrawn = await reconcilePromo(supabase, order.id);
+  // (re-read after the promo check: the fee, tax and total may just have changed)
+  const { data: money } = await supabase.from("orders").select("subtotal, discount, delivery_fee, tax_cents, tip_cents, tip_percent, tax_rate_applied, total").eq("id", order.id).maybeSingle();
   const { data: fin } = await supabase.from("order_financials").select("balance_due, amount_paid").eq("id", order.id).maybeSingle();
   const balanceCents = Math.round(Number(fin?.balance_due ?? 0) * 100);
   let paid = balanceCents <= 0 && Number(fin?.amount_paid ?? 0) > 0;
@@ -77,14 +83,17 @@ Deno.serve(async (req) => {
   const key = Deno.env.get("STRIPE_SECRET_KEY");
   if (!key) return json({ ok: false, error: "online payment is not configured" }, 503, headers);
 
+  // Assertion: food + delivery + tax + tip must be exactly what the customer is charged.
+  const lines = money ? checkoutLines({ ...money, order_number: order.order_number, delivery_method: order.delivery_method }, balanceCents, cents(money.total)) : null;
+  if (!lines) {
+    console.error("checkout lines do not add up", JSON.stringify({ order: order.order_number, money, balanceCents }));
+    return json({ ok: false, error: "could not price the payment, please contact us" }, 500, headers);
+  }
+
   const back = `${origin}/order.html`;
   const desc = `Pharaoh's Bites order ${order.order_number}`;
   const form = new URLSearchParams({
     mode: "payment",
-    "line_items[0][quantity]": "1",
-    "line_items[0][price_data][currency]": "usd",
-    "line_items[0][price_data][unit_amount]": String(balanceCents),
-    "line_items[0][price_data][product_data][name]": desc,
     client_reference_id: order.order_number,
     "metadata[order_number]": order.order_number,
     "metadata[order_id]": order.id,
@@ -92,6 +101,12 @@ Deno.serve(async (req) => {
     "payment_intent_data[description]": desc,
     success_url: `${back}?paid=1&order=${encodeURIComponent(order.order_number)}`,
     cancel_url: `${back}?cancelled=1&order=${encodeURIComponent(order.order_number)}`,
+  });
+  lines.forEach((l, i) => {
+    form.set(`line_items[${i}][quantity]`, "1");
+    form.set(`line_items[${i}][price_data][currency]`, "usd");
+    form.set(`line_items[${i}][price_data][unit_amount]`, String(l.cents));
+    form.set(`line_items[${i}][price_data][product_data][name]`, l.name);
   });
   let res: Response;
   // deno-lint-ignore no-explicit-any
@@ -114,6 +129,10 @@ Deno.serve(async (req) => {
   }
   if (!res.ok || !session.url) {
     console.error("stripe session failed", JSON.stringify(session?.error ?? session));
+    return json({ ok: false, error: "could not start payment" }, 502, headers);
+  }
+  if (typeof session.amount_total === "number" && session.amount_total !== balanceCents) {
+    console.error("stripe amount differs from the order", session.amount_total, balanceCents);
     return json({ ok: false, error: "could not start payment" }, 502, headers);
   }
   await supabase.from("orders").update({ stripe_session_id: session.id }).eq("id", order.id);

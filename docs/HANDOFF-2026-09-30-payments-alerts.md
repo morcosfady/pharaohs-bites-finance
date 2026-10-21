@@ -9,7 +9,7 @@
 ## 0. TL;DR (what the system does now)
 
 1. A customer builds an order on **pharaohsbites.com/order.html**, types name, phone, **email (required)**, street address, picks a delivery date + time window.
-2. The page shows the **delivery fee live** ($5 + $1.75 per mile) and the **total before paying**.
+2. The page shows the **delivery fee live** (distance zones since 2026-10-21, see HANDOFF.md section 18; this file originally said $5 + $1.75 per mile) and the **total before paying**.
 3. **Place Order & Pay** → order saved as *Pending* → customer pays by **card on Stripe Checkout (live mode)**.
 4. When Stripe confirms the payment: order becomes **Paid + Confirmed**, the owner gets a **Telegram alert** (English + Arabic dish names), the customer gets a **styled email receipt**, and the customer sees "Payment received ✅" (WhatsApp is now only an **optional** extra).
 5. **Pickup was built but is hidden** (delivery only for now). One switch brings it back (section 6).
@@ -52,7 +52,7 @@ All deployed with `supabase functions deploy <name> --no-verify-jwt --project-re
 | `_shared/delivery.ts` | `quoteDelivery()`: the fee formula + geocoder. **One place to change pricing.** |
 
 ### Delivery fee formula
-`fee = round(5 + 1.75 × miles, 2)` where `miles = straight-line distance × 1.3` (approximate road miles). Kitchen coordinates are in secrets (`KITCHEN_LAT`, `KITCHEN_LON`), **not in the repo**. Google Maps (driving distance) was attempted; the owner's Google Cloud billing was refused (`OR_BACR2_59`), so the free straight-line method is used. A downtown address came to about 19.8 miles = $39.65. Tax is **not** charged yet (owner will ask the accountant; `tax_status = 'review'` on items).
+**Superseded 2026-10-21 (HANDOFF.md section 18): the fee is now a zone table in `_shared/delivery.ts` (0-5 mi $5, 5-10 mi $8, 10-15 mi $12, beyond +$1.50 per started mile).** Original formula `fee = round(5 + 1.75 × miles, 2)` where `miles = straight-line distance × 1.3` (approximate road miles). Kitchen coordinates are in secrets (`KITCHEN_LAT`, `KITCHEN_LON`), **not in the repo**. Google Maps (driving distance) was attempted; the owner's Google Cloud billing was refused (`OR_BACR2_59`), so the free straight-line method is used. A downtown address came to about 19.8 miles = $39.65. Tax is **not** charged yet (owner will ask the accountant; `tax_status = 'review'` on items).
 
 ### Order status logic (important)
 - **Pay-online order:** created as `pending_whatsapp_confirmation` (label now just **"Pending"**), `notify_payload` filled. Stripe confirms → `confirmed`, payload cleared, alert + receipt sent. If the customer abandons payment, the order stays Pending and the owner is **not** alerted.
@@ -191,7 +191,7 @@ Current asset versions (bump `?v=` in **every** HTML when editing): `main.js?v=1
 
 **Re-send a failed Stripe confirmation:** Stripe → Workbench → Webhooks → `pharaohs-bites-payments-live` → Event deliveries → open the failed event → **Resend**.
 
-**Change the delivery price:** edit `FEE_BASE`/`FEE_PER_MILE` in `supabase/functions/_shared/delivery.ts`, redeploy `create-order` and `delivery-quote`, update the text "$5 + $1.75 per mile" in `order.html` (notice), `main.js` (two notes) and the fulfil card.
+**Change the delivery price (2026-10-21 onwards):** edit `DELIVERY_ZONES` / `BEYOND_PER_MILE_CENTS` in `supabase/functions/_shared/delivery.ts`, redeploy `create-order` and `delivery-quote`. The website reads the zone table from `delivery-quote` (action `config`), so no text needs changing there.
 
 **Re-enable pickup:** `enablePickup: true` in `config.js`, set `KITCHEN_ADDRESS`/`pickupAddress` as desired, bump versions, push.
 
@@ -229,7 +229,7 @@ Method: signed-in owner session in the in-app browser, every route opened at des
 
 ## 15. Update 2026-10-01: Pickup is ON again, with its own time windows
 
-Owner decision (message in Franglais): **offer both Pickup (free) and Delivery (fee unchanged: $5 + $1.75/mile)**, with different windows:
+Owner decision (message in Franglais): **offer both Pickup (free) and Delivery (fee at the time: $5 + $1.75/mile; distance zones since 2026-10-21)**, with different windows:
 - **Delivery windows:** 8:00 AM–11:00 AM or 8:00 PM–11:00 PM (ids `d1`, `d2`)
 - **Pickup windows:** 2:00 PM–4:00 PM, 4:00 PM–6:00 PM, 6:00 PM–8:00 PM (ids `p1`, `p2`, `p3`; changed from 11-2, 2-5, 5-8 on 2026-10-01)
 

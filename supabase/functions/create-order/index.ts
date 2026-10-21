@@ -6,11 +6,15 @@
 //  * validates shape, types and lengths of every field
 //  * re-prices every line from the products table (browser totals ignored)
 //  * rejects unknown / inactive products
+//  * prices the whole order (dishes, delivery zone, Texas sales tax, driver tip) in
+//    _shared/pricing.ts BEFORE anything is saved; a browser "expected total" that does
+//    not match is refused; after the database wrote the order its numbers must match
+//    the TypeScript numbers to the cent or the order is cancelled
 //  * idempotent on checkout_token (double-click / refresh safe)
 //  * basic per-IP rate limiting
 //  * CORS restricted to approved origins
-//  * writes order + items in ONE transaction (SQL function below)
-//  * returns only { ok, order_number }
+//  * writes order + items in ONE transaction (SQL function intake_website_order)
+//  * returns only { ok, order_number } plus the server totals
 //
 // Secrets: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected by the
 // Supabase runtime. They never appear in this repository or the browser.
@@ -21,6 +25,7 @@ import { quoteDelivery } from "../_shared/delivery.ts";
 import { checkPromo, markPromoUsed, normCode } from "../_shared/promo.ts";
 import { normAddress } from "../_shared/address.ts";
 import { parseChoices, resolveChoices, type ComboSlot } from "../_shared/combos.ts";
+import { priceBasket, pricingPayload } from "../_shared/pricing.ts";
 
 const ALLOWED_ORIGINS = [
   "https://morcosfady.github.io",
@@ -56,6 +61,8 @@ type Body = {
   promo?: unknown;
   visitor_id?: unknown;
   fulfillment?: unknown;
+  tip?: unknown;
+  expected_total_cents?: unknown;
   customer?: { name?: unknown; phone?: unknown; street?: unknown; apt?: unknown; city?: unknown; state?: unknown; zip?: unknown; instructions?: unknown; requested_at?: unknown; email?: unknown };
   items?: Array<{ slug?: unknown; quantity?: unknown; options?: unknown; choices?: unknown }>;
 };
@@ -75,7 +82,7 @@ function str(v: unknown, max: number, required = false): string | null {
   if (v == null) return required ? null : "";
   if (typeof v !== "string") return null;
   // strip control chars, collapse whitespace, cap length
-  const s = v.replace(/[\x00-]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+  const s = v.replace(/[\x00-\x1f\x7f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
   if (required && !s) return null;
   return s;
 }
@@ -84,6 +91,8 @@ async function sha256(s: string) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
+
+const cents = (v: unknown) => Math.round(Number(v ?? 0) * 100);
 
 Deno.serve(async (req) => {
   const origin = req.headers.get("origin");
@@ -136,6 +145,11 @@ Deno.serve(async (req) => {
     const wd = new Date(dayIn(KITCHEN_TZ, requestedDate) + "T12:00:00Z").getUTCDay();
     if (wd === 0 || wd === 6) return json({ ok: false, error: "Pickup is not available on Saturday or Sunday. Please choose delivery or a weekday." }, 400, headers);
   }
+  // The tip: shape is checked here, amount is recomputed from the server's own subtotal in priceBasket.
+  if (body.tip != null && (typeof body.tip !== "object" || Array.isArray(body.tip))) return json({ ok: false, error: "invalid tip" }, 400, headers);
+  const tipType = (body.tip as { type?: unknown } | null)?.type;
+  if (isPickup && tipType != null && tipType !== "none") return json({ ok: false, error: "a driver tip is only for delivery orders" }, 400, headers);
+  if (body.expected_total_cents != null && !Number.isInteger(body.expected_total_cents)) return json({ ok: false, error: "invalid expected total" }, 400, headers);
 
   if (!Array.isArray(body.items) || body.items.length === 0 || body.items.length > MAX_ITEMS) {
     return json({ ok: false, error: "invalid items" }, 400, headers);
@@ -190,8 +204,10 @@ Deno.serve(async (req) => {
   }
 
   // ---- idempotency: same token => same order ------------------------------
-  const { data: existing } = await supabase.from("orders").select("order_number, delivery_fee").eq("checkout_token", token).maybeSingle();
-  if (existing) return json({ ok: true, order_number: existing.order_number, delivery_fee: Number(existing.delivery_fee), duplicate: true }, 200, headers);
+  const { data: existing } = await supabase.from("orders").select("order_number, delivery_fee, delivery_miles, subtotal, tax_cents, tip_cents, total").eq("checkout_token", token).maybeSingle();
+  if (existing) {
+    return json({ ok: true, order_number: existing.order_number, delivery_fee: Number(existing.delivery_fee), miles: Number(existing.delivery_miles ?? 0), subtotal_cents: cents(existing.subtotal), tax_cents: Number(existing.tax_cents), tip_cents: Number(existing.tip_cents), total_cents: cents(existing.total), duplicate: true }, 200, headers);
+  }
 
   // ---- delivery fee (before we save anything); pickup is free ----------------
   let miles = 0, deliveryFee = 0;
@@ -212,6 +228,20 @@ Deno.serve(async (req) => {
     if (typeof pc.flat === "number") { const nf = Math.min(deliveryFee, pc.flat); feeWaived = deliveryFee - nf; deliveryFee = nf; }
     else { feeWaived = promoPercent ? 0 : deliveryFee; if (!promoPercent) deliveryFee = 0; }
     freeOrder = !!pc.free;
+  }
+
+  // ---- price everything in TypeScript before anything is saved -----------------------------------
+  // dishes from the products table, delivery as quoted (after the promo), Texas sales tax, driver tip
+  const priced = await priceBasket(supabase, {
+    items: items.map((i) => ({ slug: i.slug, quantity: i.quantity })), isDelivery: !isPickup, deliveryCents: Math.round(deliveryFee * 100),
+    promo: promoCode ? { percent: promoPercent || undefined, free: freeOrder } : undefined, tip: body.tip as never,
+  });
+  if (!priced.ok) return json({ ok: false, error: priced.error }, priced.status, headers);
+  // A free order has no card step, so it cannot carry a tip (the website hides the tip card for it).
+  if (freeOrder && priced.tip.cents > 0) return json({ ok: false, error: "A free order has no payment step, so a driver tip cannot be added. Please remove the tip." }, 400, headers);
+  // The browser sends the total it showed; anything else is refused before an order exists.
+  if (typeof body.expected_total_cents === "number" && body.expected_total_cents !== priced.totalCents) {
+    return json({ ok: false, error: "Your total was updated. Please check the new total and press the button again.", pricing: pricingPayload(priced) }, 409, headers);
   }
 
   // ---- rate limit per IP -------------------------------------------------
@@ -243,15 +273,20 @@ Deno.serve(async (req) => {
   // A free-order promo needs no card: the order is confirmed straight away like a non-paid order.
   const payNow = payOnline && !freeOrder;
   // Percent-off code: the discount is that % of the dishes (delivery is charged as usual).
-  let discount = 0;
-  if (promoPercent) {
-    const { data: sr } = await supabase.from("orders").select("subtotal").eq("order_number", data as string).maybeSingle();
-    discount = Math.round(Number(sr?.subtotal ?? 0) * promoPercent) / 100;
-  }
-  const info: OrderInfo = { pickup: isPickup, name, phone, email, address: `${street}${apt ? ", " + apt : ""}, ${city}, ${state} ${zip}`, instructions, requestedAt, items, deliveryFee, miles, ...(discount ? { discount, promo: promoCode } : {}) };
+  const discount = promoPercent ? priced.discountCents / 100 : 0;
+  const tip = priced.tip;
+  const info: OrderInfo = { pickup: isPickup, name, phone, email, address: `${street}${apt ? ", " + apt : ""}, ${city}, ${state} ${zip}`, instructions, requestedAt, items, deliveryFee, miles, ...(discount ? { discount, promo: promoCode } : {}), taxCents: priced.taxCents, taxRate: priced.taxRate, tipCents: tip.cents, tipPercent: tip.percent };
   // Pay-online orders stay "pending" and silent until Stripe confirms payment (stripe-webhook
   // then confirms the order and sends the alert + receipt). Other orders are confirmed now.
-  const { error: feeErr } = await supabase.from("orders").update({ delivery_fee: deliveryFee, delivery_miles: isPickup ? null : miles, customer_email: email, ...(promoCode ? { promo_code: promoCode } : {}), ...(discount ? { discount, discount_reason: `Promo ${promoCode} (${promoPercent}% off dishes)` } : {}), ...(isPickup ? { delivery_method: "pickup" } : {}), ...(payNow ? { notify_payload: info } : { status: "confirmed" }) }).eq("order_number", data as string);
+  // Setting delivery_fee / discount / tip_cents makes the database recompute tax and total (migration 0080).
+  const { error: feeErr } = await supabase.from("orders").update({
+    delivery_fee: deliveryFee, delivery_miles: isPickup ? null : miles, customer_email: email,
+    tip_cents: tip.cents, tip_percent: tip.percent, tip_type: tip.type,
+    ...(promoCode ? { promo_code: promoCode } : {}),
+    ...(discount ? { discount, discount_reason: `Promo ${promoCode} (${promoPercent}% off dishes)` } : {}),
+    ...(isPickup ? { delivery_method: "pickup" } : {}),
+    ...(payNow ? { notify_payload: info } : { status: "confirmed" }),
+  }).eq("order_number", data as string);
   if (feeErr) console.error("delivery fee update failed", feeErr.message);
   if (promoCode) {
     const { data: po } = await supabase.from("orders").select("id").eq("order_number", data as string).maybeSingle();
@@ -271,9 +306,18 @@ Deno.serve(async (req) => {
       } else if (!payOnline) await markPromoUsed(supabase, po.id);
     }
   }
+
+  // ---- the database must agree with the TypeScript pricing to the cent, or nothing goes ahead --------
+  const { data: saved } = await supabase.from("orders").select("id, subtotal, discount, delivery_fee, tax_cents, tip_cents, total, customer_id").eq("order_number", data as string).maybeSingle();
+  const dbTotal = cents(saved?.total), dbSub = cents(saved?.subtotal), dbDisc = cents(saved?.discount), dbFee = cents(saved?.delivery_fee);
+  if (!saved || dbTotal !== priced.totalCents || dbSub !== priced.subtotalCents || dbDisc !== priced.discountCents || dbFee !== priced.deliveryCents || Number(saved.tax_cents) !== priced.taxCents || Number(saved.tip_cents) !== priced.tip.cents) {
+    console.error("pricing mismatch", JSON.stringify({ order: data, db: saved, ts: pricingPayload(priced) }));
+    if (saved?.id) await supabase.from("orders").update({ status: "cancelled", notify_payload: null, internal_notes: "Cancelled automatically: the server pricing check failed (see function logs)." }).eq("id", saved.id);
+    return json({ ok: false, error: "We could not price your order. Nothing was charged, please try again." }, 500, headers);
+  }
+
   // keep the email on the customer record too (only when it was empty)
-  const { data: ordRow } = await supabase.from("orders").select("customer_id").eq("order_number", data as string).maybeSingle();
-  if (ordRow?.customer_id) await supabase.from("customers").update({ email }).eq("id", ordRow.customer_id).eq("email", "");
+  if (saved.customer_id) await supabase.from("customers").update({ email }).eq("id", saved.customer_id).eq("email", "");
   if (!payNow) {
     const notify = notifyAll(supabase, data as string, info);
     // keep the function alive until the alert is sent, without making the customer wait
@@ -286,7 +330,7 @@ Deno.serve(async (req) => {
     const { error: vErr } = await supabase.from("site_events").insert({ visitor_id: visitor, kind: "order_placed", page: "order", detail: data as string, meta: { ...(freeOrder ? { free: "yes" } : {}), ...(promoCode ? { code: promoCode } : {}) } });
     if (vErr) console.error("site event failed", vErr.message);
   }
-  return json({ ok: true, order_number: data as string, delivery_fee: deliveryFee, miles, ...(promoCode ? { promo: promoCode } : {}), ...(freeOrder ? { free: true } : {}), ...(discount ? { discount } : {}) }, 200, headers);
+  return json({ ok: true, order_number: data as string, delivery_fee: deliveryFee, miles, ...(promoCode ? { promo: promoCode } : {}), ...(freeOrder ? { free: true } : {}), ...(discount ? { discount } : {}), ...pricingPayload(priced) }, 200, headers);
 });
 
 function json(payload: unknown, status: number, headers: Record<string, string>) {

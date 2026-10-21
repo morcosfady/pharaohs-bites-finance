@@ -45,6 +45,7 @@ export function OrderDetailPage() {
   const cost = items.reduce((s, i) => s + i.quantity * (toCents(i.unit_ingredient_cost) + toCents(i.unit_packaging_cost) + toCents(i.unit_other_cost)), 0);
   const labor = items.reduce((s, i) => s + i.quantity * toCents(i.unit_labor_cost), 0);
   const deliveryRevenue = o.delivery_fee_customer_paid ? toCents(o.delivery_fee) : 0;
+  // profit never includes the sales tax (held for the state) or the driver tip (handed to the driver)
   const profit = toCents(o.subtotal) - toCents(o.discount) + deliveryRevenue - cost - toCents(d?.actual_cost ?? 0) - (settings.data?.include_owner_labor ? labor : 0);
   const balance = toCents(o.total) - toCents(o.amount_paid) + toCents(o.amount_refunded);
   const address = { street: o.address_street, apt: o.address_apt, city: o.address_city, state: o.address_state, zip: o.address_zip };
@@ -123,7 +124,8 @@ export function OrderDetailPage() {
               <dt className="text-charcoal/60">Subtotal</dt><dd className="text-right tabular-nums">{fmt(toCents(o.subtotal))}</dd>
               <dt className="text-charcoal/60">Discount</dt><dd className="text-right tabular-nums">−{fmt(toCents(o.discount))}</dd>
               <dt className="text-charcoal/60">Delivery</dt><dd className="text-right tabular-nums">{fmt(toCents(o.delivery_fee))}</dd>
-              <dt className="text-charcoal/60">Est. tax</dt><dd className="text-right tabular-nums">{fmt(toCents(o.tax_amount))}</dd>
+              <dt className="text-charcoal/60">Sales tax{Number(o.tax_rate_applied) > 0 ? ` (${(Number(o.tax_rate_applied) * 100).toFixed(2).replace(/\.?0+$/, "")}%)` : ""}</dt><dd className="text-right tabular-nums">{fmt(toCents(o.tax_amount))}{(o.delivery_tax_cents ?? 0) > 0 && <span className="block text-[11px] text-charcoal/50">items {fmt(o.item_tax_cents ?? 0)} + delivery {fmt(o.delivery_tax_cents ?? 0)}</span>}</dd>
+              <dt className="text-charcoal/60">Driver tip{o.tip_percent ? ` (${o.tip_percent}%)` : ""}</dt><dd className="text-right tabular-nums">{fmt(o.tip_cents ?? 0)}{(o.tip_cents ?? 0) > 0 && <label className="no-print ml-2 inline-flex items-center gap-1 text-[11px] text-charcoal/60"><input type="checkbox" checked={!!o.tip_paid_out} onChange={(e) => upd({ tip_paid_out: e.target.checked }, e.target.checked ? "Tip marked paid out to the driver" : "Tip marked not paid out")} /> paid out</label>}</dd>
               <dt className="font-medium">Final total</dt><dd className="text-right font-display text-lg font-semibold text-teal-900">{fmt(toCents(o.total))}</dd>
               <dt className="text-charcoal/60">Paid</dt><dd className="text-right tabular-nums">{fmt(toCents(o.amount_paid))}</dd>
               <dt className="text-charcoal/60">Balance due</dt><dd className={`text-right tabular-nums ${balance > 0 ? "text-negative" : "text-positive"}`}>{fmt(balance)}</dd>
@@ -216,7 +218,7 @@ function ItemRow({ item, locked, onSave }: { item: OrderItem; locked: boolean; o
       <td className="num">{locked ? item.quantity : <input type="number" min={1} className="input !min-h-8 !w-12 sm:!w-16 !py-0.5 text-right" defaultValue={item.quantity} onBlur={(e) => { const v = Math.max(1, parseInt(e.target.value || "1", 10)); if (v !== item.quantity) upd({ quantity: v }); }} />}</td>
       <td className="num">{locked ? fmt(toCents(item.unit_price)) : <input type="number" step="0.01" min={0} className="input !min-h-8 !w-14 sm:!w-20 !py-0.5 text-right" defaultValue={fromCents(toCents(item.unit_price))} onBlur={(e) => { const v = Number(e.target.value); if (toCents(v) !== toCents(item.unit_price)) upd({ unit_price: v }); }} />}</td>
       <td className="num font-medium">{fmt(toCents(item.line_total))}</td>
-      <td className="hidden sm:table-cell"><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={item.is_taxable} disabled={locked} onChange={(e) => upd({ is_taxable: e.target.checked })} />{item.is_taxable ? "taxable" : "nontaxable"}</label></td>
+      <td className="hidden sm:table-cell"><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={item.is_taxable} disabled={locked} onChange={(e) => upd({ is_taxable: e.target.checked })} />{item.is_taxable ? "taxable" : "exempt"}</label>{(item.tax_cents ?? 0) > 0 && <span className="block text-[11px] text-charcoal/50">tax {fmt(item.tax_cents ?? 0)}</span>}</td>
       <td className="no-print">{!locked && <button className="text-negative hover:underline" aria-label="Remove line" onClick={() => onSave(async () => unwrap(await supabase.from("order_items").delete().eq("id", item.id).select("id")), "Line removed")}><Trash2 size={14} /></button>}</td>
     </tr>
   );
@@ -354,11 +356,11 @@ function PrintSummary({ o, items, business }: { o: Order; items: OrderItem[]; bu
         <table className="mt-3 w-full text-sm"><thead><tr><th className="text-left">Item</th><th className="text-right">Qty</th><th className="text-right">Unit</th><th className="text-right">Total</th></tr></thead>
           <tbody>{items.map((i) => <tr key={i.id}><td>{i.product_name}{i.options ? ` (${i.options})` : ""}</td><td className="text-right">{i.quantity}</td><td className="text-right">{fmt(toCents(i.unit_price))}</td><td className="text-right">{fmt(toCents(i.line_total))}</td></tr>)}</tbody></table>
         <div className="mt-3 text-right text-sm">
-          <div>Subtotal {fmt(toCents(o.subtotal))}</div>{toCents(o.discount) > 0 && <div>Discount −{fmt(toCents(o.discount))}</div>}<div>Delivery {fmt(toCents(o.delivery_fee))}</div><div>Estimated sales tax {fmt(toCents(o.tax_amount))}</div>
+          <div>Subtotal {fmt(toCents(o.subtotal))}</div>{toCents(o.discount) > 0 && <div>Discount −{fmt(toCents(o.discount))}</div>}<div>Delivery {fmt(toCents(o.delivery_fee))}</div><div>Sales tax {fmt(toCents(o.tax_amount))}</div>{(o.tip_cents ?? 0) > 0 && <div>Driver tip{o.tip_percent ? ` (${o.tip_percent}%)` : ""} {fmt(o.tip_cents)}</div>}
           <div className="text-lg font-semibold">Total {fmt(toCents(o.total))}</div><div>Paid {fmt(toCents(o.amount_paid))} · Balance {fmt(toCents(o.total) - toCents(o.amount_paid) + toCents(o.amount_refunded))}</div>
         </div>
         {o.customer_notes && <p className="mt-3 text-sm">{o.customer_notes}</p>}
-        <p className="mt-4 text-xs text-charcoal/60">Sales tax shown is an estimate. Thank you for ordering from {business}.</p>
+        <p className="mt-4 text-xs text-charcoal/60">Texas sales tax is charged where it applies. Thank you for ordering from {business}.</p>
       </div>
     </div>
   );
