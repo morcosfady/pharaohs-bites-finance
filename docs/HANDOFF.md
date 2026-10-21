@@ -539,3 +539,6 @@ Owner edits on the dashboard (discount, delivery fee, tip, manual tax) recompute
 3. Orders placed from 2026-10-01 until this went live carried no tax. The "Tax not collected" card on the Sales Tax page estimates what is owed on them (taxable dishes x 8.25% plus delivery per the mode); the orders themselves were not changed.
 4. Kitchen coordinates still worth checking (a downtown Dallas address quotes 20.7 mi = $21.00 under the zones).
 5. `.claude/launch.json` in this repo is local (untracked): `website` = `python -m http.server 8000` on the website folder, `dashboard` = `npm run dev`.
+
+### 18.6 Combos switched off (2026-10-21, owner request)
+Migration **0081** (applied, appended) set the six combo products inactive (`party-tray`, `family-feast`, `egyptian-breakfast`, `meal-for-one`, `feteer-dip-trio`, `pick-3-puddings`); `create-order` refuses inactive products. The website hides them with `COMBOS_ENABLED = false` in `data.js` (website handoff 20.4). Nothing else removed: `combo_slots`, the picker and the Telegram names stay, so re-activating the products + flipping the flag brings combos back.
