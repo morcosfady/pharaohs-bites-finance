@@ -43,11 +43,20 @@ const KITCHEN_TZ = "America/Chicago";
 function dayIn(tz: string, d: Date): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
 }
+// Ordering for tomorrow closes at 10 PM kitchen time (same rule as the website calendar): after that the
+// earliest date is the day after tomorrow. Compared by calendar day in the kitchen's time zone.
+const ORDER_CUTOFF_HOUR = 22;
+function kitchenHour(d: Date): number {
+  return Number(new Intl.DateTimeFormat("en-US", { timeZone: KITCHEN_TZ, hour: "numeric", hour12: false }).format(d)) % 24;
+}
+function earliestDay(now: Date): string {
+  const [y, m, d] = dayIn(KITCHEN_TZ, now).split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + (kitchenHour(now) >= ORDER_CUTOFF_HOUR ? 2 : 1))).toISOString().slice(0, 10);
+}
 function deliveryDateProblem(requested: Date, now: Date = new Date()): string | null {
   if (requested.getTime() > now.getTime() + 400 * 24 * 3600 * 1000) return "requested date is too far ahead";
-  const laterDay = dayIn(KITCHEN_TZ, requested) > dayIn(KITCHEN_TZ, now);
-  const farEnough = requested.getTime() - now.getTime() >= 12 * 3600 * 1000;
-  return laterDay || farEnough ? null : "delivery must be tomorrow or later";
+  if (dayIn(KITCHEN_TZ, requested) >= earliestDay(now)) return null;
+  return kitchenHour(now) >= ORDER_CUTOFF_HOUR ? "Orders for tomorrow close at 10 PM. Please choose a later date." : "delivery must be tomorrow or later";
 }
 
 const RATE_LIMIT_WINDOW_MIN = 10;
@@ -237,6 +246,8 @@ Deno.serve(async (req) => {
     promo: promoCode ? { percent: promoPercent || undefined, free: freeOrder } : undefined, tip: body.tip as never,
   });
   if (!priced.ok) return json({ ok: false, error: priced.error }, priced.status, headers);
+  // Minimum order: $25 of dishes (before any promo). The website checks this too; this is the real guard.
+  if (priced.subtotalCents < 2500) return json({ ok: false, error: "Minimum order is $25. Please add more dishes to continue." }, 400, headers);
   // A free order has no card step, so it cannot carry a tip (the website hides the tip card for it).
   if (freeOrder && priced.tip.cents > 0) return json({ ok: false, error: "A free order has no payment step, so a driver tip cannot be added. Please remove the tip." }, 400, headers);
   // The browser sends the total it showed; anything else is refused before an order exists.
