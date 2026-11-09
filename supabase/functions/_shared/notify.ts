@@ -57,7 +57,7 @@ export function receiptHtml(orderNumber: string, info: OrderInfo, lines: Array<{
   const deliveryFee = m?.deliveryFee ?? info.deliveryFee;
   const rows = lines.map((l) => `<tr><td style="padding:8px 0;color:#f3e9d2;border-bottom:1px solid #3a3226">${l.qty} &times; ${esc(l.name)}${l.options ? `<br><span style="color:#b9a880;font-size:12px">${esc(l.options)}</span>` : ""}${ALLERGENS[l.slug]?.length ? `<br><span style="color:#a39373;font-size:12px;line-height:1.5">Contains: ${esc(ALLERGENS[l.slug].join(", "))}</span>` : ""}</td></tr>`).join("");
   const when = new Date(info.requestedAt).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "America/Chicago" });
-  const win = /Delivery window: ([^|]+?) on /.exec(info.instructions)?.[1] ?? "";
+  const win = /(?:Delivery|Pickup) window: ([^|]+?) on /.exec(info.instructions)?.[1] ?? "";
   const money = (n: number) => "$" + n.toFixed(2);
   // Texas cottage food label info (H&S Code 437.0193). Safe-handling line must stay at 12 pt (16px) minimum on the receipt.
   const foodLines = lines.filter((l) => !RESALE.has(l.slug));
@@ -142,6 +142,8 @@ export async function notifyAll(supabase: ReturnType<typeof createClient>, order
       taxCents: Number(fin?.tax_cents ?? info.taxCents ?? 0), taxRate: Number(fin?.tax_rate_applied ?? info.taxRate ?? 0),
       tipCents: Number(fin?.tip_cents ?? info.tipCents ?? 0), tipPercent: fin?.tip_percent ?? info.tipPercent ?? null, total,
     };
+    const { data: pRow } = await supabase.from("orders").select("promo_code").eq("order_number", orderNumber).maybeSingle();
+    const promoUsed = String(pRow?.promo_code ?? "").trim(); // the promo code kept on the saved order (blank = none)
     const taxLine = `Sales tax${m.taxRate > 0 ? ` (${pctLabel(m.taxRate)})` : ""}`;
     const tipLine = m.tipCents > 0 ? `Driver tip: $${(m.tipCents / 100).toFixed(2)}${m.tipPercent ? ` (${m.tipPercent}%)` : ""}` : "";
     const lines = info.items.map((i) => ({ qty: i.quantity, name: names.get(i.slug) ?? i.slug, options: i.options, slug: i.slug }));
@@ -151,14 +153,15 @@ export async function notifyAll(supabase: ReturnType<typeof createClient>, order
     const status: string[] = [];
     if (topic || (tgToken && tgChat)) {
       const when = new Date(info.requestedAt).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/Chicago" });
-      const win = /Delivery window: ([^|]+?) on /.exec(info.instructions)?.[1] ?? "";
-      const note = info.instructions.replace(/^Delivery window: [^|]+\|?\s*/, "").trim();
+      const win = /(?:Delivery|Pickup) window: ([^|]+?) on /.exec(info.instructions)?.[1] ?? "";
+      const note = info.instructions.replace(/^(?:Delivery|Pickup) window: [^|]+\|?\s*/, "").trim();
       const placed = new Date().toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" });
       const usd = (n: number) => "$" + n.toFixed(2);
       const itemLines = info.items.flatMap((i) => [`🍽️ ${i.quantity} × ${names.get(i.slug) ?? i.slug}${i.options ? " (" + i.options + ")" : ""} — ${usd(i.quantity * (prices.get(i.slug) ?? 0))}`, ...(AR_NAMES[i.slug] ? [`🇪🇬 ${AR_NAMES[i.slug]}`] : [])]);
       const rule = "━━━━━━━━━━━━━━━━";
       const text = [
         `🔖 Order: ${orderNumber}`,
+        ...(promoUsed ? [`🏷️ PROMO USED: ${promoUsed}`] : []),
         `🕒 Placed: ${placed}`,
         rule,
         "👤 CUSTOMER",
@@ -166,7 +169,7 @@ export async function notifyAll(supabase: ReturnType<typeof createClient>, order
         `📱 ${info.phone}`,
         `✉️ ${info.email}`,
         `🏠 ${info.address}`,
-        `🗓️ Delivery: ${when}${win ? " · " + win : ""}`,
+        `🗓️ ${info.pickup ? "Pickup" : "Delivery"}: ${when}${win ? " · " + win : ""}`,
         ...(note ? [`📝 Note: ${note}`] : []),
         rule,
         "🛒 ITEMS",
@@ -185,6 +188,7 @@ export async function notifyAll(supabase: ReturnType<typeof createClient>, order
         const bar = "━━━━━━━━━━━━━━━━";
         const tgHtml = [
           `🔔 <b>NEW ORDER ${esc(orderNumber)}</b>`,
+          ...(promoUsed ? [`🏷️ <b>PROMO USED: ${esc(promoUsed)}</b>`] : []),
           "",
           `<blockquote>⏰ <b>${info.pickup ? "PICKUP ON" : "DELIVER ON"}</b>\n📅 <b><u>${esc(bigDate)}</u></b>\n🕐 <code>${esc(win || "time not set")}</code></blockquote>`,
           bar,

@@ -542,3 +542,12 @@ Owner edits on the dashboard (discount, delivery fee, tip, manual tax) recompute
 
 ### 18.6 Combos switched off (2026-10-21, owner request)
 Migration **0081** (applied, appended) set the six combo products inactive (`party-tray`, `family-feast`, `egyptian-breakfast`, `meal-for-one`, `feteer-dip-trio`, `pick-3-puddings`); `create-order` refuses inactive products. The website hides them with `COMBOS_ENABLED = false` in `data.js` (website handoff 20.4). Nothing else removed: `combo_slots`, the picker and the Telegram names stay, so re-activating the products + flipping the flag brings combos back.
+
+
+## 19. Order rules and alerts (2026-11, live)
+Deployed to the live Supabase project by hand (create-order v118, stripe-webhook v72) and mirrored here. Redeploy with `supabase functions deploy create-order stripe-webhook --no-verify-jwt --project-ref vvwunhcpxofvnjijemdb`; do NOT deploy older copies or these rules are lost.
+- **Minimum order $25** (`create-order`): refused when the dishes subtotal (before any promo) is under 2500 cents. The website checks it too.
+- **Ordering cutoff 10 PM Dallas time** (`create-order`, `ORDER_CUTOFF_HOUR`): the requested day must be tomorrow or later; after 10 PM the earliest day is the day after tomorrow. This replaced the old "12 hour grace" rule; days are compared in `America/Chicago`. The website calendar uses the same rule.
+- **Telegram/ntfy alert** (`_shared/notify.ts`, used by create-order and stripe-webhook): shows "PROMO USED: CODE" for every promo (read from `orders.promo_code` at send time, so free-delivery codes show too), says "Pickup" instead of "Delivery" for pickup orders, and understands both "Delivery window:" and "Pickup window:" in the order notes.
+- **Website source question**: the website sends "Heard about us: ..." inside the order notes (instructions); there is no separate column.
+- **Promo codes** live in `promo_codes` (see 19.x notes above): YESENIA (free delivery, one use), HAMDYA (5% off, ends 2027-04-30; the owner owes the referrer 10% of dish subtotal, tracked by hand), SVATI (10% off), FIRSTBITE (free delivery, banner hidden on the website). A new row defaults `max_miles` to 5: set it to null for no distance limit.
