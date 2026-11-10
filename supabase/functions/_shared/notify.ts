@@ -19,6 +19,7 @@ export const pctLabel = (rate: number) => (rate * 100).toFixed(2).replace(/\.?0+
 const ALLERGENS: Record<string, string[]> = {
   "feteer-meshaltet": ["Milk", "Eggs", "Wheat"],
   "feteer-beef": ["Milk", "Eggs", "Wheat", "Soy"],
+  "pharaohs-rolls": ["Milk", "Eggs", "Wheat", "Soy"],
   "macarona-bechamel": ["Milk", "Wheat", "Soy"],
   "goulash-beef": ["Milk", "Wheat", "Soy"],
   "kofta-tray": ["Wheat", "Soy"],
@@ -48,7 +49,7 @@ const ALLERGENS: Record<string, string[]> = {
   "pick-3-puddings": ["Milk", "Eggs", "Wheat", "Soy", "Tree nuts"],
 };
 // TCS foods get the safe-handling line + "Made on" date. Store-bought add-ons are not cottage foods; Diet Coke is resale (no disclosure).
-const TCS = new Set(["feteer-beef", "macarona-bechamel", "goulash-beef", "kofta-tray", "koshary", "meatballs-spaghetti", "lentil-soup", "chocolate-pudding", "banana-pudding", "creme-caramel", "rice-pudding", "white-cheese", "hummus", "baba-ganoush", "protein-shake", "avocado-drink", "avocado-drink-almond", "protein-shake-almond", "om-ali", "party-tray", "family-feast", "egyptian-breakfast", "meal-for-one", "feteer-dip-trio", "pick-3-puddings"]);
+const TCS = new Set(["feteer-beef", "pharaohs-rolls", "macarona-bechamel", "goulash-beef", "kofta-tray", "koshary", "meatballs-spaghetti", "lentil-soup", "chocolate-pudding", "banana-pudding", "creme-caramel", "rice-pudding", "white-cheese", "hummus", "baba-ganoush", "protein-shake", "avocado-drink", "avocado-drink-almond", "protein-shake-almond", "om-ali", "party-tray", "family-feast", "egyptian-breakfast", "meal-for-one", "feteer-dip-trio", "pick-3-puddings"]);
 const STORE_BOUGHT = new Set(["tahini", "black-honey", "white-honey"]);
 const RESALE = new Set(["diet-coke"]);
 
@@ -96,6 +97,7 @@ ${foodInfo}<tr><td align="center" style="padding:20px 28px 26px;color:#b9a880;fo
 const AR_NAMES: Record<string, string> = {
   "feteer-meshaltet": "فطير مشلتت",
   "feteer-beef": "فطير محشي لحمة",
+  "pharaohs-rolls": "رول الفراعنة",
   "macarona-bechamel": "صينية مكرونة بشاميل",
   "goulash-beef": "صينية جلاش باللحمة",
   "kofta-tray": "صينية كفتة بالصلصة والأرز",
