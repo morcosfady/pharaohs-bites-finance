@@ -96,7 +96,7 @@ Current menu (23 dishes; prices are USD):
 | Category | id | Price | Flags |
 |---|---|---|---|
 | The Main Table | `feteer-meshaltet` | 25 | **hero**, special |
-| | `feteer-beef` (Feteer with Plant-Based Beef & Mozzarella) | 40 | signature, featured |
+| | `feteer-beef` (Feteer with Plant-Based Beef & Mozzarella) | 35 | signature, featured |
 | | `macarona-bechamel` | 30 | signature, featured |
 | | `goulash-beef` | 35 | signature |
 | | `kofta-tray` (with salsa & rice) | 40 | |
