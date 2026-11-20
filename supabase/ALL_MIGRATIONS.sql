@@ -5291,3 +5291,10 @@ update products set image_url = 'https://morcosfady.github.io/pharaohs-bites/ass
 -- ============================================================================
 
 update products set ingredient_cost = 14.24 where slug = 'pharaohs-rolls' and ingredient_cost = 0;
+
+-- ============================================================================
+-- 0086_pharaohs_rolls_cost_10.sql : Pharaoh's Rolls real ingredient cost, $10 (owner, 2026-11)
+-- Already applied to the live database. Replaces the $14.24 estimate from 0085.
+-- ============================================================================
+
+update products set ingredient_cost = 10 where slug = 'pharaohs-rolls';
